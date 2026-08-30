@@ -37,9 +37,22 @@ type ServicePlan struct {
 	Tasks []ServicePlanTask
 }
 
-// TaskCount is how many items are in the series, for a list row that has been
-// loaded with its tasks.
-func (p ServicePlan) TaskCount() int { return len(p.Tasks) }
+// TaskCount is how many items in the series still generate work, for a list row
+// that has been loaded with its tasks.
+//
+// Retired tasks are excluded. Counting them would put "3" against a plan whose
+// whole series has been retired and which AssignPlan refuses with
+// ErrPlanHasNoTasks — the same "looks covered, generates nothing" reading the
+// contract rules exist to prevent, on the page staff pick a plan from.
+func (p ServicePlan) TaskCount() int {
+	n := 0
+	for _, t := range p.Tasks {
+		if !t.Retired() {
+			n++
+		}
+	}
+	return n
+}
 
 // ServicePlanTask is one item in the series: what gets done, and how often.
 type ServicePlanTask struct {
@@ -61,9 +74,19 @@ type ServicePlanTask struct {
 	// loudest row on the due list.
 	WarrantyRequired bool
 	SortOrder        int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// RetiredAt is when the task stopped generating work, or nil while it is
+	// live. A task that has been used on a machine cannot be deleted — that
+	// would cascade away the visits it records — so this is how it comes off a
+	// plan: no new occurrences, every past one untouched.
+	RetiredAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+// Retired reports whether this task has been taken off its plan. Retired tasks
+// generate no new occurrences and are not offered when a plan is assigned; the
+// occurrences they already produced stay on their machines' records.
+func (t ServicePlanTask) Retired() bool { return t.RetiredAt != nil }
 
 // IntervalLabel is the interval in the words a person would use — "every 30
 // days" reads worse than "every month" for the common values, and worse than

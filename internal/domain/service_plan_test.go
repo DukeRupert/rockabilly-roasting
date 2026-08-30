@@ -354,3 +354,24 @@ func TestRescheduledDue(t *testing.T) {
 		assert.Equal(t, due, domain.RescheduledDue(due, 90, 90, today))
 	})
 }
+
+// A plan whose whole series is retired generates nothing and AssignPlan refuses
+// it. Counting retired tasks would put "3" against it on the list staff pick
+// plans from — the "looks covered, generates nothing" reading the contract
+// rules exist to prevent, one page earlier.
+func TestPlanTaskCountExcludesRetired(t *testing.T) {
+	retiredOn := day(2026, time.September, 1)
+	plan := domain.ServicePlan{Tasks: []domain.ServicePlanTask{
+		{Name: "Backflush"},
+		{Name: "Gaskets", RetiredAt: &retiredOn},
+		{Name: "Full service"},
+	}}
+
+	assert.Equal(t, 2, plan.TaskCount(), "only the jobs that still come round")
+
+	allRetired := domain.ServicePlan{Tasks: []domain.ServicePlanTask{
+		{Name: "Gaskets", RetiredAt: &retiredOn},
+	}}
+	assert.Equal(t, 0, allRetired.TaskCount(),
+		"and a plan that cannot be assigned does not advertise a series")
+}

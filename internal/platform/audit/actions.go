@@ -62,6 +62,10 @@ const (
 	AuditServicePlanTaskAdded   = "service_plan.task_added"
 	AuditServicePlanTaskUpdated = "service_plan.task_updated"
 	AuditServicePlanTaskRemoved = "service_plan.task_removed"
+	// AuditServicePlanTaskRetired is the other way a task leaves a plan: it had
+	// history, so deleting it would have taken completed visits with it. The
+	// task stops generating work and everything it already produced stays.
+	AuditServicePlanTaskRetired = "service_plan.task_retired"
 
 	AuditServicePlanAssigned          = "equipment.plan_assigned"
 	AuditServicePlanAssignmentUpdated = "equipment.plan_assignment_updated"

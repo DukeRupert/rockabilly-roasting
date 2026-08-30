@@ -39,10 +39,10 @@ type ServicePlanShowProps struct {
 	// be deleted, only retired.
 	TotalMachines int
 	// TaskHistory is how many recorded occurrences each task has — done,
-	// skipped, or booked onto a ticket. Any at all means RemoveTask will refuse
-	// the delete, because the occurrences cascade and that history is the
-	// record of what a machine actually received. Tasks with none are absent
-	// from the map, so reading it for a missing key gives the right answer.
+	// skipped, or with a visit booked. It decides which of the two outcomes the
+	// remove dialog describes: none and the task is deleted, any and it is
+	// retired with its record intact. Tasks with none are absent from the map,
+	// so reading it for a missing key gives the right answer.
 	TaskHistory map[uuid.UUID]int
 	// Values and Error echo back a rejected task form.
 	Values    PlanTaskFormValues
@@ -143,16 +143,30 @@ func planRetireConfirm(p domain.ServicePlan) ActionConfirm {
 // are different questions, and answering the first with the second is how this
 // dialog came to tell a plan with years of completed work and no machines
 // currently on it that "nothing else changes" — immediately before deleting all
-// of it. A task with any history is not offered a remove control at all now, so
-// this only ever describes a task that has genuinely never been done.
-func planTaskRemoveConfirm(t domain.ServicePlanTask, machines int) ActionConfirm {
+// of it.
+//
+// One control, two outcomes, and the dialog says which one this click gets:
+// a task nobody has ever used is deleted outright, a task with history is
+// retired and keeps every occurrence it produced. Asking staff to know the
+// difference before clicking is work the system already did.
+func planTaskRemoveConfirm(props ServicePlanShowProps, t domain.ServicePlanTask) ActionConfirm {
+	used := props.TaskHistory[t.ID]
 	c := ActionConfirm{
 		Title:   "Remove " + t.Name + " from the plan?",
-		Lead:    "It stops being part of the series.",
-		Confirm: "Remove it",
 		Danger:  true,
+		Confirm: "Remove it",
 	}
-	if machines > 0 {
+	if used > 0 {
+		c.Lead = "It stops being part of the series, and its record stays."
+		c.Points = []string{
+			"It comes off the schedule of every machine on this plan — no new occurrences.",
+			planTaskUsedPhrase(used) + " already on machine records, and none of it is touched.",
+			"Any visit already booked for it goes ahead.",
+		}
+		return c
+	}
+	c.Lead = "It stops being part of the series."
+	if props.LiveMachines > 0 {
 		c.Points = []string{
 			"It comes off the schedule of every machine on this plan.",
 			"Nothing recorded is lost — this job has never been done.",
@@ -163,24 +177,83 @@ func planTaskRemoveConfirm(t domain.ServicePlanTask, machines int) ActionConfirm
 	return c
 }
 
-// planTaskRemovable reports whether a task can still be taken off the plan.
-func planTaskRemovable(props ServicePlanShowProps, t domain.ServicePlanTask) bool {
-	return props.TaskHistory[t.ID] == 0
+// planTaskUsedPhrase counts occurrences in words the dialog can use mid-sentence.
+func planTaskUsedPhrase(n int) string {
+	if n == 1 {
+		return "One occurrence is"
+	}
+	return strconv.Itoa(n) + " occurrences are"
 }
 
-// planTaskKeptLabel explains, in place of the control, why it is not offered.
-//
-// "Used", not "done": CountHistoryByTask counts every occurrence that has left
-// the pending-and-unbooked state, which is completed ones, skipped ones, and
-// ones with a ticket open right now. Saying "done" would report work as
-// finished that a tech has not been to yet, or that somebody deliberately
-// skipped — and this label's only job is to explain why the task is staying.
-func planTaskKeptLabel(props ServicePlanShowProps, t domain.ServicePlanTask) string {
-	n := props.TaskHistory[t.ID]
-	if n == 1 {
-		return "Used once — kept for the record"
+// planTaskRetiredNote is what a retired row says in place of a control.
+func planTaskRetiredNote(t domain.ServicePlanTask) string {
+	return "Retired " + t.RetiredAt.Format("2 Jan 2006") + " — kept for the record"
+}
+
+// planLiveTasks and planRetiredTasks split the series. The plan page shows both
+// — a retired job is still why a machine's record reads the way it does — but
+// they are different lists doing different jobs, and only the live one answers
+// "what happens next".
+func planLiveTasks(props ServicePlanShowProps) []domain.ServicePlanTask {
+	var out []domain.ServicePlanTask
+	for _, t := range props.Plan.Tasks {
+		if !t.Retired() {
+			out = append(out, t)
+		}
 	}
-	return "Used " + strconv.Itoa(n) + " times — kept for the record"
+	return out
+}
+
+func planRetiredTasks(props ServicePlanShowProps) []domain.ServicePlanTask {
+	var out []domain.ServicePlanTask
+	for _, t := range props.Plan.Tasks {
+		if t.Retired() {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// planRetiredSummary labels the disclosure.
+func planRetiredSummary(n int) string {
+	if n == 1 {
+		return "1 retired job — no longer scheduled, record kept"
+	}
+	return strconv.Itoa(n) + " retired jobs — no longer scheduled, records kept"
+}
+
+templ planTaskRow(props ServicePlanShowProps, task domain.ServicePlanTask) {
+	<li class="py-3 first:pt-0">
+		<div class="flex flex-wrap items-start justify-between gap-2">
+			<div class="min-w-0">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="text-sm font-medium text-rr-heading">{ task.Name }</span>
+					<span class="badge badge-slate">{ task.IntervalLabel() }</span>
+					if task.WarrantyRequired {
+						<span class="badge badge-teal">Warranty</span>
+					}
+				</div>
+				<div class="mt-0.5 text-xs text-rr-muted">{ planLeadLabel(task) }</div>
+				if task.Instructions != "" {
+					<p class="mt-1 text-sm whitespace-pre-line text-rr-body">{ task.Instructions }</p>
+				}
+			</div>
+			if task.Retired() {
+				<span class="text-xs text-rr-muted">{ planTaskRetiredNote(task) }</span>
+			} else if props.CanWrite {
+				<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks/" + task.ID.String() + "/delete") }>
+					<button
+						type="submit"
+						class="text-sm text-rr-muted underline"
+						{ ConfirmAttrs(planTaskRemoveConfirm(props, task))... }
+					>Remove</button>
+				</form>
+			}
+		</div>
+		if props.CanWrite && !task.Retired() {
+			@planTaskEditForm(props, task)
+		}
+	</li>
 }
 
 templ ServicePlanShowContent(props ServicePlanShowProps) {
@@ -211,46 +284,35 @@ templ ServicePlanShowContent(props ServicePlanShowProps) {
 			<div class="border border-rr-border bg-rr-surface">
 				<div class="px-4 py-4">
 					<h2 class="text-sm font-semibold text-rr-heading">The series</h2>
-					if len(props.Plan.Tasks) == 0 {
+					if len(planLiveTasks(props)) == 0 {
 						<p class="mt-2 text-sm text-rr-muted">
-							No tasks yet. A plan with nothing in it cannot be put on a machine — add the first job below.
+							if len(props.Plan.Tasks) == 0 {
+								No tasks yet. A plan with nothing in it cannot be put on a machine — add the first job below.
+							} else {
+								Every job in this series has been retired, so this plan generates no work. It cannot be put on a machine until something live is in it.
+							}
 						</p>
 					} else {
 						<ul role="list" class="mt-3 divide-y divide-rr-border">
-							for _, task := range props.Plan.Tasks {
-								<li class="py-3 first:pt-0">
-									<div class="flex flex-wrap items-start justify-between gap-2">
-										<div class="min-w-0">
-											<div class="flex flex-wrap items-center gap-2">
-												<span class="text-sm font-medium text-rr-heading">{ task.Name }</span>
-												<span class="badge badge-slate">{ task.IntervalLabel() }</span>
-												if task.WarrantyRequired {
-													<span class="badge badge-teal">Warranty</span>
-												}
-											</div>
-											<div class="mt-0.5 text-xs text-rr-muted">{ planLeadLabel(task) }</div>
-											if task.Instructions != "" {
-												<p class="mt-1 text-sm whitespace-pre-line text-rr-body">{ task.Instructions }</p>
-											}
-										</div>
-										if props.CanWrite && planTaskRemovable(props, task) {
-											<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks/" + task.ID.String() + "/delete") }>
-												<button
-													type="submit"
-													class="text-sm text-rr-muted underline"
-													{ ConfirmAttrs(planTaskRemoveConfirm(task, props.LiveMachines))... }
-												>Remove</button>
-											</form>
-										} else if props.CanWrite {
-											<span class="text-xs text-rr-muted">{ planTaskKeptLabel(props, task) }</span>
-										}
-									</div>
-									if props.CanWrite {
-										@planTaskEditForm(props, task)
-									}
-								</li>
+							for _, task := range planLiveTasks(props) {
+								@planTaskRow(props, task)
 							}
 						</ul>
+					}
+					if retired := planRetiredTasks(props); len(retired) > 0 {
+						// Shown behind a count rather than hidden. A job that
+						// quietly vanished is the thing staff would file a bug
+						// about, and the record it left is still on machines.
+						<details class="mt-4 border-t border-rr-border pt-3">
+							<summary class="cursor-pointer text-xs text-rr-muted">
+								{ planRetiredSummary(len(retired)) }
+							</summary>
+							<ul role="list" class="mt-2 divide-y divide-rr-border opacity-70">
+								for _, task := range retired {
+									@planTaskRow(props, task)
+								}
+							</ul>
+						</details>
 					}
 				</div>
 			</div>

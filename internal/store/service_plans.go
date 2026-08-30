@@ -205,12 +205,13 @@ func (s *ServicePlanStore) CountAssignmentsByPlan(ctx context.Context, tx pgx.Tx
 // --- Tasks ---
 
 const servicePlanTaskColumns = `id, plan_id, name, instructions, interval_days, lead_days,
-	                        warranty_required, sort_order, created_at, updated_at`
+	                        warranty_required, sort_order, retired_at, created_at, updated_at`
 
 func scanServicePlanTask(row rowScanner) (*domain.ServicePlanTask, error) {
 	var t domain.ServicePlanTask
 	if err := row.Scan(&t.ID, &t.PlanID, &t.Name, &t.Instructions, &t.IntervalDays,
-		&t.LeadDays, &t.WarrantyRequired, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		&t.LeadDays, &t.WarrantyRequired, &t.SortOrder, &t.RetiredAt,
+		&t.CreatedAt, &t.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &t, nil
@@ -249,11 +250,26 @@ func (s *ServicePlanStore) GetTask(ctx context.Context, tx pgx.Tx, id uuid.UUID)
 	return scanServicePlanTask(row)
 }
 
-// ListTasks returns a plan's series in the order it should be worked.
+// ListTasks returns a plan's whole series, retired items included, in the order
+// it should be worked.
+//
+// The plan page wants all of them — a retired task is still part of why a
+// machine's record looks the way it does, and hiding it entirely would leave
+// staff wondering where a job went. Anything that generates work wants
+// ListLiveTasks instead.
 func (s *ServicePlanStore) ListTasks(ctx context.Context, tx pgx.Tx, planID uuid.UUID) ([]domain.ServicePlanTask, error) {
+	return s.listTasks(ctx, tx, planID, "")
+}
+
+// ListLiveTasks returns only the tasks still generating work.
+func (s *ServicePlanStore) ListLiveTasks(ctx context.Context, tx pgx.Tx, planID uuid.UUID) ([]domain.ServicePlanTask, error) {
+	return s.listTasks(ctx, tx, planID, " AND retired_at IS NULL")
+}
+
+func (s *ServicePlanStore) listTasks(ctx context.Context, tx pgx.Tx, planID uuid.UUID, filter string) ([]domain.ServicePlanTask, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT `+servicePlanTaskColumns+` FROM service_plan_tasks
-		 WHERE plan_id = $1 ORDER BY sort_order, created_at`, planID)
+		 WHERE plan_id = $1`+filter+` ORDER BY sort_order, created_at`, planID)
 	if err != nil {
 		return nil, fmt.Errorf("list plan tasks: %w", err)
 	}
@@ -342,10 +358,10 @@ func (s *ServicePlanStore) NextTaskSortOrder(ctx context.Context, tx pgx.Tx, pla
 // present as zero, so a caller reading it with the zero value gets the right
 // answer either way.
 //
-// The plan page needs this per task to decide whether to offer a remove
-// control at all — offering one that RemoveTask will always refuse is a worse
-// experience than not offering it. One query rather than one per task, because
-// a full manufacturer schedule runs to a dozen of them.
+// The plan page needs this per task so the remove dialog can say which of its
+// two outcomes the click will get — deleted outright, or retired with its
+// record kept. One query rather than one per task, because a full manufacturer
+// schedule runs to a dozen of them.
 func (s *ServicePlanStore) CountHistoryByTask(ctx context.Context, tx pgx.Tx, planID uuid.UUID) (map[uuid.UUID]int, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT d.task_id, count(*)
@@ -372,6 +388,37 @@ func (s *ServicePlanStore) CountHistoryByTask(ctx context.Context, tx pgx.Tx, pl
 		return nil, fmt.Errorf("count history by task: %w", err)
 	}
 	return counts, nil
+}
+
+// RetireTask stops a task generating work, keeping every occurrence it has
+// already produced.
+//
+// Idempotent on the timestamp: re-retiring does not move the date, because the
+// date is the answer to "since when did this machine stop getting that job".
+func (s *ServicePlanStore) RetireTask(ctx context.Context, tx pgx.Tx, id uuid.UUID, at time.Time) (*domain.ServicePlanTask, error) {
+	row := tx.QueryRow(ctx,
+		`UPDATE service_plan_tasks
+		 SET retired_at = COALESCE(retired_at, $2), updated_at = now()
+		 WHERE id = $1
+		 RETURNING `+servicePlanTaskColumns, id, at)
+	return scanServicePlanTask(row)
+}
+
+// DeletePendingUnbookedDue removes a task's occurrences that never happened —
+// still pending, no ticket attached.
+//
+// Exactly the rows CountTaskHistory does not count, so retiring a task and then
+// deleting it are the same operation on the occurrence table; what separates
+// them is only whether anything is left afterwards. A booked or closed
+// occurrence is left alone: somebody is going to that visit, or already did.
+func (s *ServicePlanStore) DeletePendingUnbookedDue(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) (int64, error) {
+	tag, err := tx.Exec(ctx,
+		`DELETE FROM service_maintenance_due
+		  WHERE task_id = $1 AND status = 'pending' AND ticket_id IS NULL`, taskID)
+	if err != nil {
+		return 0, fmt.Errorf("delete pending maintenance for task %s: %w", taskID, err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 // DeleteTask removes a task from a plan. Its occurrences cascade with it: an
@@ -964,6 +1011,7 @@ func (s *ServicePlanStore) ListMissingDue(ctx context.Context, tx pgx.Tx) ([]Mis
 		 JOIN service_plan_tasks t ON t.plan_id = a.plan_id
 		 JOIN equipment e ON e.id = a.equipment_id
 		 WHERE a.ended_at IS NULL
+		   AND t.retired_at IS NULL
 		   AND e.status <> 'retired'
 		   AND NOT EXISTS (
 		       SELECT 1 FROM service_maintenance_due d

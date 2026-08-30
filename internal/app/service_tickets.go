@@ -557,18 +557,20 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	if err != nil {
 		return domain.ServiceAccountReport{}, err
 	}
-	// Is there any money to rank on? Either an hour already carries a rate, or
-	// the shop has set one for the next. Both halves matter: the first keeps
-	// the column after a rate is cleared, the second makes a shop's first rate
-	// visibly do something before anybody has logged an hour at it.
+	// The window is settled first because the costed-hours question below is
+	// asked inside it.
 	report := domain.ServiceAccountReport{Rates: rates, Limit: accountCostLimit}
 	if sinceDays > 0 {
 		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
 	}
 
-	// The window has to be known first: asked globally this said yes on the
-	// strength of an hour costed last year, and kept the Cost column over a
-	// quarter with nothing costed in it.
+	// Is there any money to rank on? Either an hour in this window already
+	// carries a rate, or the shop has set one for the next. Both halves matter:
+	// the first keeps the column after a rate is cleared, the second makes a
+	// shop's first rate visibly do something before anybody has logged an hour
+	// at it. Asked over all time instead, the first half answered yes on the
+	// strength of an hour costed last year and kept the Cost column alive over
+	// a quarter with nothing costed in it.
 	costed, err := s.tickets.AnyCostedTime(ctx, tx, report.Since)
 	if err != nil {
 		return domain.ServiceAccountReport{}, err

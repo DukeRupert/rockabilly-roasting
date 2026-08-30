@@ -611,11 +611,284 @@ func TestAddTaskAppendsToTheSeries(t *testing.T) {
 	// leaves 0 and 2 behind; counting would put the next at 2.
 	full, err := svc.GetPlanWithTasks(ctx, tx, plan.ID)
 	require.NoError(t, err)
-	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, full.Tasks[1].ID, testutil.TestActor()))
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, full.Tasks[1].ID, time.Now(), testutil.TestActor()))
 
 	task, err := svc.AddTask(ctx, tx, app.AddPlanTaskParams{
 		PlanID: plan.ID, Name: "Water filter", IntervalDays: 180, LeadDays: 14,
 	}, testutil.TestActor())
 	require.NoError(t, err)
 	assert.Equal(t, 3, task.SortOrder, "still after everything, not on top of the last one")
+}
+
+// Removing a task that has never been used deletes it outright. Nothing is at
+// stake, and leaving a typo on the plan forever would be silly.
+func TestRemoveUnusedTaskDeletesIt(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Unused "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID,
+		PlanID:      plan.ID,
+		StartsOn:    planDay(2026, time.June, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	after, err := svc.GetPlanWithTasks(ctx, tx, plan.ID)
+	require.NoError(t, err)
+	assert.Empty(t, after.Tasks, "gone, not retired — there was nothing to keep")
+
+	machineID := machine.ID
+	rows, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 1),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, rows, "the visit nobody is going to goes with it")
+}
+
+// A task with history is retired instead of deleted. This is the whole point:
+// deleting it cascades service_maintenance_due and takes completed visits with
+// it, and refusing outright — which is what this used to do — left the task
+// generating work forever with no way off the plan.
+func TestRemoveUsedTaskRetiresItAndKeepsTheRecord(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Used "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID,
+		PlanID:      plan.ID,
+		StartsOn:    planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+
+	// Do it once. That closes the occurrence and writes the successor, so the
+	// task now has both a record and a live pending row — the two things the
+	// removal has to treat differently.
+	_, err = svc.CompleteDue(ctx, tx, pending[0].ID,
+		app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
+	require.NoError(t, err)
+
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	after, err := svc.GetPlanWithTasks(ctx, tx, plan.ID)
+	require.NoError(t, err)
+	require.Len(t, after.Tasks, 1, "still on the plan, so staff can see where the job went")
+	assert.True(t, after.Tasks[0].Retired(), "but retired")
+	require.NotNil(t, after.Tasks[0].RetiredAt)
+
+	live, err := svc.GetPlanWithLiveTasks(ctx, tx, plan.ID)
+	require.NoError(t, err)
+	assert.Empty(t, live.Tasks, "and invisible to anything that generates work")
+
+	history, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Scope: store.MaintenanceScopeHistory,
+		Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, history, 1, "the completed visit is exactly what deleting would have destroyed")
+	assert.Equal(t, domain.MaintenanceStatusCompleted, history[0].Status)
+
+	stillPending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, stillPending, "the successor nobody will now attend is dropped")
+}
+
+// A retired task must not come back the next time the sweep runs, which is the
+// failure that would make the whole feature pointless.
+func TestRetiredTaskGeneratesNoNewWork(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Retired "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID,
+		PlanID:      plan.ID,
+		StartsOn:    planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	_, err = svc.CompleteDue(ctx, tx, pending[0].ID,
+		app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
+	require.NoError(t, err)
+
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	missing, err := store.NewServicePlanStore().ListMissingDue(ctx, tx)
+	require.NoError(t, err)
+	for _, m := range missing {
+		assert.NotEqual(t, task.ID, m.TaskID,
+			"the backfill would put the retired job straight back on the machine")
+	}
+}
+
+// A plan whose whole series has been retired generates nothing, so it cannot be
+// put on a machine — the same rule an empty plan follows, for the same reason.
+func TestAssignPlanWithOnlyRetiredTasksIsRefused(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	first := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "AllRetired "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: first.ID, PlanID: plan.ID, StartsOn: planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	firstID := first.ID
+	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &firstID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	_, err = svc.CompleteDue(ctx, tx, pending[0].ID,
+		app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
+	require.NoError(t, err)
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	second := registerMachine(t, tx, customer.ID)
+	_, err = svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: second.ID, PlanID: plan.ID, StartsOn: planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+
+	assert.ErrorIs(t, err, app.ErrPlanHasNoTasks,
+		"a plan that looks covered from the machine page and generates nothing is the worst of both")
+}
+
+// The gap between "retire keeps booked visits" and "a retired task generates
+// nothing": closing one of those kept visits must not write a successor.
+//
+// RemoveTask deliberately leaves a pending occurrence that carries a ticket —
+// somebody is going to that visit. It is also, by itself, history, so the task
+// retires rather than deletes. Closing it later ran the same
+// successor-writing path as any other completion, which put the retired job
+// straight back on the machine. On a contract account the nightly sweep then
+// books that row a ticket, making it booked-pending again, which regenerates on
+// close: the task would never come off.
+func TestClosingARetiredTasksBookedVisitWritesNoSuccessor(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	tickets := newTicketService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Booked "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID,
+		PlanID:      plan.ID,
+		StartsOn:    planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+
+	// Book the visit. This is what the nightly sweep does for contract work and
+	// what the call list does by hand for uncovered work.
+	ticket, err := tickets.Open(ctx, tx, openParams(customer.ID), testutil.TestActor())
+	require.NoError(t, err)
+	require.NoError(t, svc.AttachTicket(ctx, tx, pending[0].ID, ticket.ID))
+
+	// The booked row is the task's only occurrence, so it counts as history and
+	// survives the removal — the task retires rather than deletes.
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	after, err := svc.GetPlanWithTasks(ctx, tx, plan.ID)
+	require.NoError(t, err)
+	require.Len(t, after.Tasks, 1)
+	require.True(t, after.Tasks[0].Retired())
+
+	stillBooked, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, stillBooked, 1, "the promised visit stands")
+
+	// The tech goes, and writes it up.
+	_, err = svc.CompleteDue(ctx, tx, stillBooked[0].ID,
+		app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 13)}, testDay(), staffActorFor(t, tx))
+	require.NoError(t, err)
+
+	next, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.September, 30),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, next, "a retired task does not come back the moment its last visit is closed")
+
+	history, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Scope: store.MaintenanceScopeHistory,
+		Now: planDay(2026, time.September, 30),
+	})
+	require.NoError(t, err)
+	require.Len(t, history, 1, "and the visit that did happen is still on the record")
+}
+
+// The two write paths a retired task must not take. The plan page hides both
+// controls; the routes are POSTable regardless.
+func TestRetiredTaskRefusesEditsAndASecondRetirement(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Guarded "+uuid.NewString()[:8], 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID, PlanID: plan.ID, StartsOn: planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &machineID, Now: planDay(2026, time.June, 20),
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	_, err = svc.CompleteDue(ctx, tx, pending[0].ID,
+		app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
+	require.NoError(t, err)
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor()))
+
+	_, err = svc.EditTask(ctx, tx, task.ID, app.EditPlanTaskParams{
+		Name: "Full service", IntervalDays: 30, LeadDays: 7,
+	}, testDay(), testutil.TestActor())
+	assert.ErrorIs(t, err, app.ErrPlanTaskRetired,
+		"an interval change would move visits on a job that has stopped")
+
+	err = svc.RemoveTask(ctx, tx, plan.ID, task.ID, testDay(), testutil.TestActor())
+	assert.ErrorIs(t, err, app.ErrPlanTaskRetired,
+		"a double submit must not write a second audit row for one retirement")
 }

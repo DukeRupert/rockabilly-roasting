@@ -709,7 +709,7 @@ func (d *Deps) handleAdminServicePlanTaskDelete(w http.ResponseWriter, r *http.R
 	}
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.ServicePlanService.RemoveTask(ctx, tx, planID, taskID, staffActor(r))
+		return d.ServicePlanService.RemoveTask(ctx, tx, planID, taskID, d.merchantToday(), staffActor(r))
 	}); err != nil {
 		d.redirectOrFail(w, r, planPath(planID), err)
 		return

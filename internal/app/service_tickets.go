@@ -575,7 +575,9 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 		sort = domain.ServiceAccountCostByHours
 	}
 
-	report := domain.ServiceAccountReport{Sort: sort, Rates: rates, CanCost: canCost}
+	report := domain.ServiceAccountReport{
+		Sort: sort, Rates: rates, CanCost: canCost, Limit: accountCostLimit,
+	}
 	if sinceDays > 0 {
 		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
 	}

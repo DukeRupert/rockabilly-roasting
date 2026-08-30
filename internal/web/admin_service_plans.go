@@ -211,6 +211,13 @@ func (d *Deps) closeMaintenance(w http.ResponseWriter, r *http.Request, skip boo
 		redirectFlashError(w, r, back, err.Error())
 		return
 	}
+	// And a completion cannot be in the future. "Done on" is a record of
+	// something that happened; a date ahead of today anchors the next
+	// occurrence from a day nobody worked.
+	if !skip && on.After(d.merchantToday()) {
+		redirectFlashError(w, r, back, app.ErrMaintenanceDateInFuture.Error())
+		return
+	}
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -779,7 +786,11 @@ func (d *Deps) handleAdminEquipmentPlanAssign(w http.ResponseWriter, r *http.Req
 		return
 	}
 	startsOn, err := parseMaintenanceDay(r.FormValue("starts_on"), time.Time{})
-	if err != nil || startsOn.IsZero() {
+	if err != nil {
+		redirectFlashError(w, r, back, "That start date is not a date.")
+		return
+	}
+	if startsOn.IsZero() {
 		redirectFlashError(w, r, back, app.ErrPlanStartRequired.Error())
 		return
 	}
@@ -941,12 +952,13 @@ func (d *Deps) handleAdminServiceCosts(w http.ResponseWriter, r *http.Request) {
 
 	staffName, staffRole := staffNameRole(r)
 	props := admin.ServiceCostsProps{
-		Report:    report,
-		Nav:       nav,
-		Days:      days,
-		StaffName: staffName,
-		StaffRole: staffRole,
-		Flash:     settingsFlash(r),
+		Report:            report,
+		Nav:               nav,
+		Days:              days,
+		CanManageSettings: staffCan(r, auth.PermManageSystem),
+		StaffName:         staffName,
+		StaffRole:         staffRole,
+		Flash:             settingsFlash(r),
 	}
 
 	if IsHTMX(r) {
@@ -1098,7 +1110,11 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 	back := equipmentPath(equipmentID)
 
 	startsOn, err := parseMaintenanceDay(r.FormValue("starts_on"), time.Time{})
-	if err != nil || startsOn.IsZero() {
+	if err != nil {
+		redirectFlashError(w, r, back, "That start date is not a date.")
+		return
+	}
+	if startsOn.IsZero() {
 		redirectFlashError(w, r, back, app.ErrPlanStartRequired.Error())
 		return
 	}

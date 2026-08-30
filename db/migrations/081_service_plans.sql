@@ -147,9 +147,10 @@ CREATE INDEX service_maintenance_due_calendar_idx
 -- The machine's own maintenance history, newest first.
 CREATE INDEX service_maintenance_due_equipment_idx
     ON service_maintenance_due (equipment_id, due_on DESC);
--- No index on ticket_id: nothing looks an occurrence up by its ticket. The
--- scopes filter on `ticket_id IS NULL`, which is the complement and is served
--- by the calendar index's own predicate.
+-- No index on ticket_id. Nothing looks an occurrence up by its ticket, and the
+-- scopes that mention the column test `ticket_id IS NULL` as one predicate
+-- among several on an already-narrow pending set — not a lookup an index of its
+-- own would serve.
 
 -- +goose Down
 

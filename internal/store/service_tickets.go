@@ -619,7 +619,7 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 	var t domain.ServiceTotals
 
 	if err := tx.QueryRow(ctx,
-		`SELECT COALESCE(SUM(unit_cost_cents * quantity), 0) FROM service_parts WHERE ticket_id = $1`,
+		`SELECT COALESCE(SUM(unit_cost_cents::bigint * quantity), 0) FROM service_parts WHERE ticket_id = $1`,
 		ticketID).Scan(&t.PartsCostCents); err != nil {
 		return domain.ServiceTotals{}, fmt.Errorf("sum service parts for ticket %s: %w", ticketID, err)
 	}
@@ -745,7 +745,7 @@ func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f Servi
 	WITH scoped AS (
 	    SELECT id FROM service_tickets WHERE ` + strings.Join(where, " AND ") + `
 	), parts AS (
-	    SELECT p.ticket_id, p.unit_cost_cents * p.quantity AS cents
+	    SELECT p.ticket_id, p.unit_cost_cents::bigint * p.quantity AS cents
 	    FROM service_parts p JOIN scoped s ON s.id = p.ticket_id
 	    WHERE true` + partWindow + `
 	), entries AS (
@@ -847,7 +847,7 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 
 	query := `
 	WITH combined AS (
-	    SELECT t.customer_id, p.ticket_id, p.unit_cost_cents * p.quantity AS cents,
+	    SELECT t.customer_id, p.ticket_id, p.unit_cost_cents::bigint * p.quantity AS cents,
 	           0 AS minutes, NULL::text AS kind, false AS billable, true AS is_part,
 	           NULL::integer AS rate_cents,
 	           ` + servicePartCostDate + ` AS on_day

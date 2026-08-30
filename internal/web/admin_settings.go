@@ -154,15 +154,33 @@ func settingsFlash(r *http.Request) admin.Flash {
 	return admin.Flash{Message: r.URL.Query().Get("flash")}
 }
 
-// redirectFlash and redirectFlashError send the staffer back to a settings page
-// with a message. Values are query-escaped here so callers can write the
-// sentence rather than its encoding.
+// redirectFlash and redirectFlashError send the staffer back to a page with a
+// message. Values are query-escaped here so callers can write the sentence
+// rather than its encoding.
+//
+// The separator is chosen, not assumed. These originally appended "?flash=" to
+// whatever they were given, which is right for a bare path and silently wrong
+// for one that already carries a query: the maintenance due list redirects back
+// to "…/maintenance?scope=overdue", and the result was
+// "?scope=overdue?flash=…" — one parameter whose value is the rest of the URL.
+// The scope came back as garbage and fell to the default, bouncing the staffer
+// off the tab they were working, and the message was never read at all, so a
+// rejected save looked exactly like a successful one.
 func redirectFlash(w http.ResponseWriter, r *http.Request, path, msg string) {
-	http.Redirect(w, r, path+"?flash="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, withQuery(path, "flash", msg), http.StatusSeeOther)
 }
 
 func redirectFlashError(w http.ResponseWriter, r *http.Request, path, msg string) {
-	http.Redirect(w, r, path+"?flash_error="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, withQuery(path, "flash_error", msg), http.StatusSeeOther)
+}
+
+// withQuery appends one query parameter to a path that may already have some.
+func withQuery(path, key, value string) string {
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + key + "=" + url.QueryEscape(value)
 }
 
 // handleAdminSettings renders the Shipping tab — the section's landing page.

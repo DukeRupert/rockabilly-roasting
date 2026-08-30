@@ -777,8 +777,8 @@ what is owed now:
     the rate then in force, plus the per-entry repricing form. Changing the
     shop's rate no longer re-costs the past. Details in *Labour rates → The
     snapshot*.
-13. **Done.** Eleven rounds of independent review, every one of which failed
-    the branch.
+13. **Done.** Thirteen rounds of independent review, every one of which
+    failed the branch.
 
     The defects that mattered: an interval edit that could book a visit the
     customer had declined; `AttachTicket` silently no-opping and crossing
@@ -788,7 +788,7 @@ what is owed now:
     its form never sent; and a helper a careless regex rewrote into a call to
     itself, fatal to the process.
 
-    Separately from those, **five fixes were asserted in a commit message and
+    Separately from those, **eight fixes were asserted in a commit message and
     were not in the tree** — including one where the "fix" rewrote a doc to
     ratify the bug it was meant to correct.
 

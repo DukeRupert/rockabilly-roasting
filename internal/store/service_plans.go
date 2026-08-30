@@ -314,10 +314,18 @@ func (s *ServicePlanStore) DeleteTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 // far less legibly than Go — and getting it wrong books a visit somebody
 // declined.
 func (s *ServicePlanStore) ListPendingForTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) ([]domain.MaintenanceDue, error) {
+	// Live arrangements on machines still in service. An interval edit that
+	// moved dates on an ended assignment — or a retired machine — would be
+	// rewriting a schedule nobody is on, and would count those rows in the
+	// audit's "rescheduled" total.
 	rows, err := tx.Query(ctx,
-		`SELECT `+strings.ReplaceAll(maintenanceDueColumns, "d.", "")+`
-		 FROM service_maintenance_due
-		 WHERE task_id = $1 AND status = 'pending'`, taskID)
+		// Columns stay qualified: the joins below make a bare `id` ambiguous.
+		`SELECT `+maintenanceDueColumns+`
+		 FROM service_maintenance_due d
+		 JOIN equipment_service_plans a ON a.id = d.assignment_id
+		 JOIN equipment e ON e.id = d.equipment_id
+		 WHERE d.task_id = $1 AND d.status = 'pending'
+		   AND a.ended_at IS NULL AND e.status <> 'retired'`, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("list pending for task: %w", err)
 	}
@@ -552,11 +560,14 @@ func (s *ServicePlanStore) GetDue(ctx context.Context, tx pgx.Tx, id uuid.UUID) 
 }
 
 // CloseDueParams closes an occurrence, either done or skipped.
+// No TicketID: an occurrence is attached to its ticket when the visit is
+// booked, through AttachTicket, which scopes the pair to one customer in SQL. A
+// second way in from here would be an unscoped one — the exact hole AttachTicket
+// documents guarding against.
 type CloseDueParams struct {
 	Status      domain.MaintenanceStatus
 	CompletedOn time.Time
 	StaffID     *uuid.UUID
-	TicketID    *uuid.UUID
 	Notes       string
 }
 
@@ -568,10 +579,10 @@ func (s *ServicePlanStore) CloseDue(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	row := tx.QueryRow(ctx,
 		`UPDATE service_maintenance_due
 		 SET status = $2, completed_on = $3, completed_by_staff_id = $4,
-		     ticket_id = COALESCE($5, ticket_id), notes = $6, updated_at = now()
+		     notes = $5, updated_at = now()
 		 WHERE id = $1 AND status = 'pending'
 		 RETURNING `+strings.ReplaceAll(maintenanceDueColumns, "d.", ""),
-		id, string(p.Status), p.CompletedOn, p.StaffID, p.TicketID, p.Notes)
+		id, string(p.Status), p.CompletedOn, p.StaffID, p.Notes)
 
 	return scanMaintenanceDue(row)
 }

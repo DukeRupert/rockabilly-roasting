@@ -421,8 +421,16 @@ func (d *Deps) handleAdminServiceTicketCreate(w http.ResponseWriter, r *http.Req
 		// Attaching in the same transaction as the ticket: a ticket that opened
 		// but did not attach would leave the maintenance still nagging, and the
 		// staffer would have no way to tell it had been booked.
-		if dueID := parseOptionalUUID(values.MaintenanceID); dueID != nil {
-			return d.ServicePlanService.AttachTicket(ctx, tx, *dueID, ticket.ID)
+		if raw := strings.TrimSpace(values.MaintenanceID); raw != "" {
+			// Parsed strictly. parseOptionalUUID answers nil for blank *and*
+			// for garbage, so a mangled id took the "no maintenance" branch and
+			// the ticket committed unattached with nobody told — the outcome
+			// the comment above forbids.
+			dueID, parseErr := uuid.Parse(raw)
+			if parseErr != nil {
+				return app.ErrMaintenanceNotFound
+			}
+			return d.ServicePlanService.AttachTicket(ctx, tx, dueID, ticket.ID)
 		}
 		return nil
 	}); err != nil {
@@ -639,6 +647,13 @@ func (d *Deps) fillTicketFormOptions(ctx context.Context, props *admin.ServiceTi
 }
 
 func ticketValidationMessage(err error) (string, bool) {
+	// A stale or already-booked occurrence arrives here because the attach runs
+	// inside the ticket's own transaction — the whole thing rolls back, so this
+	// has to read as a form rejection rather than a bare JSON 404 with the
+	// staffer's typed ticket gone and nothing saying why.
+	if errors.Is(err, app.ErrMaintenanceNotFound) {
+		return "That scheduled maintenance is no longer waiting to be booked — open the ticket without it.", true
+	}
 	switch {
 	case errors.Is(err, app.ErrServiceTicketTitleRequired),
 		errors.Is(err, app.ErrInvalidServiceSeverity),

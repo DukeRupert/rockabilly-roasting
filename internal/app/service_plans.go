@@ -582,8 +582,9 @@ func (s *ServicePlanService) EditAssignment(ctx context.Context, tx pgx.Tx, id u
 	return assignment, nil
 }
 
-// EndAssignment takes a machine off a plan. Pending occurrences go; the record
-// of what was done under the arrangement stays.
+// EndAssignment takes a machine off a plan. Pending occurrences go — except any
+// already carrying a ticket, which survive so the visit somebody booked is not
+// orphaned — and the record of what was done under the arrangement stays.
 func (s *ServicePlanService) EndAssignment(ctx context.Context, tx pgx.Tx, equipmentID, id uuid.UUID, now time.Time, actor Actor) error {
 	assignment, err := s.GetAssignment(ctx, tx, id)
 	if err != nil {

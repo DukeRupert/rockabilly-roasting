@@ -608,6 +608,9 @@ type ServiceAccountReport struct {
 	// Truncated says the limit bit and the table is not the whole picture. A
 	// bounded list that does not say it is bounded reads as complete.
 	Truncated bool
+	// Limit is the cap that bit, so the page names the real number rather than
+	// repeating it as a literal that can drift from the constant.
+	Limit int
 	// Since is the start of the window, zero for all time.
 	Since time.Time
 	Sort  ServiceAccountCostSort

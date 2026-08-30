@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -126,4 +127,35 @@ func TestCloseMaintenanceDateRules(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, got.IsZero(), "which the handler turns into ErrMaintenanceDateRequired")
 	})
+}
+
+// The redirect a filtered tab actually produces.
+//
+// TestMaintenancePath pinned the helper's output and stopped there, so nobody
+// noticed that appending "?flash=" to a path already carrying "?scope=overdue"
+// produces one parameter whose value is the rest of the URL. The scope came
+// back as garbage and fell to the default — bouncing the staffer off the tab
+// they were working, on the tab the dashboard chip links to — and the message
+// was never read, so a rejected completion looked like a successful one.
+func TestFlashRedirectSurvivesAFilteredScope(t *testing.T) {
+	for _, scope := range []string{"", "overdue", "warranty", "uncovered", "history"} {
+		t.Run("scope="+scope, func(t *testing.T) {
+			back := maintenancePath(scope)
+
+			for _, tc := range []struct{ key, target string }{
+				{"flash", withQuery(back, "flash", "Logged. The next one is scheduled.")},
+				{"flash_error", withQuery(back, "flash_error", "when was it done?")},
+			} {
+				u, err := url.Parse(tc.target)
+				require.NoError(t, err)
+				q := u.Query()
+
+				assert.NotEmpty(t, q.Get(tc.key), "the message has to survive the round trip")
+				assert.Equal(t, scope, q.Get("scope"),
+					"and the staffer has to land back on the tab they were working")
+				assert.Equal(t, maintenanceScope(q.Get("scope")), maintenanceScope(scope),
+					"the scope must still parse as the one they chose")
+			}
+		})
+	}
 }

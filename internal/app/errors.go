@@ -447,6 +447,10 @@ var (
 	// completion is logged on anchors the next occurrence, so a date a decade
 	// out takes the machine off the due list for a decade, silently.
 	ErrMaintenanceDateOutOfRange = errors.New("that date is more than ten years away — check the year")
+	// ErrMaintenanceDateInFuture guards the completion date specifically. "Done
+	// on" records something that happened; a date ahead of today would anchor
+	// the next occurrence from a day nobody worked.
+	ErrMaintenanceDateInFuture = errors.New("that is in the future — when was the work actually done?")
 
 	// ErrLaborRateInvalid guards the hourly rate. The cap exists because
 	// somebody typing cents into a dollars field would put a six-figure number

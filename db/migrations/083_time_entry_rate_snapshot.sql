@@ -19,7 +19,11 @@ COMMENT ON COLUMN service_time_entries.rate_cents IS
 
 -- +goose StatementBegin
 -- Backfill at the rate the reports are *currently* using, so this migration
--- changes no number anybody can see. Labour takes the labour rate and travel
+-- changes no number anybody can see.
+--
+-- On a fresh deploy it finds nothing: 082 adds the rate columns as NULL in the
+-- same release. It earns its place only on an instance that ran 082 long enough
+-- for somebody to set a rate before this shipped. Labour takes the labour rate and travel
 -- takes the travel rate with the same fallback to labour the application
 -- applies; a shop with no rate set gets NULL everywhere, which is exactly what
 -- its reports already show.
@@ -43,5 +47,4 @@ WHERE s.id = true
 
 -- +goose Down
 
-DROP INDEX IF EXISTS service_time_entries_uncosted_idx;
 ALTER TABLE service_time_entries DROP COLUMN IF EXISTS rate_cents;

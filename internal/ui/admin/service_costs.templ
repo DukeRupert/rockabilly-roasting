@@ -26,8 +26,13 @@ type ServiceCostsProps struct {
 	Nav    ServiceNav
 	// Days is the window in force — 90, 365, or 0 for all time — echoed back so
 	// the period control shows what is applied.
-	Days      int
-	StaffName string
+	Days int
+	// CanManageSettings gates the links into Settings → Service. That tab is
+	// PermManageSystem; this report is service:view, which finance and
+	// fulfillment hold and admin-only settings are not. Offering them a link
+	// that 403s is the thing the dashboard chip was fixed for.
+	CanManageSettings bool
+	StaffName         string
 	StaffRole string
 	Flash     Flash
 }
@@ -248,7 +253,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 	</div>
 	if props.Report.Truncated {
 		<p class="mt-3 text-sm text-rr-red">
-			Only the top 200 accounts are shown, so the total above is not the whole period. Narrow the window to see a complete picture.
+			Only the top { strconv.Itoa(props.Report.Limit) } accounts are shown, so the total above is not the whole period. Narrow the window to see a complete picture.
 		</p>
 	}
 	if props.Report.ShowCost() && !props.Report.Total.FullyCosted() {
@@ -262,7 +267,12 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 		</p>
 	} else {
 		<p class="mt-3 text-xs text-rr-muted">
-			Hours and parts are shown separately because no hourly cost is set. <a href="/admin/settings/service" class="underline">Set one</a> and this table can rank accounts by what they actually cost.
+			Hours and parts are shown separately because no hourly cost is set.
+			if props.CanManageSettings {
+				<a href="/admin/settings/service" class="underline">Set one</a> and this table can rank accounts by what they actually cost.
+			} else {
+				An admin can set one in Settings, and this table will rank accounts by what they actually cost.
+			}
 		</p>
 	}
 	if props.Report.Total.BillableMinutes > 0 {

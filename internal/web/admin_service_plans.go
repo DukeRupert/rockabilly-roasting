@@ -949,7 +949,7 @@ func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.R
 			LeadDays:         lead,
 			WarrantyRequired: r.FormValue("warranty_required") == "1",
 			SortOrder:        task.SortOrder,
-		}, staffActor(r))
+		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
 		redirectFlashError(w, r, planPath(planID), err.Error())

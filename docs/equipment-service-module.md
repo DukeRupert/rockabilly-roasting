@@ -653,6 +653,24 @@ rate of the day, and that is a fact about the past.
   correction is a decision somebody makes and signs for, not a side effect of a
   settings save.
 
+### Rescheduling on an interval change
+
+`domain.RescheduledDue` shifts a pending occurrence by the difference between
+the old and new intervals, rather than recomputing it from an anchor.
+
+Recomputing was wrong in a way that took a review to find. The anchor came from
+`max(completed_on)`, and a **skip leaves no completion** — so a skipped
+occurrence jumped back to one interval after the last time the task was actually
+done, months into the past. Past-due covered work is inside the sweep's booking
+window, so the next night's run opened a real customer ticket for the visit the
+customer had just declined.
+
+Shifting needs no anchor: the occurrence's date was produced by adding the old
+interval to *something*, so subtracting it and adding the new one keeps the same
+cadence whatever that something was. The clamp does the rest — an occurrence
+that was in the future is stepped forward whole intervals until it is future
+again, while one that was already overdue stays overdue, because it is.
+
 `ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
 figure the Cost column prints, ordered in SQL because it has to precede the
 LIMIT. `ServiceAccountReport.CanCost` decides both whether that ranking is
@@ -730,3 +748,12 @@ request for the default — so the Hours tab would come back ranked by cost.
     the rate then in force, plus the per-entry repricing form. Changing the
     shop's rate no longer re-costs the past. Details in *Labour rates → The
     snapshot*.
+13. **Done.** Two rounds of independent review. The second found that an
+    interval edit could book a declined visit (see *Rescheduling on an interval
+    change*), that `AttachTicket` could silently no-op and could cross accounts,
+    that seventeen validation sentinels were unmapped, and that
+    `bg-rr-paper-warm` was not a real token — so four styles, including today's
+    highlight on the calendar, rendered as nothing. All fixed. The last of those
+    is the one to remember: Tailwind v4 drops unknown utilities silently, so the
+    compiler, `mage checkAdminUI` and the render tests were all green while the
+    calendar had no today marker.

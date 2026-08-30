@@ -128,7 +128,30 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvalidPartCost),
 		errors.Is(err, app.ErrInvalidPartStatus),
 		errors.Is(err, app.ErrInvalidTimeMinutes),
-		errors.Is(err, app.ErrInvalidServiceTimeKind):
+		errors.Is(err, app.ErrInvalidServiceTimeKind),
+		// Preventive maintenance. Every one of these carries a sentence
+		// written for the staff member who typed the thing; falling through to
+		// the default would answer them with "internal server error" and page
+		// somebody. ErrLaborRateInvalid is the one that reached a handler
+		// calling Error() directly, so it was a 500 in practice rather than in
+		// theory.
+		errors.Is(err, app.ErrLaborRateInvalid),
+		errors.Is(err, app.ErrTravelRateWithoutLabor),
+		errors.Is(err, app.ErrPlanNameRequired),
+		errors.Is(err, app.ErrPlanNameTaken),
+		errors.Is(err, app.ErrPlanInUse),
+		errors.Is(err, app.ErrPlanInactive),
+		errors.Is(err, app.ErrPlanHasNoTasks),
+		errors.Is(err, app.ErrPlanTaskNameRequired),
+		errors.Is(err, app.ErrPlanIntervalInvalid),
+		errors.Is(err, app.ErrPlanLeadInvalid),
+		errors.Is(err, app.ErrPlanStartRequired),
+		errors.Is(err, app.ErrPlanContractEndsBeforeStart),
+		errors.Is(err, app.ErrPlanAlreadyAssigned),
+		errors.Is(err, app.ErrPlanAssignmentEnded),
+		errors.Is(err, app.ErrMaintenanceAlreadyClosed),
+		errors.Is(err, app.ErrMaintenanceDateRequired),
+		errors.Is(err, app.ErrEquipmentRetired):
 		return http.StatusBadRequest, err.Error()
 
 	case errors.Is(err, app.ErrServiceTicketTitleRequired),

@@ -275,7 +275,7 @@ func TestEditTaskIntervalReschedulesLiveMachines(t *testing.T) {
 		Name:         task.Name,
 		IntervalDays: 60,
 		LeadDays:     14,
-	}, testutil.TestActor())
+	}, planDay(2026, time.June, 1), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -406,4 +406,116 @@ func TestAssignPlanToRetiredMachineIsRefused(t *testing.T) {
 	}, testutil.TestActor())
 
 	assert.ErrorIs(t, err, app.ErrEquipmentRetired)
+}
+
+// Editing an interval must not drag a future occurrence into the past.
+//
+// The harm is specific: past-due covered work is inside MaintenanceScopeBookable,
+// so the overnight sweep opens a real customer ticket for it. If the occurrence
+// moved was one somebody had deliberately skipped, the shop books the visit the
+// customer declined.
+//
+// The original defect was worse than an off-by-a-few: the recompute anchored on
+// max(completed_on), which a skip leaves untouched, so a skipped occurrence
+// jumped back to one interval after the last *completion* — months into the past.
+func TestEditTaskIntervalNeverBooksASkippedVisit(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Skip regression", 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID:   machine.ID,
+		PlanID:        plan.ID,
+		StartsOn:      planDay(2025, time.October, 3),
+		UnderContract: true,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	pending := func(now time.Time) domain.MaintenanceDueRow {
+		rows, listErr := svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: now})
+		require.NoError(t, listErr)
+		require.Len(t, rows, 1)
+		return rows[0]
+	}
+
+	// Done once, then the next one deliberately skipped. The skip keeps the
+	// cadence, landing on 30 June.
+	today := planDay(2026, time.May, 1)
+	first := pending(today)
+	_, err = svc.CompleteDue(ctx, tx, first.ID, app.CompleteDueParams{
+		CompletedOn: planDay(2026, time.January, 1),
+	}, staffActorFor(t, tx))
+	require.NoError(t, err)
+
+	second := pending(today)
+	require.Equal(t, planDay(2026, time.April, 1).UTC(), second.DueOn.UTC())
+	_, err = svc.SkipDue(ctx, tx, second.ID, planDay(2026, time.April, 2), "customer declined", staffActorFor(t, tx))
+	require.NoError(t, err)
+
+	afterSkip := pending(today)
+	require.Equal(t, planDay(2026, time.June, 30).UTC(), afterSkip.DueOn.UTC(),
+		"the skip kept the cadence and landed in the future")
+	require.False(t, afterSkip.BookableOn(today))
+
+	// Somebody shortens the interval sharply. Shifting alone would land on
+	// 16 April — behind today, and immediately bookable.
+	_, err = svc.EditTask(ctx, tx, task.ID, app.EditPlanTaskParams{
+		Name:         "Skip regression",
+		IntervalDays: 15,
+		LeadDays:     5,
+	}, today, testutil.TestActor())
+	require.NoError(t, err)
+
+	moved := pending(today)
+	assert.False(t, moved.DueOn.Before(today),
+		"a future occurrence must not be moved into the past (got %s)",
+		moved.DueOn.UTC().Format("2006-01-02"))
+	assert.NotEqual(t, domain.MaintenanceOverdue, moved.Urgency(today),
+		"editing an interval must not retrospectively make work late")
+	assert.Equal(t, planDay(2026, time.May, 1).UTC(), moved.DueOn.UTC(),
+		"clamped forward a whole interval at a time, so it stays on the new cadence")
+
+	// Due today on a fifteen-day cadence is legitimately due — the plan now
+	// says so. What must not happen is it arriving already late.
+}
+
+// An occurrence that was already late stays late — it genuinely is, and hiding
+// it behind the clamp would be the opposite mistake.
+func TestEditTaskIntervalKeepsOverdueWorkOverdue(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, task := planWithTask(t, tx, svc, "Overdue regression", 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID,
+		PlanID:      plan.ID,
+		StartsOn:    planDay(2025, time.January, 1),
+	}, testutil.TestActor())
+	require.NoError(t, err)
+
+	today := planDay(2026, time.September, 1)
+	machineID := machine.ID
+	rows, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: today})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.True(t, rows[0].DueOn.Before(today), "already badly overdue")
+
+	_, err = svc.EditTask(ctx, tx, task.ID, app.EditPlanTaskParams{
+		Name:         "Overdue regression",
+		IntervalDays: 100,
+		LeadDays:     14,
+	}, today, testutil.TestActor())
+	require.NoError(t, err)
+
+	rows, err = svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: today})
+	require.NoError(t, err)
+	assert.Equal(t, planDay(2025, time.April, 11).UTC(), rows[0].DueOn.UTC(),
+		"shifted by the ten days the interval grew, and still overdue")
 }

@@ -81,7 +81,7 @@ func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
 	case !day.InMonth:
 		return base + " bg-rr-surface/50 text-rr-muted"
 	case sameDay(day.Date, today):
-		return base + " bg-rr-paper-warm"
+		return base + " bg-rr-raised"
 	case day.AtRisk(today):
 		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
 	}
@@ -119,9 +119,9 @@ func calendarChipClass(row domain.MaintenanceDueRow, today time.Time) string {
 	case row.Urgency(today) == domain.MaintenanceOverdue:
 		return base + " bg-rr-amber/20 text-rr-heading"
 	case !row.Covered(today):
-		return base + " bg-rr-paper-warm text-rr-heading"
+		return base + " bg-rr-raised text-rr-heading"
 	}
-	return base + " bg-rr-paper-warm/60 text-rr-body"
+	return base + " bg-rr-raised/60 text-rr-body"
 }
 
 func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component {
@@ -376,7 +376,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</tbody></table></div><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/40\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/40\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-paper-warm\"></span>No contract</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</tbody></table></div><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/40\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/40\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-raised\"></span>No contract</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

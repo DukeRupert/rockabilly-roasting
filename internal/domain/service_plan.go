@@ -390,6 +390,38 @@ func NextDueAfterSkip(dueOn, on time.Time, intervalDays int) time.Time {
 	return next
 }
 
+// RescheduledDue is where a pending occurrence moves when its task's interval
+// changes.
+//
+// Shifted rather than recomputed from an anchor. The occurrence's current date
+// was produced by adding the old interval to *something* — a completion, a
+// skipped due date, the assignment's start — so subtracting the old interval
+// and adding the new one keeps it on the same cadence without having to work
+// out which of those it was. Reconstructing the anchor from completions alone
+// is what made a skipped occurrence jump backwards: a skip leaves no
+// completed_on to find.
+//
+// The clamp is the part that matters. A pending occurrence that was in the
+// future must not land in the past, because past-due covered work is inside the
+// sweep's booking window — a longer interval would otherwise open a real
+// customer ticket for a visit somebody had just declined. An occurrence that
+// was *already* overdue stays overdue: it genuinely is, and hiding it would be
+// the opposite mistake.
+func RescheduledDue(currentDue time.Time, oldInterval, newInterval int, on time.Time) time.Time {
+	due := calendarDay(currentDue)
+	today := calendarDay(on)
+
+	shifted := due.AddDate(0, 0, newInterval-oldInterval)
+	if due.Before(today) || newInterval < 1 {
+		return shifted
+	}
+	// Bounded: newInterval is at least one day, so each step moves forward.
+	for shifted.Before(today) {
+		shifted = shifted.AddDate(0, 0, newInterval)
+	}
+	return shifted
+}
+
 // FirstDueOn is when a task first comes due on a freshly assigned plan: one
 // interval after the anchor.
 //

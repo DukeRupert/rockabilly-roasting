@@ -149,7 +149,17 @@ templ serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) {
 									<span class="tabular-nums">{ formatMinutes(w.Summary.TotalMinutes()) }</span>
 									<span class="text-rr-muted"> · { serviceCostVisits(w.Summary.Visits) }</span>
 									if showCost {
-										<span class="block font-semibold text-rr-heading">{ formatCents(w.Summary.TotalCostCents()) } all in</span>
+										<span class="block font-semibold text-rr-heading">
+											{ formatCents(w.Summary.TotalCostCents()) }
+											if w.Summary.FullyCosted() {
+												all in
+											} else {
+												so far
+											}
+										</span>
+										if !w.Summary.FullyCosted() {
+											<span class="block text-xs font-normal text-rr-red">{ formatMinutes(w.Summary.UncostedMinutes) } not priced</span>
+										}
 									}
 								} else {
 									<span class="text-rr-muted">Nothing</span>

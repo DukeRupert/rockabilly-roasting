@@ -305,37 +305,45 @@ func (s *ServicePlanStore) DeleteTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return nil
 }
 
-// RescheduleTaskOccurrences moves every pending occurrence of a task onto a new
-// interval, measured from whatever the occurrence was last anchored to.
+// ListPendingForTask returns every pending occurrence of one task, across all
+// the machines on the plan it belongs to.
 //
-// Editing an interval from 90 days to 60 has to reach the machines already on
-// the plan — otherwise the plan says one thing and the schedule does another,
-// and the fix is to unassign and reassign every machine. The anchor is the
-// completion the occurrence followed, falling back to the assignment's start
-// date for the first cycle.
-func (s *ServicePlanStore) RescheduleTaskOccurrences(ctx context.Context, tx pgx.Tx, taskID uuid.UUID, intervalDays int) (int, error) {
-	tag, err := tx.Exec(ctx,
-		`UPDATE service_maintenance_due d
-		 SET due_on = anchor.day + ($2 * INTERVAL '1 day'), updated_at = now()
-		 FROM (
-		     SELECT p.id AS due_id,
-		            COALESCE(
-		                (SELECT max(prev.completed_on) FROM service_maintenance_due prev
-		                 WHERE prev.assignment_id = p.assignment_id
-		                   AND prev.task_id = p.task_id
-		                   AND prev.status = 'completed'),
-		                a.starts_on
-		            ) AS day
-		     FROM service_maintenance_due p
-		     JOIN equipment_service_plans a ON a.id = p.assignment_id
-		     WHERE p.task_id = $1 AND p.status = 'pending'
-		 ) anchor
-		 WHERE d.id = anchor.due_id`,
-		taskID, intervalDays)
+// Read-then-write rather than one UPDATE, because moving an occurrence onto a
+// new interval has a clamp in it (domain.RescheduledDue) that SQL would express
+// far less legibly than Go — and getting it wrong books a visit somebody
+// declined.
+func (s *ServicePlanStore) ListPendingForTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) ([]domain.MaintenanceDue, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT `+strings.ReplaceAll(maintenanceDueColumns, "d.", "")+`
+		 FROM service_maintenance_due
+		 WHERE task_id = $1 AND status = 'pending'`, taskID)
 	if err != nil {
-		return 0, fmt.Errorf("reschedule task occurrences: %w", err)
+		return nil, fmt.Errorf("list pending for task: %w", err)
 	}
-	return int(tag.RowsAffected()), nil
+	defer rows.Close()
+
+	var out []domain.MaintenanceDue
+	for rows.Next() {
+		d, scanErr := scanMaintenanceDue(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan pending for task: %w", scanErr)
+		}
+		out = append(out, *d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list pending for task: %w", err)
+	}
+	return out, nil
+}
+
+// UpdateDueOn moves one pending occurrence to a new date.
+func (s *ServicePlanStore) UpdateDueOn(ctx context.Context, tx pgx.Tx, id uuid.UUID, dueOn time.Time) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE service_maintenance_due SET due_on = $2, updated_at = now()
+		 WHERE id = $1 AND status = 'pending'`, id, dueOn); err != nil {
+		return fmt.Errorf("update maintenance due date: %w", err)
+	}
+	return nil
 }
 
 // --- Assignments ---
@@ -560,11 +568,29 @@ func (s *ServicePlanStore) CloseDue(ctx context.Context, tx pgx.Tx, id uuid.UUID
 
 // AttachTicket records that an occurrence has a ticket against it. Separate
 // from closing it: booking the visit and doing the work are different days.
+//
+// Scoped to the ticket's own customer. The occurrence id arrives from a form
+// field on the open-a-ticket page, and without this one cafe's ticket could
+// mark another's maintenance booked — which there is no screen to undo.
+//
+// Reports pgx.ErrNoRows when nothing matched, rather than succeeding silently:
+// the caller opened a ticket on the strength of this working, and an occurrence
+// left unattached is one the sweep books again tomorrow.
 func (s *ServicePlanStore) AttachTicket(ctx context.Context, tx pgx.Tx, id, ticketID uuid.UUID) error {
-	if _, err := tx.Exec(ctx,
-		`UPDATE service_maintenance_due SET ticket_id = $2, updated_at = now()
-		 WHERE id = $1 AND ticket_id IS NULL`, id, ticketID); err != nil {
+	tag, err := tx.Exec(ctx,
+		`UPDATE service_maintenance_due d
+		    SET ticket_id = $2, updated_at = now()
+		  FROM equipment e, service_tickets t
+		 WHERE d.id = $1
+		   AND d.ticket_id IS NULL
+		   AND e.id = d.equipment_id
+		   AND t.id = $2
+		   AND t.customer_id = e.customer_id`, id, ticketID)
+	if err != nil {
 		return fmt.Errorf("attach maintenance ticket: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
 	}
 	return nil
 }

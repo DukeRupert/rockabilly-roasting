@@ -307,7 +307,7 @@ func (s *ServicePlanService) GetTaskOnPlan(ctx context.Context, tx pgx.Tx, planI
 // occurrence of the task, re-measured from whatever each one was anchored to —
 // otherwise the plan would say "every 60 days" while forty machines quietly
 // stayed on the old ninety.
-func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UUID, p EditPlanTaskParams, actor Actor) (*domain.ServicePlanTask, error) {
+func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UUID, p EditPlanTaskParams, now time.Time, actor Actor) (*domain.ServicePlanTask, error) {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Instructions = strings.TrimSpace(p.Instructions)
 
@@ -333,7 +333,7 @@ func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 
 	rescheduled := 0
 	if before.IntervalDays != task.IntervalDays {
-		rescheduled, err = s.plans.RescheduleTaskOccurrences(ctx, tx, task.ID, task.IntervalDays)
+		rescheduled, err = s.rescheduleTask(ctx, tx, task.ID, before.IntervalDays, task.IntervalDays, now)
 		if err != nil {
 			return nil, err
 		}
@@ -359,6 +359,24 @@ func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 	}
 
 	return task, nil
+}
+
+// rescheduleTask moves every pending occurrence of a task onto a new interval.
+//
+// Each is shifted by the difference and clamped so a future occurrence cannot
+// land in the past — see domain.RescheduledDue for why that matters.
+func (s *ServicePlanService) rescheduleTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID, oldInterval, newInterval int, now time.Time) (int, error) {
+	pending, err := s.plans.ListPendingForTask(ctx, tx, taskID)
+	if err != nil {
+		return 0, err
+	}
+	for _, d := range pending {
+		moved := domain.RescheduledDue(d.DueOn, oldInterval, newInterval, now)
+		if err := s.plans.UpdateDueOn(ctx, tx, d.ID, moved); err != nil {
+			return 0, err
+		}
+	}
+	return len(pending), nil
 }
 
 // RemoveTask takes an item out of a plan's series. Its occurrences go with it —
@@ -761,6 +779,18 @@ func (s *ServicePlanService) GetDue(ctx context.Context, tx pgx.Tx, id uuid.UUID
 
 // AttachTicket records the ticket a due item is being handled on, so the due
 // list can stop asking about work that is already booked.
+//
+// Fails rather than shrugging when nothing matched — a tampered or stale
+// occurrence id, one already booked, or one belonging to another customer. The
+// caller is inside the transaction that opened the ticket, so refusing here
+// rolls that back too, which is the right outcome: a ticket claiming to cover
+// maintenance it is not attached to is worse than no ticket.
 func (s *ServicePlanService) AttachTicket(ctx context.Context, tx pgx.Tx, id, ticketID uuid.UUID) error {
-	return s.plans.AttachTicket(ctx, tx, id, ticketID)
+	if err := s.plans.AttachTicket(ctx, tx, id, ticketID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrMaintenanceNotFound
+		}
+		return err
+	}
+	return nil
 }

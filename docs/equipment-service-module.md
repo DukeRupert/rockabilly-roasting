@@ -615,9 +615,11 @@ rate when it lands; it is deliberately not this column.
   rate honours that split. Nil means "cost it as labour", and an explicit `0.00`
   means the shop absorbs the drive — which is why the form takes strings and
   blank is not zero.
-- **A travel rate with no labour rate is refused.** It would do nothing: travel
-  falls back to labour, and with no labour rate there is no money column for it
-  to appear in.
+- **A travel rate with no labour rate is refused**, and so is a labour rate of
+  zero. There is one spelling of "unset" and it is blank: `Set()` reads a zero
+  as unset, so saving one would stamp every hour uncosted while the settings
+  page showed a figure somebody had typed. Travel keeps its zero, where it
+  means the shop absorbs the drive.
 - **Costing rounds to the nearest cent**, not truncated. These figures are
   summed across hundreds of entries; a fraction lost on each would drift away
   from the same numbers computed any other way.
@@ -667,9 +669,18 @@ customer had just declined.
 
 Shifting needs no anchor: the occurrence's date was produced by adding the old
 interval to *something*, so subtracting it and adding the new one keeps the same
-cadence whatever that something was. The clamp does the rest — an occurrence
-that was in the future is stepped forward whole intervals until it is future
-again, while one that was already overdue stays overdue, because it is.
+cadence whatever that something was.
+
+Two rules on top of the shift, both about not letting an interval edit rewrite
+what is owed now:
+
+- **Overdue work does not move at all.** It is outstanding today, and
+  lengthening an interval must not clear it — a task one day late going from
+  weekly to yearly would jump a year out, taking a warranty-critical job off the
+  list nobody would then think to look for. The new interval governs the *next*
+  occurrence, measured from whenever this one is finally done.
+- **Future work is stepped forward** whole intervals if the shift lands it in
+  the past, for the booking reason above.
 
 `ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
 figure the Cost column prints, ordered in SQL because it has to precede the

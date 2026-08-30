@@ -516,6 +516,7 @@ func TestEditTaskIntervalKeepsOverdueWorkOverdue(t *testing.T) {
 
 	rows, err = svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: today})
 	require.NoError(t, err)
-	assert.Equal(t, planDay(2025, time.April, 11).UTC(), rows[0].DueOn.UTC(),
-		"shifted by the ten days the interval grew, and still overdue")
+	assert.Equal(t, planDay(2025, time.April, 1).UTC(), rows[0].DueOn.UTC(),
+		"left exactly where it was — the work is owed today, and a longer interval must not clear it")
+	assert.True(t, rows[0].DueOn.Before(today), "still on the overdue list")
 }

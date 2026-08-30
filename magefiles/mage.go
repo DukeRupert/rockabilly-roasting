@@ -196,6 +196,12 @@ func CheckAdminUI() error {
 		return fmt.Errorf("walk admin templ files: %w", err)
 	}
 
+	dead, err := deadTokenClasses()
+	if err != nil {
+		return err
+	}
+	violations = append(violations, dead...)
+
 	if len(violations) > 0 {
 		for _, v := range violations {
 			fmt.Fprintln(os.Stderr, v)
@@ -203,6 +209,79 @@ func CheckAdminUI() error {
 		return fmt.Errorf("%d admin UI lint violation(s) — see docs/admin-ui.md", len(violations))
 	}
 	return nil
+}
+
+// emitsCSS reports whether Tailwind produced a rule for a utility.
+//
+// Substring rather than ".class", because a variant is emitted escaped —
+// `hover:text-rr-red-lt` becomes `.hover\:text-rr-red-lt:hover` — and matching
+// on the leading dot would call every variant dead. The trailing guard stops
+// `bg-rr-red` matching inside `bg-rr-red-lt`.
+func emitsCSS(compiled, class string) bool {
+	return regexp.MustCompile(regexp.QuoteMeta(class) + `([^a-z0-9-]|$)`).MatchString(compiled)
+}
+
+// deadTokenClasses finds rr-* utilities the admin uses that Tailwind never
+// emitted a rule for.
+//
+// The blocklist above catches a class that is wrong. This catches one that does
+// not exist: Tailwind v4 drops an unknown utility silently, so `bg-rr-paper-warm`
+// — the token is `--color-paper-warm`, un-prefixed and storefront-only —
+// compiled, passed this lint, passed the render tests, and produced no CSS at
+// all. Today simply was not marked on the maintenance calendar, and nothing but
+// a browser could have said so.
+//
+// Skipped when output.css has not been built; `mage check` runs css first, and
+// failing here on a clean checkout would be a confusing way to learn that.
+func deadTokenClasses() ([]string, error) {
+	css, err := os.ReadFile("internal/ui/assets/css/output.css")
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read output.css: %w", err)
+	}
+	compiled := string(css)
+
+	// Utilities only, so a token name inside a CSS variable or a comment is not
+	// mistaken for one. Opacity suffixes (bg-rr-raised/60) compile from the
+	// base utility, so they are checked as the base.
+	use := regexp.MustCompile(`\b((?:bg|text|border|ring|divide|from|via|to|fill|stroke|decoration|outline|accent|shadow)-rr-[a-z0-9-]+)`)
+
+	var dead []string
+	seen := map[string]bool{}
+
+	err = filepath.Walk("internal/ui/admin", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, ".templ") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for lineNum, line := range strings.Split(string(data), "\n") {
+			for _, m := range use.FindAllStringSubmatch(line, -1) {
+				class := strings.TrimRight(m[1], "-")
+				key := path + class
+				if seen[key] || emitsCSS(compiled, class) {
+					continue
+				}
+				seen[key] = true
+				dead = append(dead, fmt.Sprintf(
+					"%s:%d: %q emits no CSS — is the token spelled right? — %s",
+					path, lineNum+1, class, strings.TrimSpace(line),
+				))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk admin templ files: %w", err)
+	}
+	return dead, nil
 }
 
 // CheckScoping verifies customer-facing handlers don't call staff-only

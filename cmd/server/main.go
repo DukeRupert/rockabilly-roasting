@@ -515,7 +515,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewServiceStaleSweepWorker(serviceTicketSvc, pool))
-	river.AddWorker(workers, jobs.NewServiceMaintenanceSweepWorker(servicePlanSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceMaintenanceSweepWorker(servicePlanSvc, pool, merchantTZ))
 	river.AddWorker(workers, jobs.NewServiceTicketOpenedWorker(serviceTicketSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)

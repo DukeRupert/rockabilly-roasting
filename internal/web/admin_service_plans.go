@@ -89,16 +89,15 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 
 	staffName, staffRole := staffNameRole(r)
 	props := admin.MaintenanceDueProps{
-		Rows:       rows,
-		Nav:        nav,
-		Scope:      scope,
-		Counts:     counts,
-		Today:      today,
-		MerchantTZ: d.MerchantTZ,
-		StaffName:  staffName,
-		StaffRole:  staffRole,
-		CanWrite:   staffCan(r, auth.PermWriteService),
-		Flash:      settingsFlash(r),
+		Rows:      rows,
+		Nav:       nav,
+		Scope:     scope,
+		Counts:    counts,
+		Today:     today,
+		StaffName: staffName,
+		StaffRole: staffRole,
+		CanWrite:  staffCan(r, auth.PermWriteService),
+		Flash:     settingsFlash(r),
 	}
 
 	if IsHTMX(r) {
@@ -174,9 +173,17 @@ func (d *Deps) closeMaintenance(w http.ResponseWriter, r *http.Request, skip boo
 
 	back := maintenancePath(r.FormValue("scope"))
 
-	on, err := parseMaintenanceDay(r.FormValue("on"), d.merchantToday())
+	// No silent default. The form always ships today's date, so a blank one is
+	// somebody who cleared the field — and the day is what the next occurrence
+	// counts from, which is exactly what ErrMaintenanceDateRequired says must
+	// not be guessed.
+	on, err := parseMaintenanceDay(r.FormValue("on"), time.Time{})
 	if err != nil {
 		redirectFlashError(w, r, back, "That is not a date the shop recognises.")
+		return
+	}
+	if on.IsZero() {
+		redirectFlashError(w, r, back, app.ErrMaintenanceDateRequired.Error())
 		return
 	}
 

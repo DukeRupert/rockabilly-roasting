@@ -140,10 +140,21 @@ func validateLaborRates(rates domain.ServiceLaborRates) error {
 			return ErrLaborRateInvalid
 		}
 	}
+	// One way to mean "unset", and it is blank. A zero labour rate would be a
+	// second: ServiceLaborRates.Set() reads it as unset, so it would stamp
+	// every hour uncosted while the settings page showed a saved figure. Travel
+	// keeps its zero — there it means something, namely that the shop absorbs
+	// the drive.
+	if rates.LaborCentsPerHour != nil && *rates.LaborCentsPerHour == 0 {
+		return ErrLaborRateZero
+	}
 	// A travel rate on its own costs nothing: travel falls back to the labour
 	// rate, and with no labour rate there is no money column for it to appear
 	// in. Saying so beats silently accepting a setting that does nothing.
-	if rates.LaborCentsPerHour == nil && rates.TravelCentsPerHour != nil {
+	//
+	// Checked through Set() rather than against nil so this cannot drift from
+	// the definition every other surface uses.
+	if !rates.Set() && rates.TravelCentsPerHour != nil {
 		return ErrTravelRateWithoutLabor
 	}
 	return nil

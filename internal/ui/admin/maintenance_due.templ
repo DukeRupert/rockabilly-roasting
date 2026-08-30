@@ -30,12 +30,11 @@ type MaintenanceDueProps struct {
 	// Today is the day everything is measured against, in merchant time. Passed
 	// in rather than taken from the clock in the template so a render test can
 	// pin it.
-	Today      time.Time
-	MerchantTZ *time.Location
-	StaffName  string
-	StaffRole  string
-	CanWrite   bool
-	Flash      Flash
+	Today     time.Time
+	StaffName string
+	StaffRole string
+	CanWrite  bool
+	Flash     Flash
 }
 
 // MaintenanceCounts is the size of each scope.

@@ -452,6 +452,10 @@ var (
 	// behind it. Travel falls back to the labour rate, and with none set there
 	// is no money column for it to appear in — the setting would do nothing,
 	// silently.
+	// ErrLaborRateZero keeps "unset" to one spelling. A saved 0.00 reads as
+	// unset to ServiceLaborRates.Set(), so it would stamp every hour uncosted
+	// while the settings page showed a figure somebody had typed.
+	ErrLaborRateZero          = errors.New("leave the labour rate blank rather than zero — zero would silently price nothing")
 	ErrTravelRateWithoutLabor = errors.New("set the labour rate first — a travel rate on its own has nothing to appear in")
 )
 

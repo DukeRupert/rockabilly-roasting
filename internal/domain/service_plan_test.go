@@ -261,3 +261,52 @@ func TestEquipmentServicePlanLive(t *testing.T) {
 	assert.True(t, domain.EquipmentServicePlan{}.Live())
 	assert.False(t, domain.EquipmentServicePlan{EndedAt: &ended}.Live())
 }
+
+// RescheduledDue is the function an interval edit runs against every machine on
+// a plan, so it is worth pinning directly rather than only through the service.
+func TestRescheduledDue(t *testing.T) {
+	today := day(2026, time.September, 1)
+
+	t.Run("overdue work does not move", func(t *testing.T) {
+		// The regression: lengthening the interval shifted these forward and
+		// took them off the overdue list, warranty-critical ones included.
+		tests := []struct {
+			name             string
+			due              time.Time
+			oldInt, newInt   int
+		}{
+			{"a day late, weekly to yearly", day(2026, time.August, 31), 7, 365},
+			{"nine days late, monthly to quarterly", day(2026, time.August, 23), 30, 90},
+			{"badly late", day(2025, time.March, 1), 90, 180},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				got := domain.RescheduledDue(tc.due, tc.oldInt, tc.newInt, today)
+				assert.Equal(t, tc.due, got, "work owed today stays owed today")
+				assert.True(t, got.Before(today), "and stays visible as overdue")
+			})
+		}
+	})
+
+	t.Run("future work shifts by the difference", func(t *testing.T) {
+		due := day(2026, time.October, 1)
+		assert.Equal(t, day(2026, time.October, 11), domain.RescheduledDue(due, 90, 100, today))
+		assert.Equal(t, day(2026, time.September, 21), domain.RescheduledDue(due, 90, 80, today))
+	})
+
+	t.Run("a shortened interval never lands in the past", func(t *testing.T) {
+		// Shifting alone would put this on 18 August, behind today — and
+		// past-due covered work is inside the sweep's booking window.
+		due := day(2026, time.September, 17)
+		got := domain.RescheduledDue(due, 90, 60, today)
+
+		assert.False(t, got.Before(today), "got %s", got.Format("2006-01-02"))
+		assert.Equal(t, day(2026, time.October, 17), got,
+			"stepped forward a whole interval, so it stays on the new cadence")
+	})
+
+	t.Run("an unchanged interval is a no-op", func(t *testing.T) {
+		due := day(2026, time.October, 1)
+		assert.Equal(t, due, domain.RescheduledDue(due, 90, 90, today))
+	})
+}

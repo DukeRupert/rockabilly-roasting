@@ -401,18 +401,29 @@ func NextDueAfterSkip(dueOn, on time.Time, intervalDays int) time.Time {
 // is what made a skipped occurrence jump backwards: a skip leaves no
 // completed_on to find.
 //
-// The clamp is the part that matters. A pending occurrence that was in the
-// future must not land in the past, because past-due covered work is inside the
-// sweep's booking window — a longer interval would otherwise open a real
-// customer ticket for a visit somebody had just declined. An occurrence that
-// was *already* overdue stays overdue: it genuinely is, and hiding it would be
-// the opposite mistake.
+// Two rules, both about not letting an interval edit rewrite what is owed now:
+//
+//   - Work already overdue does not move at all. It is outstanding today, and
+//     lengthening an interval must not clear it — shifting a task one day late
+//     from weekly to yearly would push it a year out and take a
+//     warranty-critical job off the list nobody would then think to look for.
+//     The new interval governs the *next* occurrence, which is measured from
+//     whenever this one is finally done.
+//   - Work still in the future is shifted, then stepped forward whole intervals
+//     if that lands it in the past. Past-due covered work is inside the sweep's
+//     booking window, so without this a shortened interval would open a real
+//     customer ticket for a visit somebody had just declined.
 func RescheduledDue(currentDue time.Time, oldInterval, newInterval int, on time.Time) time.Time {
 	due := calendarDay(currentDue)
 	today := calendarDay(on)
 
+	// Already late: leave it precisely where it is.
+	if due.Before(today) {
+		return due
+	}
+
 	shifted := due.AddDate(0, 0, newInterval-oldInterval)
-	if due.Before(today) || newInterval < 1 {
+	if newInterval < 1 {
 		return shifted
 	}
 	// Bounded: newInterval is at least one day, so each step moves forward.

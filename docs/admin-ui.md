@@ -118,7 +118,7 @@ These classes exist for the storefront/marketing surfaces. Reaching for them in 
 
 ## Lint enforcement
 
-`mage lintAdmin` (and `mage check` which calls it) greps `internal/ui/admin/**/*.templ` for the deny-list above and fails the build if any matches are found. `staff_login.templ` is excluded.
+`mage checkAdminUI` (and `mage check` which calls it) greps `internal/ui/admin/**/*.templ` for the deny-list above and fails the build if any matches are found. `staff_login.templ` is excluded.
 
 To add a new admin-allowed token or update the deny-list, edit the lint target in `magefiles/mage.go`.
 
@@ -137,3 +137,21 @@ You probably don't. If you think you do, ask first — there's almost always an 
 | `font-slab` for a heading | `admin-page-title` (Alfa Slab One, page-level only) or just `font-semibold text-rr-heading` |
 
 If you're building something genuinely new (e.g., an admin onboarding splash), open a discussion before reaching for storefront classes — we may want to expand the admin palette explicitly.
+
+## The lint has two halves
+
+`mage checkAdminUI` (wired into `mage check`) fails the build on two things:
+
+1. **A banned class** — the storefront paper-and-ink utilities, brand fonts,
+   stamp shadows and heavy borders listed above. A class that is *wrong*.
+2. **A class that emits no CSS** — an `rr-*` utility Tailwind never produced a
+   rule for. A class that does not *exist*.
+
+The second half was added after `bg-rr-paper-warm` shipped. The token is
+`--color-paper-warm`: un-prefixed, and storefront-only. Tailwind v4 drops an
+unknown utility silently, so it compiled, passed the blocklist, passed the
+render tests — and produced no CSS at all. Today was simply not marked on the
+maintenance calendar, and nothing short of opening a browser could have said so.
+
+If you add a token, add it to `input.css`; if the lint calls a class dead, the
+name is wrong rather than the check.

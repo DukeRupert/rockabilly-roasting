@@ -394,3 +394,34 @@ func TestCostByAccountShowsCostFromEitherSignal(t *testing.T) {
 	assert.True(t, report.ShowCost(), "hours already priced still cost what they cost")
 	assert.Equal(t, domain.ServiceAccountCostByCost, report.Sort)
 }
+
+// One definition of "unset", and it is blank.
+//
+// A saved 0.00 labour rate reads as unset to ServiceLaborRates.Set(), so it
+// would stamp every hour uncosted while the settings page showed a figure
+// somebody had deliberately typed — and a travel rate paired with it would be
+// exactly as inert as one paired with nothing, which is what
+// ErrTravelRateWithoutLabor exists to prevent.
+func TestLaborRateZeroIsRefused(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+
+	err := svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(0),
+	}, testutil.TestActor())
+	assert.ErrorIs(t, err, app.ErrLaborRateZero)
+
+	// The case the previous spelling let through: zero labour, real travel.
+	err = svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour:  cents(0),
+		TravelCentsPerHour: cents(4000),
+	}, testutil.TestActor())
+	assert.Error(t, err, "a travel rate behind a zero labour rate prices nothing")
+
+	// Travel keeps its zero: there it means the shop absorbs the drive.
+	assert.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour:  cents(6500),
+		TravelCentsPerHour: cents(0),
+	}, testutil.TestActor()))
+}

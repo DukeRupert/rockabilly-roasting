@@ -28,15 +28,27 @@ type ServiceMaintenanceSweepWorker struct {
 	river.WorkerDefaults[ServiceMaintenanceSweepArgs]
 	plans *app.ServicePlanService
 	pool  *pgxpool.Pool
+	// loc is the merchant's zone. Which calendar day it is decides what counts
+	// as due, and this is the one path that acts on that answer unattended —
+	// a sweep reading UTC would, in Los Angeles, spend every afternoon booking
+	// tomorrow's work.
+	loc *time.Location
 }
 
 // NewServiceMaintenanceSweepWorker creates a new ServiceMaintenanceSweepWorker.
-func NewServiceMaintenanceSweepWorker(plans *app.ServicePlanService, pool *pgxpool.Pool) *ServiceMaintenanceSweepWorker {
-	return &ServiceMaintenanceSweepWorker{plans: plans, pool: pool}
+func NewServiceMaintenanceSweepWorker(plans *app.ServicePlanService, pool *pgxpool.Pool, loc *time.Location) *ServiceMaintenanceSweepWorker {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &ServiceMaintenanceSweepWorker{plans: plans, pool: pool, loc: loc}
 }
 
 // Work runs the sweep. Thin by design — everything it does lives in
 // ServicePlanService.SweepMaintenance, which is testable without a River client.
+// The day is collapsed to a UTC midnight once resolved in the merchant's zone,
+// the same shape the web handlers use, so it compares cleanly against the date
+// columns pgx hands back.
 func (w *ServiceMaintenanceSweepWorker) Work(ctx context.Context, _ *river.Job[ServiceMaintenanceSweepArgs]) error {
-	return w.plans.SweepMaintenance(ctx, w.pool, time.Now())
+	y, m, d := time.Now().In(w.loc).Date()
+	return w.plans.SweepMaintenance(ctx, w.pool, time.Date(y, m, d, 0, 0, 0, 0, time.UTC))
 }

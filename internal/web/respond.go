@@ -137,6 +137,7 @@ func mapError(err error) (int, string) {
 		// theory.
 		errors.Is(err, app.ErrLaborRateInvalid),
 		errors.Is(err, app.ErrTravelRateWithoutLabor),
+		errors.Is(err, app.ErrLaborRateZero),
 		errors.Is(err, app.ErrPlanNameRequired),
 		errors.Is(err, app.ErrPlanNameTaken),
 		errors.Is(err, app.ErrPlanInUse),

@@ -408,22 +408,57 @@ All three: check module enablement first and return nil when off. All idempotent
 
 ## Audit actions
 
-In `platform/audit/actions.go`, resource types `equipment` and `service_ticket`:
+In `platform/audit/actions.go`. Resource types: `equipment`, `service_ticket`,
+`service_plan`, and `store_settings` for the labour rates.
+
+The resource type decides which timeline a row lands on, and it is not always
+the thing the action created. `equipment.maintenance_booked` is recorded against
+the **machine**, not the ticket the sweep just opened — the machine's page is
+where somebody wondering about an unattended ticket looks, and where the rest of
+that machine's story already is. The ticket id travels in the metadata.
 
 ```
-AuditModuleEnabled          = "module.enabled"
-AuditModuleDisabled         = "module.disabled"
-AuditEquipmentCreated       = "equipment.created"
-AuditEquipmentUpdated       = "equipment.updated"
-AuditEquipmentRetired       = "equipment.retired"
-AuditServiceTicketOpened    = "service_ticket.opened"
-AuditServiceTicketAssigned  = "service_ticket.assigned"
-AuditServiceTicketStatus    = "service_ticket.status_changed"
-AuditServiceTicketResolved  = "service_ticket.resolved"
-AuditServiceTicketNoteAdded = "service_ticket.note_added"
-AuditServicePartAdded       = "service_ticket.part_added"
-AuditServicePartStatus      = "service_ticket.part_status_changed"
-AuditServiceTimeLogged      = "service_ticket.time_logged"
+module.enabled
+module.disabled
+
+equipment.created
+equipment.updated
+equipment.sent_to_shop
+equipment.returned_to_service
+equipment.retired
+
+service_ticket.opened
+service_ticket.assigned
+service_ticket.status_changed
+service_ticket.resolved
+service_ticket.reopened
+service_ticket.cancelled
+service_ticket.note_added
+service_ticket.part_added
+service_ticket.part_status_changed
+service_ticket.part_removed
+service_ticket.time_logged
+service_ticket.time_removed
+service_ticket.time_repriced
+service_ticket.stale_swept
+service_ticket.staff_notified
+
+service_plan.created
+service_plan.updated
+service_plan.deleted
+service_plan.task_added
+service_plan.task_updated
+service_plan.task_removed
+
+equipment.plan_assigned
+equipment.plan_assignment_updated
+equipment.plan_unassigned
+equipment.maintenance_completed
+equipment.maintenance_skipped
+equipment.maintenance_booked
+equipment.maintenance_swept
+
+service.labor_rates_updated
 ```
 
 These double as the detail-page timeline, so write useful metadata — old and new
@@ -505,6 +540,16 @@ original cadence, and a pure function of the anchor could express neither.
   whenever the last deploy happened — and attaches it. Uncovered work is
   never booked — that would commit the shop to a visit nobody agreed to pay for
   — and lands on the **call list** instead, which is a human's job.
+- **Coverage is decided on the occurrence's due date, never on the day you
+  ask.** `MaintenanceDueRow.Covered()` takes no day for exactly this reason, and
+  the `Bookable` and `Uncovered` SQL scopes compare `contract_ends_on` against
+  `d.due_on`. Keyed to `now()` instead, a contract lapsing inside a task's lead
+  window — cover ending Sep 4, a visit due Sep 11, fourteen days of lead — read
+  as covered on Sep 1 and booked the shop a visit a week after the term ended;
+  and because the two scopes are exact complements, the same row never reached
+  the call list where somebody would have sold it. Every fixed-term contract
+  crosses that window once, on its way out. **Move one of the three and you must
+  move all three**, or a row lands on neither list.
 
 ### Admin UI
 

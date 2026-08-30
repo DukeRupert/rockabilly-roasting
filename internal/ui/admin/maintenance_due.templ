@@ -118,14 +118,18 @@ func maintenanceTiming(row domain.MaintenanceDueRow, today time.Time) string {
 
 // maintenanceCoverage is what the row says about who pays. Uncovered work is
 // the row a staffer acts on, so it is the one that gets the badge.
-func maintenanceCoverageBadge(row domain.MaintenanceDueRow, today time.Time) string {
+//
+// No day parameter, for the same reason Covered has none: coverage is decided
+// on the occurrence's due date, and a today argument sitting here unused is an
+// invitation to start answering the question as of today again.
+func maintenanceCoverageBadge(row domain.MaintenanceDueRow) string {
 	if row.Covered() {
 		return "badge badge-teal"
 	}
 	return "badge badge-amber"
 }
 
-func maintenanceCoverageLabel(row domain.MaintenanceDueRow, today time.Time) string {
+func maintenanceCoverageLabel(row domain.MaintenanceDueRow) string {
 	if row.Covered() {
 		return "On contract"
 	}
@@ -205,8 +209,8 @@ templ maintenanceRow(row domain.MaintenanceDueRow, props MaintenanceDueProps) {
 						<span class={ maintenanceUrgencyBadge(row.Urgency(props.Today)) }>
 							{ maintenanceTiming(row, props.Today) }
 						</span>
-						<span class={ maintenanceCoverageBadge(row, props.Today) }>
-							{ maintenanceCoverageLabel(row, props.Today) }
+						<span class={ maintenanceCoverageBadge(row) }>
+							{ maintenanceCoverageLabel(row) }
 						</span>
 						if row.WarrantyAtRisk(props.Today) {
 							<span class="badge badge-red">Warranty at risk</span>

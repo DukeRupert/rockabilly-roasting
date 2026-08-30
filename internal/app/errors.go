@@ -415,6 +415,14 @@ var (
 	// that does — the worst kind of wrong.
 	ErrPlanHasNoTasks   = errors.New("add at least one task to the plan before assigning it")
 	ErrPlanTaskNotFound = errors.New("that task is not on this plan")
+
+	// ErrPlanTaskRetired guards the two write paths a retired task must not
+	// take. The plan page hides both controls, but the routes are POSTable and
+	// a retired task is not an editable one — rescheduling it would move
+	// occurrences on a job that has stopped, and retiring it twice would write
+	// a second audit row for something that already happened.
+	ErrPlanTaskRetired = errors.New("this job has been retired from the plan")
+
 	ErrPlanTaskNameRequired = errors.New("what gets done? name the task")
 	// ErrPlanIntervalInvalid guards the interval. Zero would come due forever;
 	// ten years is past the point where anything would ever surface it again,

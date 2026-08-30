@@ -355,6 +355,13 @@ func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 		}
 		return nil, err
 	}
+	// A retired job has stopped. The plan page hides its edit form, but the
+	// route is POSTable, and an interval change here would run rescheduleTask
+	// over the booked occurrences retirement deliberately kept — moving visits
+	// somebody has already been promised, for a task that generates no more.
+	if before.Retired() {
+		return nil, ErrPlanTaskRetired
+	}
 
 	task, err := s.plans.UpdateTask(ctx, tx, id, p)
 	if err != nil {
@@ -420,13 +427,17 @@ func (s *ServicePlanService) rescheduleTask(ctx context.Context, tx pgx.Tx, task
 	return moved, nil
 }
 
-// RemoveTask takes an item out of a plan's series. Its occurrences go with it —
-// pending and historical alike, by the cascade — because a completed record of
-// a task that is no longer in the plan describes work nobody can now interpret.
+// RemoveTask takes an item out of a plan's series, by whichever of two routes
+// fits what the task has behind it.
 //
-// Refused while any of those occurrences carries a ticket. The cascade would
-// take an open customer visit, or the record of one that happened, with it and
-// leave the ticket pointing at nothing.
+// A task nobody has ever used is deleted outright: there is nothing to keep,
+// and its cascade reaches only occurrences nobody will attend. A task with any
+// history is retired instead — it stops generating work, and every occurrence
+// it already produced stays exactly where it is, because deleting it would take
+// completed visits and open customer tickets with it.
+//
+// Either way the pending unbooked occurrences go. A booked one is left alone:
+// somebody is going to that visit, or already did.
 func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, id uuid.UUID, now time.Time, actor Actor) error {
 	task, err := s.plans.GetTask(ctx, tx, id)
 	if err != nil {
@@ -440,6 +451,12 @@ func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, 
 	// described a different task.
 	if task.PlanID != planID {
 		return ErrPlanTaskNotFound
+	}
+	// Already off the plan. The page hides the control, so reaching here is a
+	// double submit — and retiring twice would write a second audit row for
+	// something that happened once.
+	if task.Retired() {
+		return ErrPlanTaskRetired
 	}
 
 	// Two ways off a plan, and the system picks — asking staff to classify a
@@ -861,14 +878,22 @@ func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UU
 		return nil, err
 	}
 
-	// Only a live assignment gets a successor.
+	// Only a live assignment on a live task gets a successor.
 	//
-	// Belt and braces: ending an assignment deletes its unbooked pending rows,
-	// so GetDue above already fails for those and this is unreachable through
-	// that path. It is reachable for an occurrence that was booked — those
-	// survive EndAssignment so the ticket is not orphaned — and there, closing
-	// the work out must not restart a schedule nobody is on.
-	if assignment.Live() {
+	// Belt and braces on the assignment: ending one deletes its unbooked
+	// pending rows, so GetDue above already fails for those and this is
+	// unreachable through that path. It is reachable for an occurrence that was
+	// booked — those survive EndAssignment so the ticket is not orphaned — and
+	// there, closing the work out must not restart a schedule nobody is on.
+	//
+	// The task check is the same argument, and load-bearing rather than belt
+	// and braces. RemoveTask retires a task with history and deliberately keeps
+	// its booked pending occurrences, because somebody is going to those
+	// visits. Writing a successor when one of them is closed would put the
+	// retired job straight back on the machine — and on a contract account the
+	// nightly sweep books that row a ticket, which makes it booked-pending
+	// again, which regenerates on close. The task would never come off.
+	if assignment.Live() && !task.Retired() {
 		next := domain.NextDueAfterCompletion(on, task.IntervalDays)
 		if status == domain.MaintenanceStatusSkipped {
 			next = domain.NextDueAfterSkip(before.DueOn, on, task.IntervalDays)

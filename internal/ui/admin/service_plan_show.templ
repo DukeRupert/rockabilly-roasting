@@ -39,10 +39,9 @@ type ServicePlanShowProps struct {
 	// be deleted, only retired.
 	TotalMachines int
 	// TaskHistory is how many recorded occurrences each task has — done,
-	// skipped, or booked onto a ticket. Any at all means RemoveTask will refuse
-	// the delete, because the occurrences cascade and that history is the
-	// record of what a machine actually received. Tasks with none are absent
-	// from the map, so reading it for a missing key gives the right answer.
+	// skipped, or with a visit booked. It decides which of the two outcomes the
+	// remove dialog describes: none and the task is deleted, any and it is
+	// retired with its record intact.
 	TaskHistory map[uuid.UUID]int
 	// Values and Error echo back a rejected task form.
 	Values    PlanTaskFormValues

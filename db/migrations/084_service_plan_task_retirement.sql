@@ -30,6 +30,9 @@ CREATE INDEX service_plan_tasks_live_idx
     WHERE retired_at IS NULL;
 
 -- +goose Down
-
-DROP INDEX service_plan_tasks_live_idx;
-ALTER TABLE service_plan_tasks DROP COLUMN retired_at;
+--
+-- Rolling this back does more than drop a column: every retired task becomes
+-- live again and resumes generating work on the next sweep. A machine that
+-- stopped getting a job starts getting it again, and nothing says why.
+DROP INDEX IF EXISTS service_plan_tasks_live_idx;
+ALTER TABLE service_plan_tasks DROP COLUMN IF EXISTS retired_at;

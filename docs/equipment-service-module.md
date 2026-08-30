@@ -409,7 +409,7 @@ All three: check module enablement first and return nil when off. All idempotent
 ## Audit actions
 
 In `platform/audit/actions.go`. Resource types: `equipment`, `service_ticket`,
-`service_plan`, and `store_settings` for the labour rates.
+`service_plan`, `module`, and `store_settings` for the labour rates.
 
 The resource type decides which timeline a row lands on, and it is not always
 the thing the action created. `equipment.maintenance_booked` is recorded against

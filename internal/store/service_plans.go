@@ -358,10 +358,10 @@ func (s *ServicePlanStore) NextTaskSortOrder(ctx context.Context, tx pgx.Tx, pla
 // present as zero, so a caller reading it with the zero value gets the right
 // answer either way.
 //
-// The plan page needs this per task to decide whether to offer a remove
-// control at all — offering one that RemoveTask will always refuse is a worse
-// experience than not offering it. One query rather than one per task, because
-// a full manufacturer schedule runs to a dozen of them.
+// The plan page needs this per task so the remove dialog can say which of its
+// two outcomes the click will get — deleted outright, or retired with its
+// record kept. One query rather than one per task, because a full manufacturer
+// schedule runs to a dozen of them.
 func (s *ServicePlanStore) CountHistoryByTask(ctx context.Context, tx pgx.Tx, planID uuid.UUID) (map[uuid.UUID]int, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT d.task_id, count(*)

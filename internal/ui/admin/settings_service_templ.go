@@ -9,6 +9,9 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -39,9 +42,15 @@ type ServiceRateValues struct {
 	TravelRate string
 }
 
-// rateSet reports whether a labour rate has been entered, which decides whether
-// the page explains what the number does or what its absence does.
-func (v ServiceRateValues) rateSet() bool { return v.LaborRate != "" }
+// rateSet reports whether a rate is in force for new hours.
+//
+// Deliberately the same rule as domain.ServiceLaborRates.Set(): a saved 0.00 is
+// not a rate. Disagreeing would offer "see what it says" against a report that
+// says no rate is set.
+func (v ServiceRateValues) rateSet() bool {
+	cents, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(v.LaborRate, "$")), 64)
+	return err == nil && cents > 0
+}
 
 func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -92,7 +101,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 61, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 70, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -110,20 +119,20 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.LaborRate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 72, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 81, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" inputmode=\"decimal\" placeholder=\"65.00\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><p class=\"mt-1 text-xs text-rr-muted\">Leave blank and the reports show hours and parts separately, with no money column.</p></div><div><label for=\"travel-rate\" class=\"label-font block text-rr-muted\">Travel, per hour</label><div class=\"mt-1 flex items-center gap-2\"><span class=\"text-sm text-rr-muted\">$</span> <input type=\"text\" id=\"travel-rate\" name=\"travel_rate\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" inputmode=\"decimal\" placeholder=\"65.00\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><p class=\"mt-1 text-xs text-rr-muted\">Leave blank and new hours are logged unpriced. Hours already stamped with a rate keep their cost.</p></div><div><label for=\"travel-rate\" class=\"label-font block text-rr-muted\">Travel, per hour</label><div class=\"mt-1 flex items-center gap-2\"><span class=\"text-sm text-rr-muted\">$</span> <input type=\"text\" id=\"travel-rate\" name=\"travel_rate\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.TravelRate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 88, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 97, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {

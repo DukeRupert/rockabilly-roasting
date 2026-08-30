@@ -286,6 +286,23 @@ func (s *ServicePlanService) AddTask(ctx context.Context, tx pgx.Tx, p AddPlanTa
 // EditPlanTaskParams is the editable half of a task.
 type EditPlanTaskParams = store.UpdateServicePlanTaskParams
 
+// GetTaskOnPlan returns a task, refusing one that belongs to a different plan.
+// The ids arrive from an editable URL, so the pairing is checked rather than
+// assumed.
+func (s *ServicePlanService) GetTaskOnPlan(ctx context.Context, tx pgx.Tx, planID, taskID uuid.UUID) (*domain.ServicePlanTask, error) {
+	task, err := s.plans.GetTask(ctx, tx, taskID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPlanTaskNotFound
+		}
+		return nil, err
+	}
+	if task.PlanID != planID {
+		return nil, ErrPlanTaskNotFound
+	}
+	return task, nil
+}
+
 // EditTask rewrites a task. A changed interval is pushed onto every pending
 // occurrence of the task, re-measured from whatever each one was anchored to —
 // otherwise the plan would say "every 60 days" while forty machines quietly
@@ -347,13 +364,19 @@ func (s *ServicePlanService) EditTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 // RemoveTask takes an item out of a plan's series. Its occurrences go with it —
 // pending and historical alike, by the cascade — because a completed record of
 // a task that is no longer in the plan describes work nobody can now interpret.
-func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, id uuid.UUID, actor Actor) error {
 	task, err := s.plans.GetTask(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrPlanTaskNotFound
 		}
 		return err
+	}
+	// The id arrives from an editable URL. A task on another plan must not be
+	// deletable through this one — and the confirm dialog the staffer just read
+	// described a different task.
+	if task.PlanID != planID {
+		return ErrPlanTaskNotFound
 	}
 
 	if err := s.plans.DeleteTask(ctx, tx, id); err != nil {
@@ -535,10 +558,15 @@ func (s *ServicePlanService) EditAssignment(ctx context.Context, tx pgx.Tx, id u
 
 // EndAssignment takes a machine off a plan. Pending occurrences go; the record
 // of what was done under the arrangement stays.
-func (s *ServicePlanService) EndAssignment(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time, actor Actor) error {
+func (s *ServicePlanService) EndAssignment(ctx context.Context, tx pgx.Tx, equipmentID, id uuid.UUID, now time.Time, actor Actor) error {
 	assignment, err := s.GetAssignment(ctx, tx, id)
 	if err != nil {
 		return err
+	}
+	// Scoped to the machine in the path: another machine's schedule must not be
+	// stoppable through this one's page.
+	if assignment.EquipmentID != equipmentID {
+		return ErrPlanAssignmentNotFound
 	}
 	if !assignment.Live() {
 		return ErrPlanAssignmentEnded

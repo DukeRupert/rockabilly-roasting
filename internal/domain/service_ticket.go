@@ -560,9 +560,15 @@ type ServiceAccountCost struct {
 type ServiceAccountCostSort string
 
 const (
-	// ServiceAccountCostByHours ranks by time spent. The default: for a crew of
-	// two, hours are the thing there is least of.
-	ServiceAccountCostByHours ServiceAccountCostSort = ""
+	// ServiceAccountCostByHours ranks by time spent. The fallback ranking, and
+	// the default on a shop with no costs to rank by: for a crew of two, hours
+	// are the thing there is least of.
+	//
+	// It carries a real value rather than the empty string. An empty one cannot
+	// be told apart from an absent query parameter, and a link that omits the
+	// parameter reads as "give me the default" — which is how the Hours tab
+	// came to return the cost ranking.
+	ServiceAccountCostByHours ServiceAccountCostSort = "hours"
 	// ServiceAccountCostByParts ranks by parts spend — the money that actually
 	// left the building.
 	ServiceAccountCostByParts ServiceAccountCostSort = "parts"
@@ -578,8 +584,9 @@ const (
 	ServiceAccountCostByCost ServiceAccountCostSort = "cost"
 )
 
-// Valid reports whether s is a known sort. A hand-edited query string falls
-// back to the default rather than erroring.
+// Valid reports whether s is a known sort. The empty string is deliberately
+// not valid: it means "no sort was asked for", which is a different question
+// with a different answer.
 func (s ServiceAccountCostSort) Valid() bool {
 	switch s {
 	case ServiceAccountCostByHours, ServiceAccountCostByParts,
@@ -603,6 +610,12 @@ type ServiceAccountReport struct {
 	// Since is the start of the window, zero for all time.
 	Since time.Time
 	Sort  ServiceAccountCostSort
+	// CanCost says there is money to rank and report on: either an hour
+	// somewhere carries a rate, or the shop has set one for the next. Decided
+	// before the query, because a cost ranking with nothing to rank collapses
+	// to ordering by parts spend alone — which is exactly the misleading label
+	// this report was built to avoid.
+	CanCost bool
 	// Rates are what the *next* hour will cost. Since the snapshot moved the
 	// rate onto each entry these no longer price anything in this report; they
 	// are carried so the page can name the current rate in its footnote, and so
@@ -613,13 +626,10 @@ type ServiceAccountReport struct {
 
 // ShowCost reports whether the money column belongs on the table.
 //
-// True as soon as either an hour carries a rate or the shop has set one. The
-// second half matters: a shop that sets its first rate should see the column
-// arrive immediately, not once somebody logs an hour — otherwise the setting
-// looks like it did nothing.
-func (r ServiceAccountReport) ShowCost() bool {
-	return r.Rates.Set() || r.Total.AnyCost()
-}
+// The same question as CanCost, and deliberately the same answer: a table that
+// offered a Cost ranking without a Cost column, or the reverse, would be
+// describing two different reports.
+func (r ServiceAccountReport) ShowCost() bool { return r.CanCost }
 
 // AnyServiceCost reports whether any window in a roll-up holds anything, which
 // is how a card tells "nothing has been spent here" from "there is nothing to

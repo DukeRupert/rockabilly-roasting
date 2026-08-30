@@ -583,9 +583,11 @@ parts but no hours logged — there is a test for exactly that.
 cents and work is in minutes; blending them needs an hourly cost, and inventing
 one would put a made-up number at the top of a report meant to settle arguments.
 Set a rate in Settings → Service and a Cost column appears on all three
-surfaces, and Cost becomes the default ranking. Leave it unset — the shipped
-state — and the reader picks between hours (default), parts spend, or visits,
-with both numbers always in the table.
+surfaces, and Cost becomes the default ranking. With nothing to cost — no rate
+set and no hour carrying one — the Cost option is not offered at all and a cost
+ranking asked for by URL falls back to hours, because ordering by
+`parts_cents + 0` under a Cost heading would be the misleading label this report
+was built to avoid.
 
 Rows are driven by work recorded, not by the customer list: an account nobody
 touched in the window has no row, so the table stays as short as the finding is.
@@ -653,9 +655,13 @@ rate of the day, and that is a fact about the past.
 
 `ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
 figure the Cost column prints, ordered in SQL because it has to precede the
-LIMIT. The money column appears as soon as either an hour carries a rate or the
-shop has set one, so a first rate visibly does something before any hour is
-logged at it.
+LIMIT. `ServiceAccountReport.CanCost` decides both whether that ranking is
+offered and whether the column is drawn, from one signal so the two cannot
+disagree: true as soon as either an hour carries a rate or the shop has set one.
+
+Every link in the control strip names its ranking, including Hours. A link that
+omitted the parameter would read to the handler as "no preference", which is the
+request for the default — so the Hours tab would come back ranked by cost.
 
 ## Open decisions
 

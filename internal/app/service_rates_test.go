@@ -251,7 +251,7 @@ func TestRepriceTimeEntry(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, entry.Costed())
 
-	priced, err := svc.RepriceTimeEntry(ctx, tx, entry.ID, cents(6500), testutil.TestActor())
+	priced, err := svc.RepriceTimeEntry(ctx, tx, ticket.ID, entry.ID, cents(6500), testutil.TestActor())
 	require.NoError(t, err)
 	require.NotNil(t, priced.RateCents)
 	assert.Equal(t, 6500, *priced.RateCents)
@@ -263,7 +263,7 @@ func TestRepriceTimeEntry(t *testing.T) {
 	assert.True(t, totals.FullyCosted())
 
 	// And back out again, without touching the hours.
-	cleared, err := svc.RepriceTimeEntry(ctx, tx, entry.ID, nil, testutil.TestActor())
+	cleared, err := svc.RepriceTimeEntry(ctx, tx, ticket.ID, entry.ID, nil, testutil.TestActor())
 	require.NoError(t, err)
 	assert.False(t, cleared.Costed())
 
@@ -341,4 +341,56 @@ func TestCostByAccountRanksByCostOnceRated(t *testing.T) {
 	byParts, err := svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByParts, now)
 	require.NoError(t, err)
 	assert.Equal(t, partsHeavy.ID, byParts.Rows[0].CustomerID)
+}
+
+// The money column turns on from either signal: an hour that already carries a
+// rate, or a rate set for the next one. Both matter — the first keeps the
+// column after a rate is cleared, the second makes a shop's first rate visibly
+// do something before anybody has logged an hour at it.
+func TestCostByAccountShowsCostFromEitherSignal(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+	now := time.Date(2026, time.September, 1, 12, 0, 0, 0, time.UTC)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-SHOW-1", CustomerID: customer.ID, Title: "work",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	// Nothing priced and no rate: no column, and a cost ranking falls back
+	// rather than ordering by parts spend under a Cost heading.
+	report, err := svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByCost, now)
+	require.NoError(t, err)
+	assert.False(t, report.ShowCost())
+	assert.Equal(t, domain.ServiceAccountCostByHours, report.Sort,
+		"the strip has to highlight the ranking that actually ran")
+
+	// A rate set, still no hours logged at it.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6500),
+	}, testutil.TestActor()))
+
+	report, err = svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByCost, now)
+	require.NoError(t, err)
+	assert.True(t, report.ShowCost(), "a first rate should visibly do something")
+	assert.Equal(t, domain.ServiceAccountCostByCost, report.Sort)
+
+	// An hour logged at it, then the rate cleared: the stamped cost keeps the
+	// column alive.
+	_, err = svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor,
+		Minutes: 60, PerformedOn: now.AddDate(0, 0, -5),
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{}, testutil.TestActor()))
+
+	report, err = svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByCost, now)
+	require.NoError(t, err)
+	assert.True(t, report.ShowCost(), "hours already priced still cost what they cost")
+	assert.Equal(t, domain.ServiceAccountCostByCost, report.Sort)
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 	"github.com/dukerupert/hiri/internal/ui/admin/charts"
@@ -172,7 +173,10 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// machines. Asked only when the module is on: everywhere else the
 		// tables are empty and the query would be a daily reminder that a
 		// feature nobody uses is still being paid for.
-		if d.ModuleService.Enabled(domain.ModuleEquipmentService) {
+		// Gated on the permission as well as the module: a chip that 403s on
+		// click is worse than no chip, and catalog staff have no business
+		// reading service work.
+		if d.ModuleService.Enabled(domain.ModuleEquipmentService) && staffCan(r, auth.PermViewService) {
 			props.OverdueMaintenance, txErr = d.ServicePlanService.CountDue(ctx, tx, store.MaintenanceFilter{
 				Scope: store.MaintenanceScopeOverdue,
 				Now:   d.merchantToday(),

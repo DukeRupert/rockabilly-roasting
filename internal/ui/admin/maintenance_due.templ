@@ -39,9 +39,10 @@ type MaintenanceDueProps struct {
 }
 
 // MaintenanceCounts is the size of each scope.
+// Only the scopes whose tabs carry a badge. A count nothing renders is a query
+// run on every page load for nobody.
 type MaintenanceCounts struct {
 	Overdue   int
-	DueSoon   int
 	Warranty  int
 	Uncovered int
 }
@@ -256,10 +257,30 @@ templ maintenanceRowActions(row domain.MaintenanceDueRow, props MaintenanceDuePr
 					class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm"
 				/>
 			</div>
+			<div>
+				<label for={ "done-note-" + row.ID.String() } class="label-font block text-rr-muted">Note</label>
+				<input
+					type="text"
+					id={ "done-note-" + row.ID.String() }
+					name="notes"
+					placeholder="Anything worth remembering"
+					class="mt-1 w-48 rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm"
+				/>
+			</div>
 			<button type="submit" class="btn-secondary">Mark done</button>
 		</form>
-		<form method="post" action={ templ.SafeURL("/admin/service/maintenance/" + row.ID.String() + "/skip") }>
+		<form method="post" action={ templ.SafeURL("/admin/service/maintenance/" + row.ID.String() + "/skip") } class="flex items-end gap-2">
 			<input type="hidden" name="scope" value={ props.Scope }/>
+			<div>
+				<label for={ "skip-note-" + row.ID.String() } class="label-font block text-rr-muted">Why skipped</label>
+				<input
+					type="text"
+					id={ "skip-note-" + row.ID.String() }
+					name="notes"
+					placeholder="Cafe was shut"
+					class="mt-1 w-40 rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm"
+				/>
+			</div>
 			<button
 				type="submit"
 				class="btn-secondary"

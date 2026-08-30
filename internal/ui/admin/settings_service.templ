@@ -1,6 +1,9 @@
 package admin
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -31,9 +34,15 @@ type ServiceRateValues struct {
 	TravelRate string
 }
 
-// rateSet reports whether a labour rate has been entered, which decides whether
-// the page explains what the number does or what its absence does.
-func (v ServiceRateValues) rateSet() bool { return v.LaborRate != "" }
+// rateSet reports whether a rate is in force for new hours.
+//
+// Deliberately the same rule as domain.ServiceLaborRates.Set(): a saved 0.00 is
+// not a rate. Disagreeing would offer "see what it says" against a report that
+// says no rate is set.
+func (v ServiceRateValues) rateSet() bool {
+	cents, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(v.LaborRate, "$")), 64)
+	return err == nil && cents > 0
+}
 
 templ SettingsServiceContent(props SettingsServiceProps) {
 	@settingsSection(props.Nav, settingsTabService)
@@ -75,7 +84,7 @@ templ SettingsServiceContent(props SettingsServiceProps) {
 								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
-						<p class="mt-1 text-xs text-rr-muted">Leave blank and the reports show hours and parts separately, with no money column.</p>
+						<p class="mt-1 text-xs text-rr-muted">Leave blank and new hours are logged unpriced. Hours already stamped with a rate keep their cost.</p>
 					</div>
 					<div>
 						<label for="travel-rate" class="label-font block text-rr-muted">Travel, per hour</label>

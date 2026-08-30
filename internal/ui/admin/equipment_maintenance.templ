@@ -20,13 +20,17 @@ type EquipmentMaintenanceProps struct {
 	Assignments []domain.EquipmentServicePlan
 	// Upcoming is every pending occurrence across those plans, soonest first.
 	Upcoming []domain.MaintenanceDueRow
-	// AvailablePlans are the active plans not already on this machine, sorted
-	// with the ones written for its category first.
+	// AvailablePlans are the active plans this machine could go on: written for
+	// its category or for any machine, and not already assigned to it. A
+	// filter, not a sort — a grinder plan is not offered for an espresso
+	// machine at all.
 	AvailablePlans []domain.ServicePlan
+	// OtherCategoryPlans counts the active plans excluded by that filter, so
+	// the empty state can say "none for this kind of machine" rather than
+	// "none at all" and send somebody off to write a duplicate.
+	OtherCategoryPlans int
 	// Today is what "overdue" is measured against.
 	Today time.Time
-	// Error is a rejected assignment, shown against the form.
-	Error string
 }
 
 // Any reports whether the machine has a schedule at all.
@@ -122,9 +126,78 @@ templ equipmentMaintenancePlans(props EquipmentShowProps) {
 						</button>
 					</form>
 				}
+				if props.CanWrite && a.Live() {
+					@assignmentEditForm(props, a)
+				}
 			</li>
 		}
 	</ul>
+}
+
+// assignmentEditForm changes the terms a machine is on a plan under.
+//
+// The one that matters is the contract flag: a cafe that signs up for
+// maintenance halfway through should not have to be taken off the plan and put
+// back on, which would throw away the schedule. The anchor is here too, for the
+// case where it was typed wrong — it seeds occurrences that have not been
+// generated yet and leaves the dates already produced alone.
+templ assignmentEditForm(props EquipmentShowProps, a domain.EquipmentServicePlan) {
+	<details class="mt-1 w-full">
+		<summary class="cursor-pointer text-xs text-rr-muted underline">Change the terms</summary>
+		<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans/" + a.ID.String()) } class="mt-2 border-l border-rr-border pl-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<div>
+					<label for={ "assign-starts-" + a.ID.String() } class="label-font block text-rr-muted">Schedule anchored to</label>
+					<input
+						type="date"
+						id={ "assign-starts-" + a.ID.String() }
+						name="starts_on"
+						value={ a.StartsOn.UTC().Format("2006-01-02") }
+						required
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div>
+					<label for={ "assign-ends-" + a.ID.String() } class="label-font block text-rr-muted">Contract runs to</label>
+					<input
+						type="date"
+						id={ "assign-ends-" + a.ID.String() }
+						name="contract_ends_on"
+						value={ assignmentContractEndInput(a) }
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div class="sm:col-span-2">
+					<label class="flex items-center gap-2 text-sm text-rr-body">
+						<input type="checkbox" name="under_contract" value="1" checked?={ a.UnderContract } class="rounded-sm border-rr-border"/>
+						They pay for this maintenance
+					</label>
+				</div>
+				<div class="sm:col-span-2">
+					<label for={ "assign-notes-" + a.ID.String() } class="label-font block text-rr-muted">Notes</label>
+					<input
+						type="text"
+						id={ "assign-notes-" + a.ID.String() }
+						name="notes"
+						value={ a.Notes }
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+			</div>
+			<div class="mt-3">
+				<button type="submit" class="btn-secondary">Save the terms</button>
+			</div>
+		</form>
+	</details>
+}
+
+// assignmentContractEndInput renders the contract end for a date input, blank
+// for an open-ended arrangement.
+func assignmentContractEndInput(a domain.EquipmentServicePlan) string {
+	if a.ContractEndsOn == nil {
+		return ""
+	}
+	return a.ContractEndsOn.UTC().Format("2006-01-02")
 }
 
 // equipmentMaintenanceUpcoming is the machine's own schedule, soonest first.
@@ -167,12 +240,13 @@ templ equipmentAssignPlanForm(props EquipmentShowProps) {
 				</p>
 			}
 		} else {
-			<details open?={ props.Maintenance.Error != "" }>
+			<!-- Left closed on a rejected assignment: the failure arrives as a
+			     flash at the top of the page, which is where the eye goes after
+			     a redirect. Opening the panel as well would be two answers to
+			     the same question. -->
+			<details>
 				<summary class="cursor-pointer text-sm font-semibold text-rr-heading">Put it on a plan</summary>
 				<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans") } class="mt-3">
-					if props.Maintenance.Error != "" {
-						<p class="mb-3 text-sm text-rr-red">{ props.Maintenance.Error }</p>
-					}
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<div>
 							<label for="assign-plan" class="label-font block text-rr-muted">Plan</label>

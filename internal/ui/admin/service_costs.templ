@@ -71,19 +71,22 @@ func serviceSorts(rated bool) []struct {
 		Label string
 		Value string
 	}{
-		{"Hours", ""},
+		{"Hours", "hours"},
 		{"Parts spend", "parts"},
 		{"Visits", "visits"},
 	}...)
 }
 
 // serviceCostsHref builds a link that changes one control and keeps the other.
+//
+// The sort is always emitted. Omitting it would read to the handler as "no sort
+// asked for", which is the request for the default — so a link meaning "rank by
+// hours" would come back ranked by cost.
 func serviceCostsHref(days int, sort string) string {
-	q := "/admin/service/costs?days=" + strconv.Itoa(days)
-	if sort != "" {
-		q += "&sort=" + sort
+	if sort == "" {
+		sort = "hours"
 	}
-	return q
+	return "/admin/service/costs?days=" + strconv.Itoa(days) + "&sort=" + sort
 }
 
 // serviceCostsPeriodLabel says what the numbers cover, in a sentence.

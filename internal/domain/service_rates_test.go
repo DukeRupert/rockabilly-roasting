@@ -107,24 +107,19 @@ func TestServiceTimeEntryCost(t *testing.T) {
 	assert.Equal(t, 0, absorbed.CostCents())
 }
 
-// The money column appears as soon as either an hour is priced or a rate is
-// set — a shop setting its first rate should not have to log an hour to see
-// that the setting did anything.
+// The table's money column and its Cost ranking answer one question, so they
+// read one field. Deciding it needs a database, so the service owns that — see
+// TestCostByAccountShowsCostFromEitherSignal.
 func TestServiceAccountReportShowCost(t *testing.T) {
 	assert.False(t, domain.ServiceAccountReport{}.ShowCost())
+	assert.True(t, domain.ServiceAccountReport{CanCost: true}.ShowCost())
 
+	// Rates alone do not turn it on here: a report built without the check is
+	// one whose ranking and column could disagree.
 	rated := domain.ServiceAccountReport{
 		Rates: domain.ServiceLaborRates{LaborCentsPerHour: rate(6500)},
 	}
-	assert.True(t, rated.ShowCost(), "a rate with no hours behind it yet still shows the column")
-
-	historic := domain.ServiceAccountReport{
-		Total: domain.ServiceCostSummary{
-			ServiceTotals: domain.ServiceTotals{LaborCostCents: 16250},
-		},
-	}
-	assert.True(t, historic.ShowCost(),
-		"priced hours keep the column even after the shop clears its rate")
+	assert.False(t, rated.ShowCost())
 }
 
 func TestServiceAccountCostSortValid(t *testing.T) {

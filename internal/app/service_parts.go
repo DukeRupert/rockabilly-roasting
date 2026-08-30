@@ -366,29 +366,28 @@ func (s *ServiceTicketService) rateFor(ctx context.Context, tx pgx.Tx, kind doma
 //
 // A nil rate returns the entry to uncosted, which is how a wrongly-priced hour
 // is taken back out of the money figures without deleting the hours themselves.
-func (s *ServiceTicketService) RepriceTimeEntry(ctx context.Context, tx pgx.Tx, id uuid.UUID, rateCents *int, actor Actor) (*domain.ServiceTimeEntry, error) {
+func (s *ServiceTicketService) RepriceTimeEntry(ctx context.Context, tx pgx.Tx, ticketID, entryID uuid.UUID, rateCents *int, actor Actor) (*domain.ServiceTimeEntry, error) {
 	if rateCents != nil && (*rateCents < 0 || *rateCents > maxLaborRateCents) {
 		return nil, ErrLaborRateInvalid
 	}
 
-	before, err := s.tickets.GetTimeEntry(ctx, tx, id)
+	ticket, err := s.GetByID(ctx, tx, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	// Scoped to the ticket in the path, the same way removing one is. The id
+	// arrives from an editable URL, and an entry belonging to another ticket
+	// must not be repriced through this one.
+	before, err := s.timeEntryOnTicket(ctx, tx, ticketID, entryID)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := s.tickets.UpdateTimeEntryRate(ctx, tx, entryID, rateCents)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrServiceTimeEntryNotFound
 		}
-		return nil, err
-	}
-
-	entry, err := s.tickets.UpdateTimeEntryRate(ctx, tx, id, rateCents)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrServiceTimeEntryNotFound
-		}
-		return nil, err
-	}
-
-	ticket, err := s.GetByID(ctx, tx, entry.TicketID)
-	if err != nil {
 		return nil, err
 	}
 

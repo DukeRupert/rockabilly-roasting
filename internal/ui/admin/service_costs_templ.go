@@ -79,19 +79,22 @@ func serviceSorts(rated bool) []struct {
 		Label string
 		Value string
 	}{
-		{"Hours", ""},
+		{"Hours", "hours"},
 		{"Parts spend", "parts"},
 		{"Visits", "visits"},
 	}...)
 }
 
 // serviceCostsHref builds a link that changes one control and keeps the other.
+//
+// The sort is always emitted. Omitting it would read to the handler as "no sort
+// asked for", which is the request for the default — so a link meaning "rank by
+// hours" would come back ranked by cost.
 func serviceCostsHref(days int, sort string) string {
-	q := "/admin/service/costs?days=" + strconv.Itoa(days)
-	if sort != "" {
-		q += "&sort=" + sort
+	if sort == "" {
+		sort = "hours"
 	}
-	return q
+	return "/admin/service/costs?days=" + strconv.Itoa(days) + "&sort=" + sort
 }
 
 // serviceCostsPeriodLabel says what the numbers cover, in a sentence.
@@ -174,7 +177,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(serviceCostsHref(p.Days, string(props.Report.Sort))))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 135, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 138, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -200,7 +203,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(p.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 137, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 140, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -228,7 +231,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var7 templ.SafeURL
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(serviceCostsHref(props.Days, s.Value)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 144, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 147, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -254,7 +257,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(s.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 146, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 149, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -277,7 +280,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(serviceCostsPeriodLabel(props.Days))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 154, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 157, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -310,7 +313,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var11 templ.SafeURL
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/customers/" + row.CustomerID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 176, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 179, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -323,7 +326,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 177, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 180, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -336,7 +339,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(serviceCostMachines(row.MachineCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 179, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 182, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -349,7 +352,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(row.Summary.TotalMinutes()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 182, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 185, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -367,7 +370,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(row.Summary.TravelMinutes))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 184, Col: 87}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 187, Col: 87}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -385,7 +388,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(row.Summary.PartsCostCents))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 188, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 191, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -403,7 +406,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(serviceCostParts(row.Summary.PartCount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 190, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 193, Col: 86}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -421,7 +424,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(row.Summary.Visits))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 194, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 197, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -439,7 +442,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 					var templ_7745c5c3_Var19 string
 					templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(row.Summary.MinutesPerVisit()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 196, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 199, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 					if templ_7745c5c3_Err != nil {
@@ -462,7 +465,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 					var templ_7745c5c3_Var20 string
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(row.Summary.TotalCostCents()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 201, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 204, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -476,7 +479,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 						var templ_7745c5c3_Var21 string
 						templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(row.Summary.LaborCostCents))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 204, Col: 53}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 207, Col: 53}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 						if templ_7745c5c3_Err != nil {
@@ -495,7 +498,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 						var templ_7745c5c3_Var22 string
 						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(row.Summary.UncostedMinutes))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 207, Col: 82}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 210, Col: 82}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 						if templ_7745c5c3_Err != nil {
@@ -518,7 +521,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(dayLabel(row.LastWorkOn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 212, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 215, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -536,7 +539,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(props.Report.Total.TotalMinutes()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 222, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 225, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -549,7 +552,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Report.Total.PartsCostCents))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 225, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 228, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -562,7 +565,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Report.Total.Visits))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 228, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 231, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -580,7 +583,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Report.Total.TotalCostCents()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 232, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 235, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -614,7 +617,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(props.Report.Total.UncostedMinutes))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 249, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 252, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -633,7 +636,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Report.Rates.LaborRate()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 254, Col: 165}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 257, Col: 165}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -646,7 +649,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Report.Rates.TravelRate()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 254, Col: 225}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 257, Col: 225}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -670,7 +673,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(props.Report.Total.BillableMinutes))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 263, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_costs.templ`, Line: 266, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {

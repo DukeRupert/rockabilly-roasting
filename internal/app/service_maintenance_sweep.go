@@ -226,7 +226,29 @@ func (s *ServicePlanService) bookOne(ctx context.Context, pool *pgxpool.Pool, ro
 			return err
 		}
 
-		return s.plans.AttachTicket(ctx, tx, row.ID, ticket.ID)
+		if err := s.plans.AttachTicket(ctx, tx, row.ID, ticket.ID); err != nil {
+			return err
+		}
+
+		// A ticket appearing with no human behind it is otherwise
+		// unexplainable from the ticket page: the opened-by fields are empty
+		// and nothing says why today. This is the row that answers it.
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "service_maintenance_sweep",
+			Action:       audit.AuditMaintenanceBooked,
+			ResourceType: "service_ticket",
+			ResourceID:   ticket.ID,
+			Metadata: map[string]any{
+				"number":         ticket.Number,
+				"customer_id":    row.CustomerID.String(),
+				"equipment_id":   row.EquipmentID.String(),
+				"plan":           row.PlanName,
+				"task":           row.TaskName,
+				"due_on":         row.DueOn.Format(time.DateOnly),
+				"maintenance_id": row.ID.String(),
+			},
+		})
 	})
 }
 

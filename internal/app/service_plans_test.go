@@ -310,7 +310,7 @@ func TestEndAssignmentClearsPendingKeepsHistory(t *testing.T) {
 	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, staffActorFor(t, tx))
 	require.NoError(t, err)
 
-	require.NoError(t, svc.EndAssignment(ctx, tx, assignment.ID, time.Now(), testutil.TestActor()))
+	require.NoError(t, svc.EndAssignment(ctx, tx, machine.ID, assignment.ID, time.Now(), testutil.TestActor()))
 
 	pending, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: planDay(2026, time.June, 1)})
 	require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestCompleteAfterEndDoesNotResurrect(t *testing.T) {
 
 	// End the assignment, which deletes the pending row — then try to close the
 	// id somebody still had on a stale page.
-	require.NoError(t, svc.EndAssignment(ctx, tx, assignment.ID, time.Now(), testutil.TestActor()))
+	require.NoError(t, svc.EndAssignment(ctx, tx, machine.ID, assignment.ID, time.Now(), testutil.TestActor()))
 
 	_, err = svc.CompleteDue(ctx, tx, dueID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, staffActorFor(t, tx))
 	assert.ErrorIs(t, err, app.ErrMaintenanceNotFound)

@@ -789,9 +789,11 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("POST /admin/service/plans/{id}/reactivate", deps.handleAdminServicePlanReactivate)
 	serviceWrite("POST /admin/service/plans/{id}/delete", deps.handleAdminServicePlanDelete)
 	serviceWrite("POST /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskAdd)
+	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}", deps.handleAdminServicePlanTaskUpdate)
 	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}/delete", deps.handleAdminServicePlanTaskDelete)
 
 	serviceWrite("POST /admin/service/equipment/{id}/plans", deps.handleAdminEquipmentPlanAssign)
+	serviceWrite("POST /admin/service/equipment/{id}/plans/{childID}", deps.handleAdminEquipmentPlanUpdate)
 	serviceWrite("POST /admin/service/equipment/{id}/plans/{childID}/end", deps.handleAdminEquipmentPlanEnd)
 
 	// The cross-account cost report. Read-only, so finance — which holds

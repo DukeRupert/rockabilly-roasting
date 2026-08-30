@@ -546,8 +546,25 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	if err != nil {
 		return domain.ServiceAccountReport{}, err
 	}
+	// Is there any money to rank on? Either an hour already carries a rate, or
+	// the shop has set one for the next. Both halves matter: the first keeps
+	// the column after a rate is cleared, the second makes a shop's first rate
+	// visibly do something before anybody has logged an hour at it.
+	costed, err := s.tickets.AnyCostedTime(ctx, tx)
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+	canCost := rates.Set() || costed
 
-	report := domain.ServiceAccountReport{Sort: sort, Rates: rates}
+	// A cost ranking with nothing to rank orders by parts spend alone. Fall
+	// back rather than print that under a Cost heading — and echo back the sort
+	// that actually ran, so the strip highlights the tab the reader is looking
+	// at rather than the one they asked for.
+	if sort == domain.ServiceAccountCostByCost && !canCost {
+		sort = domain.ServiceAccountCostByHours
+	}
+
+	report := domain.ServiceAccountReport{Sort: sort, Rates: rates, CanCost: canCost}
 	if sinceDays > 0 {
 		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
 	}

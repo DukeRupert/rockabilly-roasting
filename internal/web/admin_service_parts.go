@@ -276,7 +276,7 @@ func (d *Deps) handleAdminServiceTimeReprice(w http.ResponseWriter, r *http.Requ
 	var entry *domain.ServiceTimeEntry
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		entry, txErr = d.ServiceTicketService.RepriceTimeEntry(ctx, tx, entryID, rate, staffActor(r))
+		entry, txErr = d.ServiceTicketService.RepriceTimeEntry(ctx, tx, ticketID, entryID, rate, staffActor(r))
 		return txErr
 	}); err != nil {
 		Error(w, r, err)

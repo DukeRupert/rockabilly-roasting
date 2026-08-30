@@ -134,7 +134,6 @@ func (d *Deps) maintenanceCounts(ctx context.Context, tx pgx.Tx, today time.Time
 		into  *int
 	}{
 		{store.MaintenanceScopeOverdue, &counts.Overdue},
-		{store.MaintenanceScopeDueSoon, &counts.DueSoon},
 		{store.MaintenanceScopeWarranty, &counts.Warranty},
 		{store.MaintenanceScopeUncovered, &counts.Uncovered},
 	} {
@@ -333,6 +332,22 @@ func buildCalendarDays(gridStart, month time.Time, rows []domain.MaintenanceDueR
 
 // handleAdminServicePlanList renders the plan index.
 func (d *Deps) handleAdminServicePlanList(w http.ResponseWriter, r *http.Request) {
+	props, err := d.planListProps(r)
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		admin.ServicePlanListContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	admin.ServicePlanList(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// planListProps reads everything the index draws. Shared with the rejected-form
+// path, so a bounced create redraws the same page rather than a thinner one.
+func (d *Deps) planListProps(r *http.Request) (admin.ServicePlanListProps, error) {
 	ctx := r.Context()
 
 	var plans []domain.ServicePlan
@@ -361,12 +376,11 @@ func (d *Deps) handleAdminServicePlanList(w http.ResponseWriter, r *http.Request
 		nav, txErr = d.serviceNav(ctx, tx)
 		return txErr
 	}); err != nil {
-		Error(w, r, err)
-		return
+		return admin.ServicePlanListProps{}, err
 	}
 
 	staffName, staffRole := staffNameRole(r)
-	props := admin.ServicePlanListProps{
+	return admin.ServicePlanListProps{
 		Plans:     plans,
 		Nav:       nav,
 		Machines:  machines,
@@ -375,13 +389,7 @@ func (d *Deps) handleAdminServicePlanList(w http.ResponseWriter, r *http.Request
 		StaffRole: staffRole,
 		CanWrite:  staffCan(r, auth.PermWriteService),
 		Flash:     settingsFlash(r),
-	}
-
-	if IsHTMX(r) {
-		admin.ServicePlanListContent(props).Render(ctx, w) //nolint:errcheck
-		return
-	}
-	admin.ServicePlanList(props).Render(ctx, w) //nolint:errcheck
+	}, nil
 }
 
 // handleAdminServicePlanCreate writes a new plan.
@@ -392,17 +400,27 @@ func (d *Deps) handleAdminServicePlanCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	values := admin.ServicePlanFormValues{
+		Name:        r.FormValue("name"),
+		Description: r.FormValue("description"),
+		Category:    r.FormValue("category"),
+		Active:      true,
+	}
+
 	var plan *domain.ServicePlan
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		plan, txErr = d.ServicePlanService.CreatePlan(ctx, tx, app.CreateServicePlanParams{
-			Name:        r.FormValue("name"),
-			Description: r.FormValue("description"),
-			Category:    domain.EquipmentCategory(r.FormValue("category")),
+			Name:        values.Name,
+			Description: values.Description,
+			Category:    domain.EquipmentCategory(values.Category),
 		}, staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, "/admin/service/plans", err.Error())
+		// Re-render in place rather than redirecting. The commonest rejection
+		// is a duplicate name, and bouncing back to an empty form would throw
+		// away a description somebody had just written.
+		d.renderPlanList(w, r, values, err.Error())
 		return
 	}
 
@@ -411,17 +429,42 @@ func (d *Deps) handleAdminServicePlanCreate(w http.ResponseWriter, r *http.Reque
 	redirectFlash(w, r, planPath(plan.ID), "Plan created. Add the jobs it is made of.")
 }
 
+// renderPlanList redraws the index with a rejected create form open on it.
+func (d *Deps) renderPlanList(w http.ResponseWriter, r *http.Request, values admin.ServicePlanFormValues, msg string) {
+	props, err := d.planListProps(r)
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	props.Values = values
+	props.Error = msg
+	props.ShowForm = true
+
+	if IsHTMX(r) {
+		admin.ServicePlanListContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	admin.ServicePlanList(props).Render(r.Context(), w) //nolint:errcheck
+}
+
 // handleAdminServicePlanShow renders one plan and its series.
 func (d *Deps) handleAdminServicePlanShow(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		Error(w, r, app.ErrPlanNotFound)
 		return
 	}
+	d.renderPlanShow(w, r, id, admin.NewPlanTaskFormValues(), "")
+}
+
+// renderPlanShow draws the plan page, optionally with a rejected task form on
+// it. One path for both so a bounced submission gets the whole page back.
+func (d *Deps) renderPlanShow(w http.ResponseWriter, r *http.Request, id uuid.UUID, values admin.PlanTaskFormValues, msg string) {
+	ctx := r.Context()
 
 	var plan *domain.ServicePlan
 	var live, total int
+	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		plan, txErr = d.ServicePlanService.GetPlanWithTasks(ctx, tx, id)
@@ -429,6 +472,10 @@ func (d *Deps) handleAdminServicePlanShow(w http.ResponseWriter, r *http.Request
 			return txErr
 		}
 		live, total, txErr = d.ServicePlanService.CountAssignments(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		nav, txErr = d.serviceNav(ctx, tx)
 		return txErr
 	}); err != nil {
 		Error(w, r, err)
@@ -438,9 +485,11 @@ func (d *Deps) handleAdminServicePlanShow(w http.ResponseWriter, r *http.Request
 	staffName, staffRole := staffNameRole(r)
 	props := admin.ServicePlanShowProps{
 		Plan:          *plan,
+		Nav:           nav,
 		LiveMachines:  live,
 		TotalMachines: total,
-		Values:        admin.NewPlanTaskFormValues(),
+		Values:        values,
+		Error:         msg,
 		StaffName:     staffName,
 		StaffRole:     staffRole,
 		CanWrite:      staffCan(r, auth.PermWriteService),
@@ -549,18 +598,26 @@ func (d *Deps) handleAdminServicePlanTaskAdd(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	interval, err := strconv.Atoi(strings.TrimSpace(r.FormValue("interval_days")))
+	values := admin.PlanTaskFormValues{
+		Name:             r.FormValue("name"),
+		Instructions:     r.FormValue("instructions"),
+		IntervalDays:     strings.TrimSpace(r.FormValue("interval_days")),
+		LeadDays:         strings.TrimSpace(r.FormValue("lead_days")),
+		WarrantyRequired: r.FormValue("warranty_required") == "1",
+	}
+
+	interval, err := strconv.Atoi(values.IntervalDays)
 	if err != nil {
-		redirectFlashError(w, r, planPath(planID), app.ErrPlanIntervalInvalid.Error())
+		d.renderPlanShow(w, r, planID, values, app.ErrPlanIntervalInvalid.Error())
 		return
 	}
 	// A blank notice period is none, not a rejection: plenty of jobs are done
 	// on the day and want no warning at all.
 	lead := 0
-	if raw := strings.TrimSpace(r.FormValue("lead_days")); raw != "" {
-		lead, err = strconv.Atoi(raw)
+	if values.LeadDays != "" {
+		lead, err = strconv.Atoi(values.LeadDays)
 		if err != nil {
-			redirectFlashError(w, r, planPath(planID), app.ErrPlanLeadInvalid.Error())
+			d.renderPlanShow(w, r, planID, values, app.ErrPlanLeadInvalid.Error())
 			return
 		}
 	}
@@ -574,16 +631,19 @@ func (d *Deps) handleAdminServicePlanTaskAdd(w http.ResponseWriter, r *http.Requ
 		}
 		_, txErr = d.ServicePlanService.AddTask(ctx, tx, app.AddPlanTaskParams{
 			PlanID:           planID,
-			Name:             r.FormValue("name"),
-			Instructions:     r.FormValue("instructions"),
+			Name:             values.Name,
+			Instructions:     values.Instructions,
 			IntervalDays:     interval,
 			LeadDays:         lead,
-			WarrantyRequired: r.FormValue("warranty_required") == "1",
+			WarrantyRequired: values.WarrantyRequired,
 			SortOrder:        len(plan.Tasks),
 		}, staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, planPath(planID), err.Error())
+		// Instructions can be several lines of procedure. Losing them to a
+		// mistyped interval would be a good way to teach somebody not to write
+		// them in the first place.
+		d.renderPlanShow(w, r, planID, values, err.Error())
 		return
 	}
 
@@ -605,7 +665,7 @@ func (d *Deps) handleAdminServicePlanTaskDelete(w http.ResponseWriter, r *http.R
 	}
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.ServicePlanService.RemoveTask(ctx, tx, taskID, staffActor(r))
+		return d.ServicePlanService.RemoveTask(ctx, tx, planID, taskID, staffActor(r))
 	}); err != nil {
 		redirectFlashError(w, r, planPath(planID), err.Error())
 		return
@@ -686,7 +746,7 @@ func (d *Deps) handleAdminEquipmentPlanEnd(w http.ResponseWriter, r *http.Reques
 	back := equipmentPath(equipmentID)
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.ServicePlanService.EndAssignment(ctx, tx, assignmentID, time.Now(), staffActor(r))
+		return d.ServicePlanService.EndAssignment(ctx, tx, equipmentID, assignmentID, time.Now(), staffActor(r))
 	}); err != nil {
 		redirectFlashError(w, r, back, err.Error())
 		return
@@ -741,6 +801,16 @@ func (d *Deps) equipmentMaintenanceProps(ctx context.Context, tx pgx.Tx, equipme
 		}
 	}
 
+	// How many active plans the category filter left out, so an empty picker
+	// can tell "you have written none" from "none of yours suit this machine".
+	if len(props.AvailablePlans) == 0 {
+		all, allErr := d.ServicePlanService.ListPlans(ctx, tx, store.ServicePlanFilter{ActiveOnly: true})
+		if allErr != nil {
+			return props, allErr
+		}
+		props.OtherCategoryPlans = len(all) - len(plans)
+	}
+
 	return props, nil
 }
 
@@ -758,10 +828,10 @@ func (d *Deps) handleAdminServiceCosts(w http.ResponseWriter, r *http.Request) {
 	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		// With a rate set, cost is the ranking the report exists to produce, so
-		// it leads unless the reader asked for another. CostByAccount falls the
-		// choice back to hours when no rate is set, and the strip highlights
-		// whatever came back rather than what was asked for.
+		// Cost is the ranking the report exists to produce, so it leads unless
+		// the reader asked for another. CostByAccount falls the choice back to
+		// hours when there is no money to rank on, and echoes back whichever
+		// ran — so the strip highlights the tab actually being shown.
 		if !explicit {
 			sort = domain.ServiceAccountCostByCost
 		}
@@ -828,4 +898,125 @@ func serviceCostDays(raw string) int {
 		return 365
 	}
 	return 90
+}
+
+// handleAdminServicePlanTaskUpdate rewrites one job in a plan's series.
+//
+// A changed interval reaches every machine on the plan, which is the point of a
+// plan being a template rather than a thing you copy.
+func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	planID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		Error(w, r, app.ErrPlanNotFound)
+		return
+	}
+	taskID, err := uuid.Parse(r.PathValue("childID"))
+	if err != nil {
+		Error(w, r, app.ErrPlanTaskNotFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	interval, err := strconv.Atoi(strings.TrimSpace(r.FormValue("interval_days")))
+	if err != nil {
+		redirectFlashError(w, r, planPath(planID), app.ErrPlanIntervalInvalid.Error())
+		return
+	}
+	lead := 0
+	if raw := strings.TrimSpace(r.FormValue("lead_days")); raw != "" {
+		lead, err = strconv.Atoi(raw)
+		if err != nil {
+			redirectFlashError(w, r, planPath(planID), app.ErrPlanLeadInvalid.Error())
+			return
+		}
+	}
+
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// Scoped to the plan in the path: a task on another plan must not be
+		// editable through this one.
+		task, txErr := d.ServicePlanService.GetTaskOnPlan(ctx, tx, planID, taskID)
+		if txErr != nil {
+			return txErr
+		}
+		_, txErr = d.ServicePlanService.EditTask(ctx, tx, taskID, app.EditPlanTaskParams{
+			Name:             r.FormValue("name"),
+			Instructions:     r.FormValue("instructions"),
+			IntervalDays:     interval,
+			LeadDays:         lead,
+			WarrantyRequired: r.FormValue("warranty_required") == "1",
+			SortOrder:        task.SortOrder,
+		}, staffActor(r))
+		return txErr
+	}); err != nil {
+		redirectFlashError(w, r, planPath(planID), err.Error())
+		return
+	}
+
+	redirectFlash(w, r, planPath(planID), "Job updated. Machines on this plan are rescheduled to match.")
+}
+
+// handleAdminEquipmentPlanUpdate changes the terms a machine is on a plan under.
+//
+// The contract flag is the one that matters: a cafe that signs up halfway
+// through should not have to be taken off the plan and put back on, which would
+// throw away the schedule it has built up.
+func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	equipmentID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		Error(w, r, app.ErrEquipmentNotFound)
+		return
+	}
+	assignmentID, err := uuid.Parse(r.PathValue("childID"))
+	if err != nil {
+		Error(w, r, app.ErrPlanAssignmentNotFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+	back := equipmentPath(equipmentID)
+
+	startsOn, err := parseMaintenanceDay(r.FormValue("starts_on"), time.Time{})
+	if err != nil || startsOn.IsZero() {
+		redirectFlashError(w, r, back, app.ErrPlanStartRequired.Error())
+		return
+	}
+	var contractEnds *time.Time
+	if raw := strings.TrimSpace(r.FormValue("contract_ends_on")); raw != "" {
+		end, parseErr := time.Parse("2006-01-02", raw)
+		if parseErr != nil {
+			redirectFlashError(w, r, back, "That contract end date is not a date.")
+			return
+		}
+		contractEnds = &end
+	}
+
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// Scoped to the machine in the path, like ending one is.
+		assignment, txErr := d.ServicePlanService.GetAssignment(ctx, tx, assignmentID)
+		if txErr != nil {
+			return txErr
+		}
+		if assignment.EquipmentID != equipmentID {
+			return app.ErrPlanAssignmentNotFound
+		}
+		_, txErr = d.ServicePlanService.EditAssignment(ctx, tx, assignmentID, app.EditPlanAssignmentParams{
+			StartsOn:       startsOn,
+			UnderContract:  r.FormValue("under_contract") == "1",
+			ContractEndsOn: contractEnds,
+			Notes:          r.FormValue("notes"),
+		}, staffActor(r))
+		return txErr
+	}); err != nil {
+		redirectFlashError(w, r, back, err.Error())
+		return
+	}
+
+	redirectFlash(w, r, back, "Terms updated.")
 }

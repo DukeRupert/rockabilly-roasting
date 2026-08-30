@@ -794,6 +794,21 @@ type ServiceAccountCostFilter struct {
 	Limit int
 }
 
+// AnyCostedTime reports whether a single logged hour anywhere carries a rate.
+//
+// Asked before a cost ranking, because with no costed hour the cost ordering
+// degenerates into ordering by parts spend — the same rows in the same order,
+// under a column heading that claims to mean something else.
+func (s *ServiceTicketStore) AnyCostedTime(ctx context.Context, tx pgx.Tx) (bool, error) {
+	var exists bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM service_time_entries WHERE rate_cents IS NOT NULL)`,
+	).Scan(&exists); err != nil {
+		return false, fmt.Errorf("any costed time: %w", err)
+	}
+	return exists, nil
+}
+
 // CostByCustomer ranks every account by what servicing it has taken.
 //
 // Driven by work recorded, not by the customer list: an account nobody has

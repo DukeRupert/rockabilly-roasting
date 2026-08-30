@@ -70,6 +70,10 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrServiceTicketNotFound),
 		errors.Is(err, app.ErrServicePartNotFound),
 		errors.Is(err, app.ErrServiceTimeEntryNotFound),
+		errors.Is(err, app.ErrPlanNotFound),
+		errors.Is(err, app.ErrPlanTaskNotFound),
+		errors.Is(err, app.ErrPlanAssignmentNotFound),
+		errors.Is(err, app.ErrMaintenanceNotFound),
 		// Access denial is surfaced as 404 so we never confirm a restricted
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):

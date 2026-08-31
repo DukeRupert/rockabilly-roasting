@@ -957,3 +957,59 @@ func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 		UpdatedAt:             r.UpdatedAt,
 	}
 }
+
+// ForecastRenewals rolls up the subscription renewals due in [from, to) by
+// product: how many subscriptions bill, how many bags that is, and what it
+// weighs. Ordered heaviest first — the roast schedule is built around the big
+// batches.
+//
+// Only 'active' subscriptions count. ListSubscriptionsDueForRenewal also picks
+// up 'past_due' (where next_order_at is the next dunning retry), but those are
+// charges that have already failed at least once and may fail again. Roasting
+// against them over-roasts, and green bought for coffee nobody paid for is the
+// expensive mistake here. The card says "active" so the omission is visible.
+//
+// The ends_at clause is belt and braces, and says so rather than pretending to
+// work: migration 075 added CHECK (ends_at IS NULL OR status NOT IN ('active',
+// 'past_due')) after a past ends_at silently stopped three live subscriptions
+// billing, so on an active row ends_at is now provably NULL and this predicate
+// can never fire. It stays because it costs nothing and because the guard it
+// duplicates lives in the schema, not here — if that CHECK is ever relaxed, the
+// right comparison is against each subscription's own next_order_at rather than
+// the window edge, so a subscription ending mid-window still ships the renewal
+// that falls before it ends.
+func (s *SubscriptionStore) ForecastRenewals(ctx context.Context, tx pgx.Tx, from, to time.Time) (_ []domain.RenewalForecastLine, err error) {
+	defer trackQuery(s.metrics, "subscriptions.forecast_renewals", time.Now(), &err)
+
+	const query = `
+		SELECT p.id, p.title,
+		       COUNT(*)::int                                                          AS subscriptions,
+		       COALESCE(SUM(s.quantity), 0)::int                                      AS units,
+		       COALESCE(SUM(s.quantity * COALESCE(v.weight_grams, 0)), 0)::int        AS weight_grams,
+		       COALESCE(SUM(s.quantity) FILTER (WHERE v.weight_grams IS NULL), 0)::int AS units_missing_weight
+		FROM subscriptions s
+		JOIN variants v ON v.id = s.variant_id
+		JOIN products p ON p.id = v.product_id
+		WHERE s.status = 'active'
+		  AND (s.ends_at IS NULL OR s.ends_at > s.next_order_at)
+		  AND s.next_order_at >= $1
+		  AND s.next_order_at <  $2
+		GROUP BY p.id, p.title
+		ORDER BY weight_grams DESC, units DESC, p.title ASC`
+
+	rows, err := tx.Query(ctx, query, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("forecast renewals: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.RenewalForecastLine
+	for rows.Next() {
+		var l domain.RenewalForecastLine
+		if err := rows.Scan(&l.ProductID, &l.Title, &l.Subscriptions, &l.Units, &l.WeightGrams, &l.UnitsMissingWeight); err != nil {
+			return nil, fmt.Errorf("scan renewal forecast line: %w", err)
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}

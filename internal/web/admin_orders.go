@@ -89,6 +89,7 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 	var counts store.OrderViewCounts
 	var failedLabelIDs map[uuid.UUID]bool
 	var suggestions []domain.Customer
+	var pickupEnabled bool
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -104,6 +105,19 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 		if txErr != nil {
 			return txErr
 		}
+
+		// Drives whether the fulfillment filter offers "Ready for pickup".
+		//
+		// A read failure drops the pill rather than the page. The singleton
+		// config row is seeded by migration so this should not happen, but the
+		// orders list is the busiest screen in the admin and losing all of it
+		// over one decorative filter is a bad trade — buildDeliveryRun already
+		// settled the same question the same way on the dashboard.
+		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if cfgErr != nil && !errors.Is(cfgErr, pgx.ErrNoRows) {
+			return cfgErr
+		}
+		pickupEnabled = cfgErr == nil && cfg != nil && cfg.LocalPickupEnabled
 
 		// Enrich each order with customer display info. Bounded by perPage,
 		// so per-row lookup is acceptable here.
@@ -177,24 +191,25 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 			Archive:     counts.Archive,
 			All:         counts.All,
 		},
-		Search:      search,
-		Suggestions: suggestions,
-		Sort:        string(sort),
-		Payment:     payment,
-		Fulfillment: fulfillment,
-		Range:       dateRange,
-		From:        minRawDate(q.Get("from"), dateRange),
-		To:          minRawDate(q.Get("to"), dateRange),
-		Min:         minRaw,
-		Max:         maxRaw,
-		TotalCount:  totalCount,
-		Page:        page,
-		PerPage:     perPage,
-		HasMore:     hasMore,
-		MerchantTZ:  d.MerchantTZ,
-		Now:         time.Now(),
-		StaffName:   name,
-		StaffRole:   role,
+		Search:        search,
+		Suggestions:   suggestions,
+		Sort:          string(sort),
+		Payment:       payment,
+		Fulfillment:   fulfillment,
+		PickupEnabled: pickupEnabled,
+		Range:         dateRange,
+		From:          minRawDate(q.Get("from"), dateRange),
+		To:            minRawDate(q.Get("to"), dateRange),
+		Min:           minRaw,
+		Max:           maxRaw,
+		TotalCount:    totalCount,
+		Page:          page,
+		PerPage:       perPage,
+		HasMore:       hasMore,
+		MerchantTZ:    d.MerchantTZ,
+		Now:           time.Now(),
+		StaffName:     name,
+		StaffRole:     role,
 	}
 
 	if IsHTMX(r) {
@@ -232,7 +247,7 @@ func normalizeOrderPayment(v string) string {
 // normalizeOrderFulfillment clamps ?fulfillment= to the fulfillment status values.
 func normalizeOrderFulfillment(v string) string {
 	switch v {
-	case "unfulfilled", "partially_fulfilled", "fulfilled", "delivered":
+	case "unfulfilled", "partially_fulfilled", "fulfilled", "ready_for_pickup", "delivered":
 		return v
 	default:
 		return ""

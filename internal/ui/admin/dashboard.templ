@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -167,6 +168,47 @@ func urgentGroupTotal(groups []UrgentOrderGroup) int {
 	return n
 }
 
+// RenewalForecastProps backs the roast-forecast card: which coffees upcoming
+// subscription renewals will call for, and how much of each.
+//
+// This is the only forward-looking number on the dashboard. Everything else
+// reports what already happened; this one is actionable precisely because it
+// isn't history — every active subscription already carries the date it bills,
+// so the week's roast is knowable before the orders exist.
+type RenewalForecastProps struct {
+	Days  int // 7, 14, or 30
+	Lines []domain.RenewalForecastLine
+}
+
+// totalGrams is the whole window's green requirement.
+func (p RenewalForecastProps) totalGrams() int {
+	total := 0
+	for _, l := range p.Lines {
+		total += l.WeightGrams
+	}
+	return total
+}
+
+// totalSubscriptions is how many renewals the window covers.
+func (p RenewalForecastProps) totalSubscriptions() int {
+	total := 0
+	for _, l := range p.Lines {
+		total += l.Subscriptions
+	}
+	return total
+}
+
+// missingWeightUnits counts bags the weight total could not account for. Any
+// non-zero value makes the headline poundage an undercount, and the card says
+// so — a roast plan that is quietly short is worse than one that flags itself.
+func (p RenewalForecastProps) missingWeightUnits() int {
+	total := 0
+	for _, l := range p.Lines {
+		total += l.UnitsMissingWeight
+	}
+	return total
+}
+
 type DashboardProps struct {
 	// Today stats
 	TodayOrderCount int
@@ -190,6 +232,30 @@ type DashboardProps struct {
 	// equipment service module, which is how it stays off a coffee-only
 	// dashboard without the template having to know about modules.
 	OverdueMaintenance int
+	// WaitingPickups are orders the customer was told were ready and never came
+	// for, past PickupStaleAfter. The fulfillment queue does list them — its
+	// needs-action tab includes ready_for_pickup — but beside every other order
+	// awaiting action, and it never ages them, so a bag that has been on the
+	// shelf a fortnight reads exactly like one boxed this morning. The ageing is
+	// what this row adds. OldestPickupReadyAt drives the "waiting N days" line;
+	// zero when the count is zero.
+	WaitingPickupCount  int
+	OldestPickupReadyAt time.Time
+	// PickupStaleDays is app.PickupStaleAfter in days, passed in rather than
+	// written into the copy. The headline names the threshold so the longer
+	// list behind the link reads as a superset; hardcoding "3" here would leave
+	// the headline lying the day somebody tunes the constant, and ui may not
+	// import app to go and look.
+	PickupStaleDays int
+
+	// DeadJobCount is background jobs that exhausted their retries, and
+	// DeadJobKinds the per-kind breakdown behind it. This is the one urgent
+	// signal that makes the rest of the dashboard look *better* when it fires:
+	// if the renewal or email worker is discarding jobs, fewer orders appear,
+	// queues shorten, and a quiet page reads as a good day. buy_label is
+	// excluded — those already have their own group naming the stuck orders.
+	DeadJobCount int
+	DeadJobKinds []domain.DeadJobKindCount
 
 	// Urgent action queues, each split by sales channel — see UrgentOrderGroup.
 	OnHold         []UrgentOrderGroup
@@ -225,6 +291,11 @@ type DashboardProps struct {
 	TopProducts     []charts.LabeledValue // top 5 by selected metric, last 30 days
 	TopBy           string                // "units" (default) or "weight"
 
+	// Renewals is the roast forecast: what upcoming subscription renewals will
+	// need, by coffee. Lives above the analytics charts because it is work to
+	// plan, not a trend to read.
+	Renewals RenewalForecastProps
+
 	// Merchant local timezone for date display.
 	MerchantTZ *time.Location
 	// Now is injected so relative ages and staleness are deterministic in
@@ -259,12 +330,12 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount +
+	return p.PastDueAccountCount + p.DeadJobCount +
 		urgentGroupTotal(p.OnHold) + urgentGroupTotal(p.FailedPayments) + urgentGroupTotal(p.LabelFailures)
 }
 
 func (p DashboardProps) reviewCount() int {
-	return p.PendingWholesale + p.PendingWhiteLabel
+	return p.PendingWholesale + p.PendingWhiteLabel + p.WaitingPickupCount
 }
 
 func (p DashboardProps) retailCount() int {
@@ -325,6 +396,13 @@ templ DashboardContent(props DashboardProps) {
 			<div id="band-urgent" class="mt-8 scroll-mt-6">
 				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
 				<div class="mt-3 space-y-3">
+					if props.DeadJobCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d background job%s failed", props.DeadJobCount, pluralS(props.DeadJobCount)),
+							deadJobDetail(props.DeadJobKinds),
+							"/admin/jobs",
+						)
+					}
 					if props.PastDueAccountCount > 0 {
 						@urgentGroupLink(
 							fmt.Sprintf("%d past-due wholesale account%s", props.PastDueAccountCount, pluralS(props.PastDueAccountCount)),
@@ -401,6 +479,30 @@ templ DashboardContent(props DashboardProps) {
 							</div>
 						</a>
 					}
+					if props.WaitingPickupCount > 0 {
+						// The count is pickups past PickupStaleAfter; the list
+						// behind the link is every pickup awaiting collection,
+						// because the orders filter has no age bound. The
+						// headline names the threshold so the longer list reads
+						// as the superset it is rather than a contradiction.
+						<a href="/admin/orders?view=all&amp;fulfillment=ready_for_pickup" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+							<div class="flex items-center gap-3 min-w-0">
+								<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0"></span>
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-rr-heading">
+										{ fmt.Sprintf("%d pickup order", props.WaitingPickupCount) }{ pluralS(props.WaitingPickupCount) }{ fmt.Sprintf(" waiting over %d day", props.PickupStaleDays) }{ pluralS(props.PickupStaleDays) }
+									</p>
+									<p class="text-xs text-rr-muted mt-0.5">
+										{ pickupWaitDetail(props.OldestPickupReadyAt, props.Now) }
+									</p>
+								</div>
+							</div>
+							<div class="flex items-center gap-3 shrink-0">
+								<span class="label-font text-rr-amber" style="font-size:0.6rem;">Chase</span>
+								@chevronRight()
+							</div>
+						</a>
+					}
 				</div>
 			</div>
 		}
@@ -423,6 +525,14 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		}
 	}
+	<!-- Coming up: forward-looking work. Below today's triage because none of it
+	     is due yet, above Analytics because it is a plan, not a report. -->
+	<div class="mt-12">
+		<p class="label-font text-rr-muted">Coming up</p>
+		<div class="mt-4">
+			@RenewalForecastCard(props.Renewals)
+		</div>
+	</div>
 	<!-- Analytics zone: trend reporting, demoted below the day's work. -->
 	<div class="mt-12">
 		<p class="label-font text-rr-muted">Analytics</p>
@@ -837,6 +947,112 @@ func deliveryStripShadow(urgent bool) string {
 		return "box-shadow: 4px 4px 0 0 var(--color-rr-red);"
 	}
 	return ""
+}
+
+// pickupWaitDetail states how long the oldest bag has been on the shelf. The
+// number is the persuasive part — "ready 11 days ago" is what makes someone
+// pick up the phone, where "some orders are waiting" gets skimmed.
+func pickupWaitDetail(oldest, now time.Time) string {
+	if oldest.IsZero() {
+		return "Marked ready and never collected — coffee is going stale."
+	}
+	days := int(now.Sub(oldest).Hours() / 24)
+	if days < 1 {
+		return "Marked ready and never collected — coffee is going stale."
+	}
+	return fmt.Sprintf("Oldest was ready %d day%s ago — coffee is going stale.", days, pluralS(days))
+}
+
+// deadJobDetail names the kinds that failed. Dead jobs cluster by cause — one
+// expired token discards every job of a kind at once — so the kinds are the
+// diagnosis, and a generic "some jobs failed" would send staff to the list to
+// learn what this line could have told them. Three kinds is enough to see the
+// pattern; the rest are a count.
+func deadJobDetail(kinds []domain.DeadJobKindCount) string {
+	if len(kinds) == 0 {
+		return "Emails, invoices and renewals run as background jobs — these gave up, and nothing retries them."
+	}
+	parts := make([]string, 0, 4)
+	for i, k := range kinds {
+		if i == 3 {
+			parts = append(parts, fmt.Sprintf("+%d more", len(kinds)-3))
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%s ×%d", k.Kind, k.Count))
+	}
+	return strings.Join(parts, " · ") + " — nothing retries these on its own."
+}
+
+// RenewalForecastCard answers "what do we need to roast." The headline is total
+// pounds, because that is the number a roaster plans around; the per-coffee
+// breakdown underneath is what actually goes on the schedule.
+//
+// htmx swaps the whole card on the window toggle, so #renewal-forecast-card is
+// the stable target — same pattern as the analytics cards.
+templ RenewalForecastCard(props RenewalForecastProps) {
+	<div id="renewal-forecast-card" class="border border-rr-border bg-rr-surface px-6 py-5">
+		<div class="flex items-baseline justify-between gap-3">
+			<p class="label-font text-rr-muted">{ fmt.Sprintf("Roast forecast · next %d days", props.Days) }</p>
+			<div class="flex items-center gap-1 text-xs shrink-0">
+				@renewalPeriodToggle(7, props.Days)
+				@renewalPeriodToggle(14, props.Days)
+				@renewalPeriodToggle(30, props.Days)
+			</div>
+		</div>
+		if len(props.Lines) == 0 {
+			<p class="mt-3 text-sm text-rr-muted">No subscription renewals due in this window.</p>
+		} else {
+			<div class="mt-3 flex items-baseline gap-3 flex-wrap">
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">
+					{ formatLoadPounds(props.totalGrams()) }
+					<span class="text-sm font-semibold text-rr-muted">lb</span>
+				</p>
+				<span class="text-xs text-rr-muted">
+					{ fmt.Sprintf("across %d renewal%s", props.totalSubscriptions(), pluralS(props.totalSubscriptions())) }
+				</span>
+			</div>
+			<div class="mt-4 divide-y divide-rr-border border-t border-rr-border">
+				for _, line := range props.Lines {
+					<div class="flex items-baseline justify-between gap-4 py-2">
+						<div class="min-w-0">
+							<p class="truncate text-sm font-semibold text-rr-heading">{ line.Title }</p>
+							<p class="text-xs text-rr-muted">
+								{ fmt.Sprintf("%d bag%s · %d subscription%s", line.Units, pluralS(line.Units), line.Subscriptions, pluralS(line.Subscriptions)) }
+							</p>
+						</div>
+						<p class="shrink-0 text-sm font-semibold tabular-nums text-rr-heading">
+							{ formatLoadPounds(line.WeightGrams) }
+							<span class="text-xs font-normal text-rr-muted">lb</span>
+						</p>
+					</div>
+				}
+			</div>
+			if props.missingWeightUnits() > 0 {
+				<p class="mt-3 text-xs text-rr-red">
+					{ fmt.Sprintf("%d bag%s have no weight set — the total above is short by that much.", props.missingWeightUnits(), pluralS(props.missingWeightUnits())) }
+				</p>
+			}
+			<p class="mt-3 text-xs text-rr-muted">Active subscriptions only. Paused, cancelled and past-due renewals are excluded.</p>
+		}
+	</div>
+}
+
+// renewalPeriodToggle is one window button. Swaps the card through its own
+// fragment route rather than reloading the dashboard, so ?days= here never
+// collides with the revenue card's reading of the same key.
+templ renewalPeriodToggle(value, current int) {
+	if value == current {
+		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ fmt.Sprintf("%dd", value) }</span>
+	} else {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/renewals?days=%d", value)) }
+			hx-get={ fmt.Sprintf("/admin/dashboard/renewals?days=%d", value) }
+			hx-target="#renewal-forecast-card"
+			hx-swap="outerHTML"
+			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			style="font-size:0.65rem;"
+		>{ fmt.Sprintf("%dd", value) }</a>
+	}
 }
 
 // bandHeader renders a labeled band title with a count chip.

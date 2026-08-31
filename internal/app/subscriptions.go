@@ -172,6 +172,29 @@ func (s *SubscriptionService) CountSubscriptionsByStatus(ctx context.Context, tx
 	return count, nil
 }
 
+// RenewalForecastMaxDays bounds the forecast window. Ninety days is roughly a
+// green-coffee purchasing cycle; past that the forecast is fiction anyway,
+// since subscribers pause, skip, and cancel.
+const RenewalForecastMaxDays = 90
+
+// ForecastRenewals rolls up the coffee that upcoming subscription renewals will
+// need, by product, over the next `days` days starting at now. The window is
+// half-open [now, now+days): a renewal that already fired is fulfillment's
+// problem, not the roaster's.
+func (s *SubscriptionService) ForecastRenewals(ctx context.Context, tx pgx.Tx, now time.Time, days int) ([]domain.RenewalForecastLine, error) {
+	if days <= 0 {
+		return nil, nil
+	}
+	if days > RenewalForecastMaxDays {
+		days = RenewalForecastMaxDays
+	}
+	lines, err := s.subscriptions.ForecastRenewals(ctx, tx, now, now.AddDate(0, 0, days))
+	if err != nil {
+		return nil, fmt.Errorf("forecast renewals: %w", err)
+	}
+	return lines, nil
+}
+
 // ActiveSubscriptionsAsOf returns the number of subscriptions live (created and
 // not yet cancelled or expired) at the instant asOf. Seeds the running total
 // for the active-subscriptions-over-time chart.

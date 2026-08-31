@@ -30,6 +30,26 @@ const (
 	SubscriptionStatusExpired   SubscriptionStatus = "expired"
 )
 
+// RenewalForecastLine is one coffee's share of the subscription renewals due in
+// a forward window: how many subscriptions, how many bags, and how much green
+// that implies. This is the number that drives the roast schedule and green
+// purchasing, and it is knowable days ahead — every active subscription already
+// carries the date it will bill.
+//
+// UnitsMissingWeight counts bags whose variant has no weight recorded. Their
+// units are still in Units but contribute nothing to WeightGrams, so a total
+// with a non-zero UnitsMissingWeight is an undercount and must say so rather
+// than quietly reading low — a roast plan that is short is worse than one that
+// admits it doesn't know.
+type RenewalForecastLine struct {
+	ProductID          uuid.UUID
+	Title              string
+	Subscriptions      int
+	Units              int
+	WeightGrams        int
+	UnitsMissingWeight int
+}
+
 // SubscriptionPlan defines a recurring delivery cadence (decoupled from products).
 type SubscriptionPlan struct {
 	ID            uuid.UUID

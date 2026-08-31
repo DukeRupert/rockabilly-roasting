@@ -196,6 +196,10 @@ type OrderListProps struct {
 	Sort        string
 	Payment     string // payment status filter, "" for any
 	Fulfillment string // fulfillment status filter, "" for any
+	// PickupEnabled adds the "Ready for pickup" fulfillment pill. A shop that
+	// does not offer pickup has no order that can ever be in that state, and a
+	// filter guaranteed to return nothing is worse than no filter at all.
+	PickupEnabled bool
 	Range       string // date preset key, "" for any, "custom" for From/To
 	From        string // yyyy-mm-dd, only when Range == "custom"
 	To          string // yyyy-mm-dd, only when Range == "custom"
@@ -423,7 +427,7 @@ templ OrderListContent(props OrderListProps) {
 		     the tabs are the primary workflow split, these narrow within it. -->
 		<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
 			@orderPillRow(props, "Payment", "payment", props.Payment, orderPaymentPills)
-			@orderPillRow(props, "Fulfillment", "fulfillment", props.Fulfillment, orderFulfillmentPills)
+			@orderPillRow(props, "Fulfillment", "fulfillment", props.Fulfillment, orderFulfillmentPillsFor(props.PickupEnabled))
 			@orderPillRow(props, "Placed", "range", props.Range, orderRangePills)
 		</div>
 		if props.Range == "custom" {
@@ -897,6 +901,23 @@ var orderFulfillmentPills = []adminListPill{
 	{"unfulfilled", "Unfulfilled"},
 	{"fulfilled", "Fulfilled"},
 	{"delivered", "Delivered"},
+}
+
+// orderFulfillmentPillsFor inserts the pickup pill between Fulfilled and
+// Delivered — the order the states actually occur in — for shops that offer
+// pickup, and leaves the row untouched for those that don't.
+func orderFulfillmentPillsFor(pickupEnabled bool) []adminListPill {
+	if !pickupEnabled {
+		return orderFulfillmentPills
+	}
+	out := make([]adminListPill, 0, len(orderFulfillmentPills)+1)
+	for _, p := range orderFulfillmentPills {
+		if p.Value == "delivered" {
+			out = append(out, adminListPill{"ready_for_pickup", "Ready for pickup"})
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 var orderRangePills = []adminListPill{

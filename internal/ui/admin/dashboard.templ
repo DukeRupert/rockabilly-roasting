@@ -241,6 +241,12 @@ type DashboardProps struct {
 	// zero when the count is zero.
 	WaitingPickupCount  int
 	OldestPickupReadyAt time.Time
+	// PickupStaleDays is app.PickupStaleAfter in days, passed in rather than
+	// written into the copy. The headline names the threshold so the longer
+	// list behind the link reads as a superset; hardcoding "3" here would leave
+	// the headline lying the day somebody tunes the constant, and ui may not
+	// import app to go and look.
+	PickupStaleDays int
 
 	// DeadJobCount is background jobs that exhausted their retries, and
 	// DeadJobKinds the per-kind breakdown behind it. This is the one urgent
@@ -484,7 +490,7 @@ templ DashboardContent(props DashboardProps) {
 								<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0"></span>
 								<div class="min-w-0">
 									<p class="text-sm font-medium text-rr-heading">
-										{ fmt.Sprintf("%d pickup order", props.WaitingPickupCount) }{ pluralS(props.WaitingPickupCount) } waiting over 3 days
+										{ fmt.Sprintf("%d pickup order", props.WaitingPickupCount) }{ pluralS(props.WaitingPickupCount) }{ fmt.Sprintf(" waiting over %d day", props.PickupStaleDays) }{ pluralS(props.PickupStaleDays) }
 									</p>
 									<p class="text-xs text-rr-muted mt-0.5">
 										{ pickupWaitDetail(props.OldestPickupReadyAt, props.Now) }

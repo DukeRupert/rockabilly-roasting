@@ -102,10 +102,31 @@ func TestWaitingPickups(t *testing.T) {
 	_, err := tx.Exec(ctx, `UPDATE orders SET status = 'cancelled' WHERE id = $1`, cancelled)
 	require.NoError(t, err)
 
+	// A wholesale account set to pickup. Reachable, but /admin/orders — where
+	// this row's link goes — is the retail channel, so counting it would send
+	// staff to a list that does not contain it.
+	wholesale := newPickupOrder(t, tx)
+	markedReadyAt(t, tx, wholesale, now.Add(-15*24*time.Hour))
+	_, err = tx.Exec(ctx, `UPDATE orders SET channel = 'wholesale' WHERE id = $1`, wholesale)
+	require.NoError(t, err)
+
+	// The customer came in and took it. This is the case the fulfillment_status
+	// predicate exists for, and the only one it catches on its own: MarkPickedUp
+	// leaves status = 'complete', which is not in the query's
+	// NOT IN ('cancelled','refunded') list, so nothing else here would drop it.
+	// Its audit row survives collection, and it is the oldest of the lot — miss
+	// this and the dashboard chases customers who already have their coffee.
+	collected := newPickupOrder(t, tx)
+	markedReadyAt(t, tx, collected, now.Add(-40*24*time.Hour))
+	_, err = tx.Exec(ctx,
+		`UPDATE orders SET fulfillment_status = 'delivered', status = 'complete' WHERE id = $1`,
+		collected)
+	require.NoError(t, err)
+
 	count, err := orders.CountWaitingPickups(ctx, tx, cutoff)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count,
-		"only the two past the stale threshold, and not the cancelled one")
+		"only the two retail bags still waiting past the threshold — not the fresh one, the cancelled one, the wholesale one, or the one already collected")
 
 	list, err := orders.ListWaitingPickups(ctx, tx, cutoff, 5)
 	require.NoError(t, err)
@@ -121,10 +142,14 @@ func TestWaitingPickups(t *testing.T) {
 	assert.Equal(t, older, oldest[0].OrderID)
 }
 
-// A pickup order with no audit row cannot be dated, and the query inner-joins
-// on it. Nothing writes ready_for_pickup without auditing, but this pins the
-// join so a future writer that skips the audit is caught here rather than by a
-// row quietly missing from the dashboard.
+// A pickup order with no audit row cannot be dated, so it cannot be aged, so it
+// does not appear.
+//
+// This pins the behaviour, not the join: a LEFT JOIN would leave ra.at NULL,
+// the ra.at < $1 comparison would be NULL, and the row would drop out anyway.
+// What it catches is a future writer that sets ready_for_pickup without
+// auditing — those orders would silently never reach the dashboard, and the
+// count here says so out loud.
 func TestWaitingPickupsNeedsTheAuditRow(t *testing.T) {
 	tx := testutil.NewTestTx(t, testPool)
 	ctx := t.Context()
@@ -158,11 +183,25 @@ func TestForecastRenewals(t *testing.T) {
 	product := testutil.CreateProduct(t, tx, testutil.WithProductTitle("Rebel Blend"))
 	twelveOz := testutil.CreateVariant(t, tx, product.ID)
 	setVariantWeight(t, tx, twelveOz.ID, 340)
+	// A second size of the same coffee. The roast is of the coffee, not the
+	// bag it ends up in, so both sizes have to land on one line — with only one
+	// variant in play, grouping by variant would look identical and this test
+	// would not notice.
+	fivePound := testutil.CreateVariant(t, tx, product.ID)
+	setVariantWeight(t, tx, fivePound.ID, 2270)
 
-	// Two subscriptions on the same product, one of them for two bags: the
+	// A second coffee, lighter, to give the heaviest-first ordering something
+	// to order.
+	other := testutil.CreateProduct(t, tx, testutil.WithProductTitle("Iron Horse"))
+	otherBag := testutil.CreateVariant(t, tx, other.ID)
+	setVariantWeight(t, tx, otherBag.ID, 250)
+	newSubscription(t, tx, customer.ID, addr.ID, plan.ID, otherBag.ID, 1, "active", from.AddDate(0, 0, 6))
+
+	// Two subscriptions on the same coffee, one of them for two bags: the
 	// forecast is per coffee, not per subscription.
 	newSubscription(t, tx, customer.ID, addr.ID, plan.ID, twelveOz.ID, 1, "active", from.AddDate(0, 0, 3))
 	newSubscription(t, tx, customer.ID, addr.ID, plan.ID, twelveOz.ID, 2, "active", from.AddDate(0, 0, 5))
+	newSubscription(t, tx, customer.ID, addr.ID, plan.ID, fivePound.ID, 1, "active", from.AddDate(0, 0, 7))
 
 	// past_due is a charge that already failed. Roasting against it buys green
 	// for coffee nobody has paid for.
@@ -173,13 +212,15 @@ func TestForecastRenewals(t *testing.T) {
 
 	lines, err := subs.ForecastRenewals(ctx, tx, from, to)
 	require.NoError(t, err)
-	require.Len(t, lines, 1, "one coffee, however many subscriptions bought it")
+	require.Len(t, lines, 2, "one line per coffee, however many sizes or subscriptions")
+
+	assert.Equal(t, "Rebel Blend", lines[0].Title, "heaviest first — the roast schedule is built around the big batches")
+	assert.Equal(t, "Iron Horse", lines[1].Title)
 
 	line := lines[0]
-	assert.Equal(t, "Rebel Blend", line.Title)
-	assert.Equal(t, 2, line.Subscriptions)
-	assert.Equal(t, 3, line.Units, "one bag plus two")
-	assert.Equal(t, 3*340, line.WeightGrams)
+	assert.Equal(t, 3, line.Subscriptions, "two on the 12oz, one on the five-pound")
+	assert.Equal(t, 4, line.Units, "one bag plus two, plus the five-pound")
+	assert.Equal(t, 3*340+2270, line.WeightGrams, "both sizes weighed at their own weight")
 	assert.Zero(t, line.UnitsMissingWeight)
 }
 

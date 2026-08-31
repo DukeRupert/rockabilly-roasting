@@ -1713,8 +1713,15 @@ type WaitingPickup struct {
 }
 
 // waitingPickupsCTE is the shared body behind CountWaitingPickups and
-// ListWaitingPickups: pickup orders still in ready_for_pickup that were marked
-// ready before the given cutoff.
+// ListWaitingPickups: retail pickup orders still in ready_for_pickup that were
+// marked ready before the given cutoff.
+//
+// Retail only, because the dashboard row linking here goes to /admin/orders,
+// which is the retail channel. Nothing stops a wholesale account being set to
+// pickup, so a combined count would send staff to a list that does not hold
+// what they were just shown — the failure the on-hold groups on the same page
+// split by channel to avoid. A wholesale pickup queue would want its own row
+// against the wholesale list, not a number that quietly spans both.
 //
 // "Ready at" comes from the audit log rather than an orders column. The audit
 // entry is written in the same transaction as the status change, so its
@@ -1733,6 +1740,7 @@ const waitingPickupsCTE = `
 	FROM orders o
 	JOIN ready_at ra ON ra.order_id = o.id
 	WHERE o.fulfillment_status = 'ready_for_pickup'
+	  AND o.channel = 'retail'
 	  AND o.status NOT IN ('cancelled', 'refunded')
 	  AND ra.at < $1`
 

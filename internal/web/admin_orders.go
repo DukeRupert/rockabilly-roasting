@@ -107,11 +107,17 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 		}
 
 		// Drives whether the fulfillment filter offers "Ready for pickup".
+		//
+		// A read failure drops the pill rather than the page. The singleton
+		// config row is seeded by migration so this should not happen, but the
+		// orders list is the busiest screen in the admin and losing all of it
+		// over one decorative filter is a bad trade — buildDeliveryRun already
+		// settled the same question the same way on the dashboard.
 		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
-		if cfgErr != nil {
+		if cfgErr != nil && !errors.Is(cfgErr, pgx.ErrNoRows) {
 			return cfgErr
 		}
-		pickupEnabled = cfg != nil && cfg.LocalPickupEnabled
+		pickupEnabled = cfgErr == nil && cfg != nil && cfg.LocalPickupEnabled
 
 		// Enrich each order with customer display info. Bounded by perPage,
 		// so per-row lookup is acceptable here.

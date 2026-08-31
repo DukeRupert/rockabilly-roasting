@@ -220,6 +220,7 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// has sat behind the counter a fortnight looks exactly like one boxed
 		// this morning. This row is the ageing: only pickups past
 		// PickupStaleAfter, so the ones worth a phone call separate themselves.
+		props.PickupStaleDays = int(app.PickupStaleAfter.Hours() / 24)
 		props.WaitingPickupCount, txErr = d.OrderService.CountWaitingPickups(ctx, tx, now)
 		if txErr != nil {
 			return txErr

@@ -266,6 +266,7 @@ func TestDashboard_UncollectedPickupsReachTheReviewBand(t *testing.T) {
 	props := DashboardProps{
 		Now:                 now,
 		WaitingPickupCount:  2,
+		PickupStaleDays:     3,
 		OldestPickupReadyAt: now.Add(-11 * 24 * time.Hour),
 	}
 	html := renderDashboard(t, props)

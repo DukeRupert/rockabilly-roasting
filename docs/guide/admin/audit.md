@@ -52,7 +52,7 @@ Each row shows:
 - The **Action** column shows the action in readable form (`order.refunded` displays as "Order refunded").
 - The **Resource** column (visible on wider screens) shows the resource type and the first 8 characters of the resource ID. **Click it** to see that one record's whole history.
 
-The count under the table ("101–150 of 3,204") tells you how much you are looking at; use Previous and Next to page through.
+Once you have narrowed the list with a search or a filter, the count under the table ("101–150 of 3,204") tells you how much you are looking at. On the unfiltered view it just says which page you are on — counting every entry ever written, to answer a question nobody opened this page to ask, would mean reading the whole log on every keystroke. Narrow by anything and the exact total comes back. Use Previous and Next to page through either way.
 
 ## Searching and Filtering
 

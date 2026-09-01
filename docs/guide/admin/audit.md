@@ -43,45 +43,61 @@ Behind the scenes, each entry also stores:
 
 ## Reading the Audit Log
 
-The audit log page displays entries in reverse chronological order (newest first), 50 per page.
+The audit log page displays entries in reverse chronological order (newest first), 50 per page. Click the **When** header to flip to oldest-first — useful when you want to read a sequence of events forward.
 
 Each row shows:
 
 - The timestamp in the **When** column.
-- The actor, displayed as a colored badge indicating the type (slate for staff, green for customer, grey for system) followed by the actor's name.
-- The **Action** column shows the action in a human-readable format (e.g., `order.refunded` displays as "Order Refunded").
-- The **Resource** column (visible on wider screens) shows the resource type and the first 8 characters of the resource ID.
+- The actor, displayed as a colored badge indicating the type (slate for staff, green for customer, grey for system) followed by the actor's name. **Click the name** to see everything that person did.
+- The **Action** column shows the action in readable form (`order.refunded` displays as "Order refunded").
+- The **Resource** column (visible on wider screens) shows the resource type and the first 8 characters of the resource ID. **Click it** to see that one record's whole history.
 
-Use the Previous and Next links at the bottom of the page to navigate through older entries.
+Once you have narrowed the list with a search or a filter, the count under the table ("101–150 of 3,204") tells you how much you are looking at. On the unfiltered view it just says which page you are on — counting every entry ever written, to answer a question nobody opened this page to ask, would mean reading the whole log on every keystroke. Narrow by anything and the exact total comes back. Use Previous and Next to page through either way.
 
-## Filtering
+## Searching and Filtering
 
-Two filter dropdowns appear above the table:
+Every control is reflected in the URL, so any filtered view can be bookmarked or pasted into a message.
 
-### By Actor Type
+### Search
 
-Filter entries by who performed the action:
+The search box narrows as you type. It matches:
 
-- **All actors** -- No filter applied.
-- **Staff** -- Actions taken by admin panel users.
-- **Customer** -- Actions taken by customers (login, logout, etc.).
-- **System** -- Automated actions from background jobs, scheduled tasks, or integrations.
+- **A person's name** — "wanda" finds everything Wanda did.
+- **A word in the action** — "refund" finds every refund.
+- **An ID** — paste a full ID, or just the 8-character fragment shown in the Resource column.
 
-### By Resource Type
+Search does not match the reason or the metadata behind an entry, only what you can see on screen.
 
-Filter entries by the kind of resource affected. Note: not all resource types are available as filters -- the dropdown covers the most commonly audited resources.
+### Actor tabs
 
-- **Orders**
-- **Products**
-- **Variants**
-- **Subscriptions**
-- **Customers**
-- **Addresses**
-- **Invoices**
+The tabs across the top split the log by who acted:
 
-When any filter is active, a **Clear filters** link appears to reset all filters at once.
+- **Everything** — no filter.
+- **Staff** — actions taken by admin panel users.
+- **Customers** — actions taken by customers (login, self-service edits).
+- **System** — automated actions from background jobs, scheduled tasks, or integrations.
 
-Filters are preserved in the URL query string, so filtered views can be bookmarked or shared.
+### When
+
+Date presets — Today, 7 days, 30 days, This month — plus **Custom** for an explicit from/to. Dates are the shop's dates, not UTC, so "Today" means today where the shop is.
+
+### Area, Action, and Resource
+
+Three dropdowns, all built from what the log actually contains — every option returns rows.
+
+- **Area** is the family the action belongs to: `order`, `customer`, `email`, `service_ticket`, and so on.
+- **Action** appears once you pick an area, and narrows to one exact action inside it. It is hidden otherwise, because the system records a couple of hundred distinct actions.
+- **Resource** is the kind of thing that was affected — which is *not* always the same as the area. A shipment notification is recorded as an `email` action against an `order` resource, so filtering by area finds the mail and filtering by resource finds everything that ever touched that order.
+
+### Pinned filters
+
+Some filters arrive from links rather than controls, and show as a dark chip above the table with an × to remove them:
+
+- **Actor** — set by clicking a name in the table.
+- **Resource** — set by clicking a resource in the table.
+- **Customer** — set by the **Full audit log for this customer** link at the bottom of a customer's activity timeline. Unlike Actor, this catches both sides: what the customer did *and* what staff did to their account.
+
+**Clear all** resets everything at once.
 
 ## Common Audit Actions Reference
 

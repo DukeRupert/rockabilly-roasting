@@ -32,6 +32,48 @@ func (s *AuditQueryService) List(ctx context.Context, tx pgx.Tx, f store.AuditFi
 	return entries, nil
 }
 
+// Count returns how many entries match the filter, ignoring pagination. The
+// list page needs it for "X–Y of Z"; it must be given the same filter List got
+// or the total contradicts the rows.
+func (s *AuditQueryService) Count(ctx context.Context, tx pgx.Tx, f store.AuditFilter) (int, error) {
+	count, err := s.entries.Count(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("count audit entries: %w", err)
+	}
+	return count, nil
+}
+
+// AuditFacets holds the dropdown options for the audit list, read from what the log
+// actually contains rather than from the full set of action constants — see
+// AuditStore.ListActionAreas for why.
+//
+// Actions is populated only when an area is selected: the whole point of the
+// two-step control is that you never face a list of every action in the system.
+type AuditFacets struct {
+	Areas         []string
+	Actions       []string
+	ResourceTypes []string
+}
+
+// ListFacets returns the filter options for the audit list page.
+func (s *AuditQueryService) ListFacets(ctx context.Context, tx pgx.Tx, area string) (AuditFacets, error) {
+	var f AuditFacets
+	var err error
+
+	if f.Areas, err = s.entries.ListActionAreas(ctx, tx); err != nil {
+		return AuditFacets{}, fmt.Errorf("list audit action areas: %w", err)
+	}
+	if f.ResourceTypes, err = s.entries.ListResourceTypes(ctx, tx); err != nil {
+		return AuditFacets{}, fmt.Errorf("list audit resource types: %w", err)
+	}
+	if area != "" {
+		if f.Actions, err = s.entries.ListActionsInArea(ctx, tx, area); err != nil {
+			return AuditFacets{}, fmt.Errorf("list audit actions in area: %w", err)
+		}
+	}
+	return f, nil
+}
+
 // ListByResource returns all audit entries for a single resource, newest first.
 // Used to render per-resource activity timelines on detail pages.
 func (s *AuditQueryService) ListByResource(ctx context.Context, tx pgx.Tx, resourceType string, resourceID uuid.UUID) ([]domain.AuditEntry, error) {

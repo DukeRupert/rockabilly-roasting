@@ -104,7 +104,7 @@ func TestActivityWrappers_ShareOneShape(t *testing.T) {
 
 	wrappers := map[string]templ.Component{
 		"announcement": AnnouncementActivity(e, time.UTC),
-		"customer":     CustomerActivity(e, time.UTC),
+		"customer":     CustomerActivity(uuid.New(), e, time.UTC),
 		"discount":     DiscountActivity(e, time.UTC),
 		"invoice":      InvoiceActivity(e, time.UTC),
 		"order":        OrderActivity(e, time.UTC),

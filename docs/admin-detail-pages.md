@@ -147,6 +147,14 @@ All of them go through one shared `ActivityTimeline(entries, label, marker, loc)
 (`RouteActivity`, `InvoiceActivity`, …) so call sites read well. Do not hand-roll the heading
 and `<ol>` again — there is a render test asserting the wrappers still share one shape.
 
+`CustomerActivity` is the one wrapper that takes more than the shared four arguments: it
+also takes the customer's id, and renders a link to `/admin/audit?customer_id=…` under the
+timeline. The timeline is capped at 25 entries, so without that link the cap is a dead end —
+staff can see older events exist and have no route to them. Adding a *third* wrapper with its
+own extra argument is a sign the extra thing belongs in `ActivityTimeline` itself; note that
+`TestActivityWrappers_ShareOneShape` asserts the shared heading and `<ol>` are present, not
+that nothing follows them, so it will not catch divergence on its own.
+
 `product_edit` is the odd one out in shape: it is tabbed rather than main+rail, so its
 timeline is a sixth tab instead of a section under the main column. That keeps the audit
 query off the four tabs staff actually live in. Two things are deliberately true of it:

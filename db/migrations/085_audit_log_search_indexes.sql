@@ -17,6 +17,12 @@ CREATE INDEX idx_audit_log_resource_type ON audit_log (resource_type, created_at
 CREATE INDEX idx_audit_log_actor_id ON audit_log (actor_id, created_at DESC)
     WHERE actor_id IS NOT NULL;
 
+-- "Show me this one record's whole history." resource_id is the *second*
+-- column of idx_audit_log_resource, which serves a type+id pair but leaves an
+-- id on its own to a full index scan. The audit list reaches that shape
+-- whenever a pinned resource outlives the resource_type beside it.
+CREATE INDEX idx_audit_log_resource_id ON audit_log (resource_id, created_at DESC);
+
 -- The area filter groups the ~250 action constants by their namespace
 -- ("order.refunded" -> "order"), which is the only way a dropdown of them stays
 -- readable. Matching on split_part rather than a LIKE prefix is what keeps it
@@ -42,4 +48,5 @@ DROP INDEX IF EXISTS idx_audit_log_action_trgm;
 DROP INDEX IF EXISTS idx_audit_log_actor_name_trgm;
 DROP INDEX IF EXISTS idx_audit_log_action_area;
 DROP INDEX IF EXISTS idx_audit_log_actor_id;
+DROP INDEX IF EXISTS idx_audit_log_resource_id;
 DROP INDEX IF EXISTS idx_audit_log_resource_type;

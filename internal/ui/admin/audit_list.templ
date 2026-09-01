@@ -523,6 +523,11 @@ templ AuditListContent(props AuditListProps) {
 					<p class="text-sm text-rr-muted">
 						<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>–<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span> of <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
 					</p>
+				} else {
+					<!-- No total on the unfiltered view: counting the whole log to
+					     get one costs a scan of every row ever written. Narrow by
+					     anything and the exact count comes back. -->
+					<p class="text-sm text-rr-muted">Page <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.Page) }</span></p>
 				}
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {

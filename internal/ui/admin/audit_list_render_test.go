@@ -152,7 +152,7 @@ func TestAuditListRendersFiltersAndRows(t *testing.T) {
 	assert.Contains(t, html, "Order refunded", "actions read as prose, not as dotted keys")
 	assert.Contains(t, html, "Wanda Jackson", "the pinned actor is named, not left as a uuid")
 	assert.Contains(t, html, "Clear all", "a fully filtered list always offers a way out")
-	assert.Contains(t, html, "</span> of <span", "the total count anchors the pagination")
+	assert.Contains(t, html, "</span> of <span", "a filtered list gets an exact total")
 
 	// The action select only appears once an area narrows it — otherwise it
 	// would list every action in the system.
@@ -161,6 +161,24 @@ func TestAuditListRendersFiltersAndRows(t *testing.T) {
 	buf.Reset()
 	require.NoError(t, AuditListContent(props).Render(context.Background(), &buf))
 	assert.NotContains(t, buf.String(), `id="audit-action"`)
+}
+
+// The unfiltered view deliberately has no total: counting it is a scan of the
+// whole log. It still has to say where you are.
+func TestAuditUnfilteredPaginationShowsAPageNumberInsteadOfATotal(t *testing.T) {
+	props := AuditListProps{
+		Entries:    []domain.AuditEntry{{ActorType: domain.AuditActorTypeSystem, ActorName: "system", Action: "job.retried", ResourceType: "job", ResourceID: uuid.New(), CreatedAt: time.Now()}},
+		Page:       3,
+		PerPage:    50,
+		TotalCount: 0,
+		MerchantTZ: time.UTC,
+	}
+	var buf bytes.Buffer
+	require.NoError(t, AuditListContent(props).Render(context.Background(), &buf))
+	html := buf.String()
+	assert.Contains(t, html, "Page <span")
+	assert.Contains(t, html, ">3</span>")
+	assert.NotContains(t, html, "</span> of <span", "there is no total to show, so none is claimed")
 }
 
 func TestAuditEmptyStateNamesTheCulprit(t *testing.T) {

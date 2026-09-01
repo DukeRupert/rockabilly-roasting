@@ -86,9 +86,15 @@ func (d *Deps) handleAdminAuditList(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		totalCount, txErr = d.AuditQueryService.Count(ctx, tx, filter)
-		if txErr != nil {
-			return txErr
+		// See AuditFilter.Narrows: an unfiltered count is a scan of the whole
+		// log to produce a number nobody came here for. Zero reads as "no
+		// total" to the template, which is the same thing an empty result set
+		// renders, so there is one code path either way.
+		if filter.Narrows() {
+			totalCount, txErr = d.AuditQueryService.Count(ctx, tx, filter)
+			if txErr != nil {
+				return txErr
+			}
 		}
 		facets, txErr = d.AuditQueryService.ListFacets(ctx, tx, area)
 		if txErr != nil {
@@ -226,16 +232,22 @@ func auditActorLabel(ctx context.Context, tx pgx.Tx, d *Deps, actorID *uuid.UUID
 	return ""
 }
 
-// auditResourceLabel names the pinned resource for the filter chip, using the
-// resource type off any visible entry ("order 1f2e3d4c" beats a bare uuid).
+// auditResourceLabel names the pinned resource for the filter chip.
+//
+// The type alone is not a name: every order pins as "order", so two different
+// records produce an identical chip and the operator cannot tell which one
+// they are looking at. The id fragment is what distinguishes them — the same
+// eight characters the Resource column shows — so the label carries both, and
+// falls back to the fragment when no visible row names the type.
 func auditResourceLabel(resourceID *uuid.UUID, entries []domain.AuditEntry) string {
 	if resourceID == nil {
 		return ""
 	}
+	short := resourceID.String()[:8]
 	if i := slices.IndexFunc(entries, func(e domain.AuditEntry) bool {
 		return e.ResourceID == *resourceID
 	}); i >= 0 {
-		return entries[i].ResourceType
+		return entries[i].ResourceType + " " + short
 	}
-	return ""
+	return short
 }

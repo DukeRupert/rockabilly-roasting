@@ -112,9 +112,13 @@ const (
 
 // AuditFilter holds optional filters for listing audit entries.
 //
-// Every dimension here is backed by an index (migration 085) — the audit log is
+// Every dimension here is served by an index (migration 085) — the audit log is
 // append-only and grows without bound, so a filter that falls back to a
 // sequential scan gets slower every week it is left in place.
+//
+// "Served by an index" includes the awkward shapes: ResourceID has one of its
+// own rather than riding idx_audit_log_resource, where it is the second column
+// and an id without a type beside it would degrade to a full index scan.
 type AuditFilter struct {
 	// Search is one free-text term. See auditSearchClause for how it is read:
 	// an identifier searches identifiers, anything else searches names and
@@ -152,8 +156,8 @@ type AuditFilter struct {
 	Offset int
 }
 
-// auditColumns is the full projection every audit read shares, so a column
-// added to the table shows up in one place rather than four.
+// auditColumns is the full projection the hand-written audit reads share, so
+// a column added to the table shows up in one place rather than two.
 const auditColumns = `id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
 	                  after_snapshot, request_id, ip_address, reason, metadata, created_at`
 
@@ -253,6 +257,19 @@ func auditWhere(query string, f AuditFilter) (string, []any, int) {
 	return query, args, argN
 }
 
+// Narrows reports whether the filter restricts the log at all.
+//
+// It exists so the list can decline to count. COUNT(*) over an unfiltered
+// audit_log is a sequential scan of every row ever written, and on the default
+// view it would run on every page load to answer "how many entries exist in
+// total" — a number nobody opened this page to learn. Once any filter is on,
+// the count is both cheap and the thing the operator actually wants.
+func (f AuditFilter) Narrows() bool {
+	return f.Search != "" || f.ActorType != nil || f.ActorID != nil ||
+		f.Action != nil || f.ActionArea != nil || f.ResourceType != nil ||
+		f.ResourceID != nil || f.CustomerID != nil || f.From != nil || f.To != nil
+}
+
 // auditOrderBy returns the ORDER BY for a sort key. Newest-first is the
 // default because an audit log is read from the top.
 func auditOrderBy(sort AuditSort) string {
@@ -298,14 +315,27 @@ func (s *AuditStore) Count(ctx context.Context, tx pgx.Tx, f AuditFilter) (int, 
 // ListActionAreas returns the action namespaces present in the log, sorted.
 //
 // The dropdowns are built from what the table actually contains rather than
-// from the action constants: there are around 250 constants across 30-odd
-// namespaces, and most of any one shop's are never written. A list of options
-// that all return rows beats a complete one that mostly does not.
+// from the action constants: there are 222 constants across 31 namespaces, and
+// most of any one shop's are never written. A list of options that all return
+// rows beats a complete one that mostly does not.
 //
-// Backed by the (split_part(action,'.',1), created_at DESC) expression index,
-// so this is an index-only scan.
+// The recursive form is a loose index scan, and it is not decoration. Postgres
+// has no skip scan, so the obvious SELECT DISTINCT reads every row — a
+// sequential scan of an append-only table, run on every page load including
+// every keystroke in the search box. This walks the expression index one
+// distinct value at a time instead: ~30 index probes rather than N heap rows,
+// so the cost tracks the number of areas, which barely changes, not the size
+// of the log, which only grows.
 func (s *AuditStore) ListActionAreas(ctx context.Context, tx pgx.Tx) ([]string, error) {
-	rows, err := tx.Query(ctx, `SELECT DISTINCT split_part(action, '.', 1) FROM audit_log ORDER BY 1`)
+	rows, err := tx.Query(ctx, `
+		WITH RECURSIVE areas AS (
+			(SELECT split_part(action, '.', 1) AS area FROM audit_log ORDER BY 1 LIMIT 1)
+			UNION ALL
+			SELECT (SELECT split_part(action, '.', 1) FROM audit_log
+			         WHERE split_part(action, '.', 1) > areas.area ORDER BY 1 LIMIT 1)
+			  FROM areas WHERE areas.area IS NOT NULL
+		)
+		SELECT area FROM areas WHERE area IS NOT NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("list audit action areas: %w", err)
 	}
@@ -329,8 +359,18 @@ func (s *AuditStore) ListActionsInArea(ctx context.Context, tx pgx.Tx, area stri
 // differ: an "email.shipment_sent" event is recorded against resource_type
 // "order", so filtering by area finds the mail and filtering by resource finds
 // everything that ever touched that order.
+//
+// Same loose index scan as ListActionAreas, for the same reason — see there.
 func (s *AuditStore) ListResourceTypes(ctx context.Context, tx pgx.Tx) ([]string, error) {
-	rows, err := tx.Query(ctx, `SELECT DISTINCT resource_type FROM audit_log ORDER BY 1`)
+	rows, err := tx.Query(ctx, `
+		WITH RECURSIVE types AS (
+			(SELECT resource_type AS t FROM audit_log ORDER BY 1 LIMIT 1)
+			UNION ALL
+			SELECT (SELECT resource_type FROM audit_log
+			         WHERE resource_type > types.t ORDER BY 1 LIMIT 1)
+			  FROM types WHERE types.t IS NOT NULL
+		)
+		SELECT t FROM types WHERE t IS NOT NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("list audit resource types: %w", err)
 	}

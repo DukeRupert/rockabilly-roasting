@@ -147,9 +147,44 @@ You probably don't. If you think you do, ask first — there's almost always an 
 
 If you're building something genuinely new (e.g., an admin onboarding splash), open a discussion before reaching for storefront classes — we may want to expand the admin palette explicitly.
 
-## The lint has two halves
+## Filter forms on list pages
 
-`mage checkAdminUI` (wired into `mage check`) fails on two things:
+Every admin list page (orders, customers, subscriptions, audit) carries its
+filter state through **one** `<form method="get">`, and the search box sends
+that form with `hx-include="closest form"`.
+
+The rule underneath it: **a parameter is carried by exactly one element.** If it
+has a visible control — a select, a date field — that control *is* the carrier.
+If it only has links behind it (tabs, pills, sortable headers, chips), it gets
+one hidden input inside the same form.
+
+This is not a style preference. `hx-include` resolves its selector with
+`querySelectorAll`, and htmx's `addValues` dedupes by *element*, not by name,
+before appending each value. So a parameter written both as a hidden input
+beside the search box and as a real control further down is sent **twice**, and
+Go's `Query().Get` takes the first in document order — the stale hidden copy.
+The symptom is small and very hard to place: type a date into a custom range,
+don't press Apply, type one character into the search box, and the date reverts.
+
+Four pages had it (three sending duplicates outright, one scoped by id so the
+hidden copy beat the live select next to it). `mage checkAdminUI` now rejects any
+`hx-include="[name='…']"`, and `list_filter_form_test.go` asserts, per page,
+that no parameter is carried twice, that there is exactly one un-nested form,
+and that the search box includes the form rather than a name.
+
+Two things to keep in mind when adding a filter:
+
+- **Don't nest a form** inside the filter form. The parser drops the inner one
+  and takes its fields with it, and nothing looks wrong until a filter stops
+  working.
+- **Add the page to `listFilterPages`** in that test, in *both* date states. The
+  lint catches the bad selector on any page; the per-parameter check only covers
+  what is listed there, and the custom-range and preset-range branches render
+  different elements — a duplicate can hide in one while the other passes.
+
+## The lint has three halves
+
+`mage checkAdminUI` (wired into `mage check`) fails on three things:
 
 1. **A banned class** — the storefront paper-and-ink utilities, brand fonts,
    stamp shadows and heavy borders listed above. A class that is *wrong*.
@@ -161,6 +196,8 @@ If you're building something genuinely new (e.g., an admin onboarding splash), o
    gaps, deliberately: a class assembled by string concatenation, a *non*-`rr`
    typo like `bg-surface`, and `rr-*` classes written in Go or JS rather than a
    `.templ`. This closes the hole that shipped, not every hole.
+3. **An `hx-include` that matches by parameter name** — see *Filter forms on
+   list pages* above. A selector that is *ambiguous*.
 
 The second half was added after `bg-rr-paper-warm` shipped. The token is
 `--color-paper-warm`: un-prefixed, and storefront-only. Tailwind v4 drops an

@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -107,8 +108,14 @@ func TestSubscriptionList_LinksPreserveFilterState(t *testing.T) {
 	assert.Contains(t, html, ">60<", "the total is the count, not the page size")
 }
 
-// Every name in hx-include has to exist inside the state container, or typing
-// in the search box silently clears that filter.
+// Typing in the search box must carry every active filter with it, or the
+// search silently widens the list it was meant to narrow.
+//
+// This used to be asserted against a hand-maintained state container matched by
+// id. The container is gone: every control now lives in one form and the search
+// box sends that form, so the thing worth asserting is that each filter is
+// present exactly once — see list_filter_form_test.go for why "exactly once"
+// is the load-bearing half.
 func TestSubscriptionList_SearchCarriesFilterState(t *testing.T) {
 	html := renderSubscriptionList(t, SubscriptionListProps{
 		Subscriptions: []EnrichedSubscription{subRow("Ash Kagan", domain.SubscriptionStatusActive, time.Now())},
@@ -120,11 +127,15 @@ func TestSubscriptionList_SearchCarriesFilterState(t *testing.T) {
 		Now:           time.Now(),
 	})
 
-	assert.Contains(t, html, `hx-include="#subscriptions-filter-state input"`)
-	assert.Contains(t, html, `id="subscriptions-filter-state"`)
-	for _, name := range []string{"status", "plan", "product", "due", "from", "to", "sort"} {
-		assert.Contains(t, html, `name="`+name+`"`, "hx-include expects a %s input", name)
+	assert.Contains(t, html, `hx-include="closest form"`)
+	for _, name := range []string{"status", "plan", "product", "due", "from", "to", "sort", "q"} {
+		assert.Equal(t, 1, strings.Count(html, `name="`+name+`"`),
+			"%s must be carried by exactly one element", name)
 	}
+	// The active values, not just the names.
+	assert.Contains(t, html, `name="status" value="paused"`)
+	assert.Contains(t, html, `name="due" value="overdue"`)
+	assert.Contains(t, html, `name="sort" value="customer_asc"`)
 }
 
 // A failed search offers a way forward; an over-narrow filter set says so

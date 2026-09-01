@@ -254,7 +254,12 @@ templ CustomerListContent(props CustomerListProps) {
 		@adminChannelToggleCount(CustomersRetailPath, CustomersWholesalePath, props.BasePath(), props.Counts["pending"])
 	</div>
 	<!-- Search + filters -->
-	<div class="space-y-3">
+	<!-- One form, so each parameter appears exactly once. Nothing here has a
+	     visible control other than search — every filter is a link — so the
+	     bare [name='…'] selectors this used to carry were unambiguous today and
+	     would have broken silently the first time somebody added a select
+	     beside them, which is what happened on the orders and audit lists. -->
+	<form method="get" action={ templ.SafeURL(props.BasePath()) } class="space-y-3">
 		<div class="flex flex-wrap items-center gap-3">
 			<div class="max-w-sm flex-auto">
 				<label for="customers-search" class="sr-only">Search customers</label>
@@ -268,11 +273,11 @@ templ CustomerListContent(props CustomerListProps) {
 					hx-trigger="input changed delay:300ms, search"
 					hx-target="#main-content"
 					hx-push-url="true"
-					hx-include="[name='status'],[name='verified'],[name='sort']"
+					hx-include="closest form"
 					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 				/>
 			</div>
-			<!-- Carried with the search request so typing never drops the active filters. -->
+			<!-- The pills and sort headers are links, so their state rides here. -->
 			<input type="hidden" name="status" value={ props.StatusFilter }/>
 			<input type="hidden" name="verified" value={ props.VerifiedFilter }/>
 			<input type="hidden" name="sort" value={ props.Sort }/>
@@ -317,7 +322,7 @@ templ CustomerListContent(props CustomerListProps) {
 				}
 			</div>
 		}
-	</div>
+	</form>
 	<!-- Customer table -->
 	<div class="mt-6">
 		if len(props.Customers) == 0 {

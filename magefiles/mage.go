@@ -291,6 +291,12 @@ func CheckAdminUI() error {
 	}
 	violations = append(violations, dead...)
 
+	includes, err := bareNameIncludes(excluded)
+	if err != nil {
+		return err
+	}
+	violations = append(violations, includes...)
+
 	if len(violations) > 0 {
 		for _, v := range violations {
 			fmt.Fprintln(os.Stderr, v)
@@ -298,6 +304,54 @@ func CheckAdminUI() error {
 		return fmt.Errorf("%d admin UI lint violation(s) — see docs/admin-ui.md", len(violations))
 	}
 	return nil
+}
+
+// bareNameIncludes flags hx-include selectors that match by parameter name
+// across the whole document, e.g. hx-include="[name='from']".
+//
+// htmx resolves the selector with querySelectorAll and appends a value for
+// every match, deduping by element rather than by name. A page that carries a
+// parameter both as a hidden input and as a real control therefore sends it
+// twice, and the server reads whichever the markup emitted first — which is the
+// stale hidden copy, not what is on screen. The symptom is tiny and awful to
+// diagnose: type a date into a custom range, do not press Apply, type one
+// character into search, and the date reverts.
+//
+// The fix on every list page was one form holding each parameter once, with
+// hx-include="closest form". This keeps the next page from rediscovering it.
+func bareNameIncludes(excluded map[string]bool) ([]string, error) {
+	re := regexp.MustCompile(`hx-include="[^"]*\[name=`)
+
+	var violations []string
+	walk := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, ".templ") || excluded[path] {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for lineNum, line := range strings.Split(string(data), "\n") {
+			if re.MatchString(line) {
+				violations = append(violations, fmt.Sprintf(
+					"%s:%d: hx-include matches by parameter name across the whole document — "+
+						"include the form instead (hx-include=\"closest form\"), so each "+
+						"parameter is sent once: %s",
+					path, lineNum+1, strings.TrimSpace(line),
+				))
+			}
+		}
+		return nil
+	}
+	for _, root := range adminUIRoots() {
+		if err := filepath.Walk(root, walk); err != nil {
+			return nil, fmt.Errorf("walk %s: %w", root, err)
+		}
+	}
+	return violations, nil
 }
 
 // styleOpenAt reports where a real <style> tag starts on a line, or -1.

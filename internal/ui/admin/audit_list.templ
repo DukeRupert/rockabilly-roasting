@@ -248,26 +248,6 @@ func auditNoMatchMessage(p AuditListProps) string {
 	return fmt.Sprintf("Nothing for %q. Search matches the person's name and the action — try a name, or a word like \"refund\".", p.Search)
 }
 
-// auditHiddenState emits the filter state as hidden inputs for a GET form.
-// `except` names the fields that form owns as real inputs — emitting them
-// twice would send both values and the stale one could win.
-templ auditHiddenState(props AuditListProps, except ...string) {
-	for k, vals := range auditQueryValues(props) {
-		if !auditExcluded(k, except) {
-			<input type="hidden" name={ k } value={ vals[0] }/>
-		}
-	}
-}
-
-func auditExcluded(name string, except []string) bool {
-	for _, e := range except {
-		if e == name {
-			return true
-		}
-	}
-	return false
-}
-
 // auditSelect renders one labelled dropdown that submits its form on change.
 templ auditSelect(id, name, label, allLabel, active string, options []string) {
 	<div>
@@ -322,102 +302,110 @@ templ AuditListContent(props AuditListProps) {
 	     subscriptions lists. Tabs left, search right on desktop; stacked with
 	     tabs on top on mobile. -->
 	<section class="mt-4" aria-label="Filter the audit log">
-		<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
-			<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Actor">
-				for _, tab := range auditActorTabs {
-					<a
-						href={ templ.SafeURL(auditFilterURL(props, "actor_type", tab.Value)) }
-						class={ adminTabClass(props.ActorTypeFilter == tab.Value) }
-						if props.ActorTypeFilter == tab.Value {
-							aria-current="page"
-						}
-					>
-						<span>{ tab.Label }</span>
-					</a>
-				}
-			</nav>
-			<!-- Search — refreshes the table inline as you type. -->
-			<div class="md:w-72 md:shrink-0">
-				<label for="audit-search" class="sr-only">Search the audit log</label>
-				<input
-					id="audit-search"
-					type="search"
-					name="q"
-					value={ props.Search }
-					placeholder="Search by person, action, or ID"
-					hx-get="/admin/audit"
-					hx-trigger="input changed delay:300ms, search"
-					hx-target="#main-content"
-					hx-push-url="true"
-					hx-include="[name='actor_type'],[name='area'],[name='action'],[name='resource_type'],[name='actor_id'],[name='resource_id'],[name='customer_id'],[name='range'],[name='from'],[name='to'],[name='sort']"
-					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-				/>
-				<!-- Carried with the search request so typing never drops the
-				     active filters. Every name here appears in hx-include above. -->
-				<input type="hidden" name="actor_type" value={ props.ActorTypeFilter }/>
-				<input type="hidden" name="area" value={ props.Area }/>
-				<input type="hidden" name="action" value={ props.ActionFilter }/>
-				<input type="hidden" name="resource_type" value={ props.ResourceFilter }/>
-				<input type="hidden" name="actor_id" value={ props.ActorID }/>
-				<input type="hidden" name="resource_id" value={ props.ResourceID }/>
-				<input type="hidden" name="customer_id" value={ props.CustomerID }/>
+		<!-- One form for every control on the page.
+		     Each parameter appears exactly once inside it, which is the whole
+		     point: hx-include resolves a selector with querySelectorAll and
+		     appends *every* match, so a name carried both as a hidden input and
+		     as a real control was sent twice and the server read whichever came
+		     first in the document — the stale hidden copy. A date typed into
+		     the custom range and not yet applied was discarded by the next
+		     keystroke in the search box. With one element per name, what is on
+		     screen is what gets sent. -->
+		<form method="get" action="/admin/audit">
+			<!-- State with no control of its own: the tabs, pills, sort header
+			     and chips are links, so their value has to ride along here. -->
+			<input type="hidden" name="actor_type" value={ props.ActorTypeFilter }/>
+			<input type="hidden" name="actor_id" value={ props.ActorID }/>
+			<input type="hidden" name="resource_id" value={ props.ResourceID }/>
+			<input type="hidden" name="customer_id" value={ props.CustomerID }/>
+			<input type="hidden" name="sort" value={ auditSortParam(props.Sort) }/>
+			if props.Range != "custom" {
+				<!-- Under a preset the dates are implied, and the inputs that
+				     would carry them are not rendered. -->
 				<input type="hidden" name="range" value={ props.Range }/>
-				<input type="hidden" name="from" value={ props.From }/>
-				<input type="hidden" name="to" value={ props.To }/>
-				<input type="hidden" name="sort" value={ auditSortParam(props.Sort) }/>
+			}
+			<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+				<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Actor">
+					for _, tab := range auditActorTabs {
+						<a
+							href={ templ.SafeURL(auditFilterURL(props, "actor_type", tab.Value)) }
+							class={ adminTabClass(props.ActorTypeFilter == tab.Value) }
+							if props.ActorTypeFilter == tab.Value {
+								aria-current="page"
+							}
+						>
+							<span>{ tab.Label }</span>
+						</a>
+					}
+				</nav>
+				<!-- Search — refreshes the table inline as you type. -->
+				<div class="md:w-72 md:shrink-0">
+					<label for="audit-search" class="sr-only">Search the audit log</label>
+					<input
+						id="audit-search"
+						type="search"
+						name="q"
+						value={ props.Search }
+						placeholder="Search by person, action, or ID"
+						hx-get="/admin/audit"
+						hx-trigger="input changed delay:300ms, search"
+						hx-target="#main-content"
+						hx-push-url="true"
+						hx-include="closest form"
+						class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+					/>
+				</div>
 			</div>
-		</div>
-		<!-- Date range. Quieter than the tabs: it narrows within the actor split
+			<!-- Date range. Quieter than the tabs: it narrows within the actor split
 		     rather than switching what you are looking at. -->
-		<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-			<div class="flex flex-wrap items-center gap-2">
-				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">When</span>
-				for _, f := range auditRangePills {
-					<a
-						href={ templ.SafeURL(auditFilterURL(props, "range", f.Value)) }
-						class={ adminPillClasses(props.Range == f.Value) }
-						if props.Range == f.Value {
-							aria-current="page"
-						}
-					>
-						{ f.Label }
-					</a>
-				}
+			<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="label-font text-xs uppercase tracking-wide text-rr-muted">When</span>
+					for _, f := range auditRangePills {
+						<a
+							href={ templ.SafeURL(auditFilterURL(props, "range", f.Value)) }
+							class={ adminPillClasses(props.Range == f.Value) }
+							if props.Range == f.Value {
+								aria-current="page"
+							}
+						>
+							{ f.Label }
+						</a>
+					}
+				</div>
 			</div>
-		</div>
-		if props.Range == "custom" {
-			<form method="get" action="/admin/audit" class="mt-3 flex flex-wrap items-end gap-3">
-				@auditHiddenState(props, "range", "from", "to")
-				<input type="hidden" name="range" value="custom"/>
-				<div>
-					<label for="audit-from" class="label-font block text-xs uppercase tracking-wide text-rr-muted">From</label>
-					<input id="audit-from" type="date" name="from" value={ props.From } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+			if props.Range == "custom" {
+				<div class="mt-3 flex flex-wrap items-end gap-3">
+					<input type="hidden" name="range" value="custom"/>
+					<div>
+						<label for="audit-from" class="label-font block text-xs uppercase tracking-wide text-rr-muted">From</label>
+						<input id="audit-from" type="date" name="from" value={ props.From } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+					</div>
+					<div>
+						<label for="audit-to" class="label-font block text-xs uppercase tracking-wide text-rr-muted">To</label>
+						<input id="audit-to" type="date" name="to" value={ props.To } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+					</div>
+					<button type="submit" class="btn-secondary">Apply</button>
 				</div>
-				<div>
-					<label for="audit-to" class="label-font block text-xs uppercase tracking-wide text-rr-muted">To</label>
-					<input id="audit-to" type="date" name="to" value={ props.To } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
-				</div>
-				<button type="submit" class="btn-secondary">Apply</button>
-			</form>
-		}
-		<!-- What happened, and to what. Two questions, deliberately separate:
+			}
+			<!-- What happened, and to what. Two questions, deliberately separate:
 		     an "email.shipment_sent" entry is recorded against resource_type
 		     "order", so Area finds the mail and Resource finds everything that
 		     ever touched that order. Action only appears once an area narrows
 		     it — the log holds a couple of hundred distinct actions. -->
-		<form method="get" action="/admin/audit" class="mt-3 flex flex-wrap items-end gap-3">
-			@auditHiddenState(props, "area", "action", "resource_type")
-			@auditSelect("audit-area", "area", "Area", "All areas", props.Area, props.Areas)
-			if len(props.Actions) > 1 {
-				@auditSelect("audit-action", "action", "Action", "Any "+auditHumanize(props.Area)+" action", props.ActionFilter, props.Actions)
-			}
-			@auditSelect("audit-resource", "resource_type", "Resource", "All resources", props.ResourceFilter, props.ResourceTypes)
-			<noscript>
-				<button type="submit" class="btn-secondary">Apply</button>
-			</noscript>
-			if anyAuditFilterActive(props) {
-				<a href="/admin/audit" class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
-			}
+			<div class="mt-3 flex flex-wrap items-end gap-3">
+				@auditSelect("audit-area", "area", "Area", "All areas", props.Area, props.Areas)
+				if len(props.Actions) > 1 {
+					@auditSelect("audit-action", "action", "Action", "Any "+auditHumanize(props.Area)+" action", props.ActionFilter, props.Actions)
+				}
+				@auditSelect("audit-resource", "resource_type", "Resource", "All resources", props.ResourceFilter, props.ResourceTypes)
+				<noscript>
+					<button type="submit" class="btn-secondary">Apply</button>
+				</noscript>
+				if anyAuditFilterActive(props) {
+					<a href="/admin/audit" class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
+				}
+			</div>
 		</form>
 		if props.ActorID != "" || props.ResourceID != "" || props.CustomerID != "" {
 			<div class="mt-3 flex flex-wrap items-center gap-2">

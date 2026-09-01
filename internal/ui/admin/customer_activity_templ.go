@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 )
@@ -107,7 +109,12 @@ func customerEventMarker(action string) string {
 // CustomerActivity renders a vertical activity log for a customer, sourced
 // from audit_log entries where the customer was either the actor or the
 // resource. Newest first.
-func CustomerActivity(entries []domain.AuditEntry, loc *time.Location) templ.Component {
+//
+// The timeline is capped at the most recent entries, so it ends in a link to
+// the same query in the audit log — where it can be paged, searched, and
+// narrowed by date. Without it the cap is a dead end: staff can see that older
+// events exist and have no way to reach them.
+func CustomerActivity(customerID uuid.UUID, entries []domain.AuditEntry, loc *time.Location) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -131,6 +138,25 @@ func CustomerActivity(entries []domain.AuditEntry, loc *time.Location) templ.Com
 		templ_7745c5c3_Err = ActivityTimeline(entries, customerEventLabel, customerEventMarker, loc).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
+		}
+		if len(entries) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mt-3\"><a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 templ.SafeURL
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/audit?customer_id=" + customerID.String()))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_activity.templ`, Line: 113, Col: 77}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"text-sm font-medium text-rr-red hover:text-rr-red-lt\">Full audit log for this customer &rarr;</a></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})

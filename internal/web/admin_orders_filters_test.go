@@ -33,8 +33,8 @@ func TestNormalizeOrderStatusParams(t *testing.T) {
 	// all: the normalizer dropped it and the list came back unfiltered. Every
 	// status the orders list offers as a pill has to survive this function.
 	assert.Equal(t, "ready_for_pickup", normalizeOrderFulfillment("ready_for_pickup"))
-	assert.Equal(t, "30d", normalizeOrderRange("30d"))
-	assert.Equal(t, "", normalizeOrderRange("last_century"))
+	assert.Equal(t, "30d", normalizeDateRange("30d"))
+	assert.Equal(t, "", normalizeDateRange("last_century"))
 }
 
 func TestParseDollarFilter(t *testing.T) {
@@ -78,7 +78,7 @@ func TestOrderDateBounds_UsesMerchantTimezone(t *testing.T) {
 
 	now := time.Date(2026, 8, 16, 1, 30, 0, 0, time.UTC) // = Aug 15, 19:30 Denver
 
-	from, to := orderDateBounds("today", "", "", denver, now)
+	from, to := listDateBounds("today", "", "", denver, now)
 	require.NotNil(t, from)
 	assert.Nil(t, to, "an open-ended preset shouldn't cap the future")
 
@@ -94,23 +94,23 @@ func TestOrderDateBounds_Presets(t *testing.T) {
 	utc := time.UTC
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, utc)
 
-	from, _ := orderDateBounds("7d", "", "", utc, now)
+	from, _ := listDateBounds("7d", "", "", utc, now)
 	require.NotNil(t, from)
 	// Inclusive of today, so 7 days spans the 10th through the 16th.
 	assert.Equal(t, 10, from.Day())
 
-	from, _ = orderDateBounds("30d", "", "", utc, now)
+	from, _ = listDateBounds("30d", "", "", utc, now)
 	require.NotNil(t, from)
 	assert.Equal(t, time.July, from.Month())
 	assert.Equal(t, 18, from.Day())
 
-	from, _ = orderDateBounds("month", "", "", utc, now)
+	from, _ = listDateBounds("month", "", "", utc, now)
 	require.NotNil(t, from)
 	assert.Equal(t, 1, from.Day())
 	assert.Equal(t, time.August, from.Month())
 
 	// No range means no bounds at all.
-	from, to := orderDateBounds("", "", "", utc, now)
+	from, to := listDateBounds("", "", "", utc, now)
 	assert.Nil(t, from)
 	assert.Nil(t, to)
 }
@@ -121,7 +121,7 @@ func TestOrderDateBounds_CustomCoversWholeEndDay(t *testing.T) {
 	utc := time.UTC
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, utc)
 
-	from, to := orderDateBounds("custom", "2026-08-01", "2026-08-15", utc, now)
+	from, to := listDateBounds("custom", "2026-08-01", "2026-08-15", utc, now)
 	require.NotNil(t, from)
 	require.NotNil(t, to)
 
@@ -141,7 +141,7 @@ func TestOrderDateBounds_CustomIgnoresGarbage(t *testing.T) {
 	utc := time.UTC
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, utc)
 
-	from, to := orderDateBounds("custom", "not-a-date", "", utc, now)
+	from, to := listDateBounds("custom", "not-a-date", "", utc, now)
 	assert.Nil(t, from)
 	assert.Nil(t, to)
 }
@@ -149,7 +149,7 @@ func TestOrderDateBounds_CustomIgnoresGarbage(t *testing.T) {
 // A nil timezone must not panic — it falls back to UTC.
 func TestOrderDateBounds_NilTimezone(t *testing.T) {
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
-	from, _ := orderDateBounds("today", "", "", nil, now)
+	from, _ := listDateBounds("today", "", "", nil, now)
 	require.NotNil(t, from)
 	assert.Equal(t, 16, from.Day())
 }

@@ -192,7 +192,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		<div class="space-y-8 lg:col-span-2">
 			@customerOrdersSection(props)
 			@customerSubscriptionsSection(props)
-			@CustomerActivity(props.Activity, props.MerchantTZ)
+			@CustomerActivity(props.Customer.ID, props.Activity, props.MerchantTZ)
 		</div>
 		<!-- Rail: who they are, and how the account is configured -->
 		<div class="space-y-6 lg:sticky lg:top-6 lg:self-start">

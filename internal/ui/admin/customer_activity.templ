@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 )
@@ -99,6 +101,18 @@ func customerEventMarker(action string) string {
 // CustomerActivity renders a vertical activity log for a customer, sourced
 // from audit_log entries where the customer was either the actor or the
 // resource. Newest first.
-templ CustomerActivity(entries []domain.AuditEntry, loc *time.Location) {
+//
+// The timeline is capped at the most recent entries, so it ends in a link to
+// the same query in the audit log — where it can be paged, searched, and
+// narrowed by date. Without it the cap is a dead end: staff can see that older
+// events exist and have no way to reach them.
+templ CustomerActivity(customerID uuid.UUID, entries []domain.AuditEntry, loc *time.Location) {
 	@ActivityTimeline(entries, customerEventLabel, customerEventMarker, loc)
+	if len(entries) > 0 {
+		<div class="mt-3">
+			<a href={ templ.SafeURL("/admin/audit?customer_id=" + customerID.String()) } class="text-sm font-medium text-rr-red hover:text-rr-red-lt">
+				Full audit log for this customer &rarr;
+			</a>
+		</div>
+	}
 }

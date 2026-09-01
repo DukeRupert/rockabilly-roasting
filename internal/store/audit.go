@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -87,84 +89,183 @@ func (s *AuditStore) ListByAction(ctx context.Context, tx pgx.Tx, action string)
 	return auditEntriesFromRows(rows), nil
 }
 
-// ListForCustomer returns audit entries that relate to a single customer:
-// either entries where the customer was the actor (self-service actions, login,
-// logout) or where the customer was the resource (staff actions on the customer,
-// wholesale events). Ordered newest first, capped at limit.
+// ListForCustomer returns audit entries that relate to a single customer,
+// newest first, capped at limit. See AuditFilter.CustomerID for what "relate"
+// means; it delegates so the customer detail page's timeline and the audit
+// log's customer filter can never disagree about which entries those are.
 func (s *AuditStore) ListForCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, limit int) ([]domain.AuditEntry, error) {
 	if limit <= 0 {
 		limit = 25
 	}
-	query := `SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
-	                 after_snapshot, request_id, ip_address, reason, metadata, created_at
-	          FROM audit_log
-	          WHERE (actor_type = 'customer' AND actor_id = $1)
-	             OR (resource_type = 'customer' AND resource_id = $1)
-	          ORDER BY created_at DESC
-	          LIMIT $2`
-	rows, err := tx.Query(ctx, query, customerID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("list audit for customer: %w", err)
-	}
-	defer rows.Close()
-
-	var entries []domain.AuditEntry
-	for rows.Next() {
-		var e domain.AuditEntry
-		var actorType string
-		var metadataJSON json.RawMessage
-		if err := rows.Scan(
-			&e.ID, &actorType, &e.ActorID, &e.ActorName,
-			&e.Action, &e.ResourceType, &e.ResourceID,
-			&e.AfterSnapshot, &e.RequestID, &e.IPAddress,
-			&e.Reason, &metadataJSON, &e.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan audit entry: %w", err)
-		}
-		e.ActorType = domain.AuditActorType(actorType)
-		e.Metadata = metadataFromJSON(metadataJSON)
-		entries = append(entries, e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate audit entries: %w", err)
-	}
-	return entries, nil
+	return s.List(ctx, tx, AuditFilter{CustomerID: &customerID, Limit: limit})
 }
 
+// AuditSort names the orderings the audit list offers. The log is a
+// chronology and nothing else, so date is the only axis worth sorting on —
+// the only question is which end of it you want to read from.
+type AuditSort string
+
+const (
+	AuditSortNewest AuditSort = "newest"
+	AuditSortOldest AuditSort = "oldest"
+)
+
 // AuditFilter holds optional filters for listing audit entries.
+//
+// Every dimension here is backed by an index (migration 085) — the audit log is
+// append-only and grows without bound, so a filter that falls back to a
+// sequential scan gets slower every week it is left in place.
 type AuditFilter struct {
-	ActorType    *string
-	Action       *string
+	// Search is one free-text term. See auditSearchClause for how it is read:
+	// an identifier searches identifiers, anything else searches names and
+	// actions.
+	Search string
+
+	ActorType *string
+	ActorID   *uuid.UUID
+
+	// Action matches one exact action ("order.refunded"); ActionArea matches
+	// every action in a namespace ("order"). They are separate fields because
+	// the UI offers them as separate controls — pick an area, then optionally
+	// narrow to a single action within it.
+	Action     *string
+	ActionArea *string
+
 	ResourceType *string
-	Limit        int
-	Offset       int
+	ResourceID   *uuid.UUID
+
+	// CustomerID matches everything about one customer, from either side: the
+	// things they did themselves (logins, self-service edits) and the things
+	// done to their account (a staff approval, a wholesale suspension). Those
+	// are two different columns, which is why it cannot be expressed with
+	// ActorID and ResourceID — and why "show me this customer" needs its own
+	// field rather than being assembled by the caller.
+	CustomerID *uuid.UUID
+
+	// From and To bound created_at inclusively. The caller resolves presets
+	// like "this month" into instants in the merchant's timezone.
+	From *time.Time
+	To   *time.Time
+
+	Sort   AuditSort
+	Limit  int
+	Offset int
+}
+
+// auditColumns is the full projection every audit read shares, so a column
+// added to the table shows up in one place rather than four.
+const auditColumns = `id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
+	                  after_snapshot, request_id, ip_address, reason, metadata, created_at`
+
+// auditSearchClause interprets one free-text term.
+//
+// The two readings are kept deliberately disjoint rather than OR'd together.
+// A term that looks like an identifier searches identifiers; anything else
+// searches actor_name and action. OR-ing an equality against two trigram
+// matches would force the planner to scan the whole table to satisfy the one
+// branch it has no index for, which is exactly the outcome migration 085
+// exists to avoid.
+//
+// The text half stops at actor_name and action on purpose: those are the two
+// columns the list actually renders. Matching on reason or metadata would
+// return rows whose reason for matching is invisible on screen.
+func auditSearchClause(term string, argN int) (string, []any, int) {
+	if id, err := uuid.Parse(term); err == nil {
+		return fmt.Sprintf(" AND (actor_id = $%d OR resource_id = $%d)", argN, argN),
+			[]any{id}, argN + 1
+	}
+	// The list renders the first 8 characters of each resource id, so staff
+	// paste that fragment back in. Anything shorter is treated as text —
+	// otherwise a word like "added" would be read as a hex fragment.
+	if isHexFragment(term) {
+		return fmt.Sprintf(" AND resource_id::text LIKE $%d || '%%'", argN),
+			[]any{strings.ToLower(term)}, argN + 1
+	}
+	return fmt.Sprintf(" AND (actor_name ILIKE '%%' || $%d || '%%' OR action ILIKE '%%' || $%d || '%%')", argN, argN),
+		[]any{term}, argN + 1
+}
+
+// isHexFragment reports whether a term reads as the leading chunk of a uuid.
+// The 8-character floor matches the fragment the list displays.
+func isHexFragment(term string) bool {
+	if len(term) < 8 {
+		return false
+	}
+	for _, r := range strings.ToLower(term) {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && r != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+// auditWhere grows query with the filter's WHERE clauses and returns the query,
+// its args, and the next free placeholder.
+//
+// List and Count both build their WHERE here. If they drift, the "X–Y of Z"
+// total starts contradicting the rows underneath it.
+func auditWhere(query string, f AuditFilter) (string, []any, int) {
+	args := []any{}
+	argN := 1
+	add := func(clause string, v any) {
+		query += fmt.Sprintf(" AND "+clause, argN)
+		args = append(args, v)
+		argN++
+	}
+
+	if f.ActorType != nil {
+		add("actor_type = $%d", *f.ActorType)
+	}
+	if f.ActorID != nil {
+		add("actor_id = $%d", *f.ActorID)
+	}
+	if f.Action != nil {
+		add("action = $%d", *f.Action)
+	}
+	if f.ActionArea != nil {
+		add("split_part(action, '.', 1) = $%d", *f.ActionArea)
+	}
+	if f.ResourceType != nil {
+		add("resource_type = $%d", *f.ResourceType)
+	}
+	if f.ResourceID != nil {
+		add("resource_id = $%d", *f.ResourceID)
+	}
+	if f.CustomerID != nil {
+		query += fmt.Sprintf(
+			" AND ((actor_type = 'customer' AND actor_id = $%d) OR (resource_type = 'customer' AND resource_id = $%d))",
+			argN, argN)
+		args = append(args, *f.CustomerID)
+		argN++
+	}
+	if f.From != nil {
+		add("created_at >= $%d", *f.From)
+	}
+	if f.To != nil {
+		add("created_at <= $%d", *f.To)
+	}
+	if term := strings.TrimSpace(f.Search); term != "" {
+		clause, sargs, next := auditSearchClause(term, argN)
+		query += clause
+		args = append(args, sargs...)
+		argN = next
+	}
+	return query, args, argN
+}
+
+// auditOrderBy returns the ORDER BY for a sort key. Newest-first is the
+// default because an audit log is read from the top.
+func auditOrderBy(sort AuditSort) string {
+	if sort == AuditSortOldest {
+		return " ORDER BY created_at ASC"
+	}
+	return " ORDER BY created_at DESC"
 }
 
 // List returns audit entries matching the given filter, paginated.
 func (s *AuditStore) List(ctx context.Context, tx pgx.Tx, f AuditFilter) ([]domain.AuditEntry, error) {
-	query := `SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
-	                  after_snapshot, request_id, ip_address, reason, metadata, created_at
-	           FROM audit_log WHERE 1=1`
-	args := []any{}
-	argN := 1
-
-	if f.ActorType != nil {
-		query += fmt.Sprintf(" AND actor_type = $%d", argN)
-		args = append(args, *f.ActorType)
-		argN++
-	}
-	if f.Action != nil {
-		query += fmt.Sprintf(" AND action = $%d", argN)
-		args = append(args, *f.Action)
-		argN++
-	}
-	if f.ResourceType != nil {
-		query += fmt.Sprintf(" AND resource_type = $%d", argN)
-		args = append(args, *f.ResourceType)
-		argN++
-	}
-
-	query += " ORDER BY created_at DESC"
+	query, args, argN := auditWhere(`SELECT `+auditColumns+` FROM audit_log WHERE true`, f)
+	query += auditOrderBy(f.Sort)
 
 	if f.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argN)
@@ -174,36 +275,84 @@ func (s *AuditStore) List(ctx context.Context, tx pgx.Tx, f AuditFilter) ([]doma
 	if f.Offset > 0 {
 		query += fmt.Sprintf(" OFFSET $%d", argN)
 		args = append(args, f.Offset)
-		argN++
 	}
 
 	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list audit entries: %w", err)
 	}
-	defer rows.Close()
+	return scanAuditEntries(rows)
+}
 
-	var entries []domain.AuditEntry
+// Count returns how many entries match the filter, ignoring limit and offset.
+func (s *AuditStore) Count(ctx context.Context, tx pgx.Tx, f AuditFilter) (int, error) {
+	query, args, _ := auditWhere(`SELECT COUNT(*) FROM audit_log WHERE true`, f)
+
+	var count int
+	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count audit entries: %w", err)
+	}
+	return count, nil
+}
+
+// ListActionAreas returns the action namespaces present in the log, sorted.
+//
+// The dropdowns are built from what the table actually contains rather than
+// from the action constants: there are around 250 constants across 30-odd
+// namespaces, and most of any one shop's are never written. A list of options
+// that all return rows beats a complete one that mostly does not.
+//
+// Backed by the (split_part(action,'.',1), created_at DESC) expression index,
+// so this is an index-only scan.
+func (s *AuditStore) ListActionAreas(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT split_part(action, '.', 1) FROM audit_log ORDER BY 1`)
+	if err != nil {
+		return nil, fmt.Errorf("list audit action areas: %w", err)
+	}
+	return scanStrings(rows, "audit action areas")
+}
+
+// ListActionsInArea returns the distinct actions inside one namespace, sorted.
+// Only queried once an area is chosen, which keeps the second dropdown short.
+func (s *AuditStore) ListActionsInArea(ctx context.Context, tx pgx.Tx, area string) ([]string, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT DISTINCT action FROM audit_log WHERE split_part(action, '.', 1) = $1 ORDER BY 1`, area)
+	if err != nil {
+		return nil, fmt.Errorf("list audit actions in area: %w", err)
+	}
+	return scanStrings(rows, "audit actions in area")
+}
+
+// ListResourceTypes returns the resource types present in the log, sorted.
+//
+// Worth its own control alongside the action area because the two genuinely
+// differ: an "email.shipment_sent" event is recorded against resource_type
+// "order", so filtering by area finds the mail and filtering by resource finds
+// everything that ever touched that order.
+func (s *AuditStore) ListResourceTypes(ctx context.Context, tx pgx.Tx) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT resource_type FROM audit_log ORDER BY 1`)
+	if err != nil {
+		return nil, fmt.Errorf("list audit resource types: %w", err)
+	}
+	return scanStrings(rows, "audit resource types")
+}
+
+func scanStrings(rows pgx.Rows, what string) ([]string, error) {
+	defer rows.Close()
+	var out []string
 	for rows.Next() {
-		var e domain.AuditEntry
-		var actorType string
-		var metadataJSON json.RawMessage
-		if err := rows.Scan(
-			&e.ID, &actorType, &e.ActorID, &e.ActorName,
-			&e.Action, &e.ResourceType, &e.ResourceID,
-			&e.AfterSnapshot, &e.RequestID, &e.IPAddress,
-			&e.Reason, &metadataJSON, &e.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan audit entry: %w", err)
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, fmt.Errorf("scan %s: %w", what, err)
 		}
-		e.ActorType = domain.AuditActorType(actorType)
-		e.Metadata = metadataFromJSON(metadataJSON)
-		entries = append(entries, e)
+		if v != "" {
+			out = append(out, v)
+		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate audit entries: %w", err)
+		return nil, fmt.Errorf("iterate %s: %w", what, err)
 	}
-	return entries, nil
+	return out, nil
 }
 
 // ListByResourceIDsWithActionPrefix returns audit entries for any of the given
@@ -226,8 +375,7 @@ func (s *AuditStore) ListByResourceIDsWithActionPrefix(
 	}
 
 	rows, err := tx.Query(ctx,
-		`SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
-		        after_snapshot, request_id, ip_address, reason, metadata, created_at
+		`SELECT `+auditColumns+`
 		   FROM audit_log
 		  WHERE resource_type = $1 AND resource_id = ANY($2) AND action LIKE $3 || '%'
 		  ORDER BY created_at DESC`,
@@ -236,6 +384,15 @@ func (s *AuditStore) ListByResourceIDsWithActionPrefix(
 	if err != nil {
 		return nil, fmt.Errorf("list audit by resource ids: %w", err)
 	}
+	return scanAuditEntries(rows)
+}
+
+// --- Row converters ---
+
+// scanAuditEntries drains a result set projecting auditColumns. Every
+// hand-written audit query shares it so a column added to the projection has
+// exactly one place to be read.
+func scanAuditEntries(rows pgx.Rows) ([]domain.AuditEntry, error) {
 	defer rows.Close()
 
 	var entries []domain.AuditEntry
@@ -260,8 +417,6 @@ func (s *AuditStore) ListByResourceIDsWithActionPrefix(
 	}
 	return entries, nil
 }
-
-// --- Row converters ---
 
 func auditEntryFromRow(r sqlcgen.AuditLog) *domain.AuditEntry {
 	return &domain.AuditEntry{

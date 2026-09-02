@@ -33,8 +33,11 @@ type SubscriptionShowProps struct {
 	Activity        []domain.AuditEntry
 	Flash           string
 	// ResumeOrderOn is when a resume pressed now would place the next order —
-	// the next renewal window — the following pre-dawn run. Named on the Resume confirmation
-	// so staff know they are booking a charge today, not next cycle.
+	// the next renewal window — the following pre-dawn run. Named on the Resume
+	// confirmation so staff know they are booking a charge today, not next cycle.
+	// Computed at render, so a tab left open across the anchor hour promises a
+	// window that has passed; the flash after the resume reports the date that
+	// was actually booked.
 	ResumeOrderOn time.Time
 	MerchantTZ    *time.Location
 	StaffName       string

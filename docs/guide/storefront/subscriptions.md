@@ -144,7 +144,7 @@ Ready for more coffee? Resume your subscription at any time.
 
 The paused card and the confirmation both name the date your next order goes out, and you get an email saying the same thing.
 
-You are not made to wait out a whole cycle. Resuming puts your next order on the **next roasting run** -- the following morning -- and your usual rhythm picks up from there. So a 30-day subscriber who resumes on March 15 ships on the 16th and is next up around April 15, not on April 14 with nothing in between.
+You are not made to wait out a whole cycle. Resuming puts your next order on the **next roasting run**, and your usual rhythm picks up from there. So a 30-day subscriber who resumes on the afternoon of March 15 goes out on the 16th and is next up around April 15 -- not April 14 with nothing in between. The card names the exact date before you confirm, which is the one to go by: resume in the small hours and the run that morning may still catch you.
 
 ### Cancelling a Subscription
 

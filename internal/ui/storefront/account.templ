@@ -504,9 +504,12 @@ type AccountSubscriptionsProps struct {
 	CartCount int
 	// ResumeOrderOn is when an order would be placed if a paused subscription
 	// were resumed right now — the next renewal window, which is the following
-	// pre-dawn run. Paused
-	// cards name it before the customer commits, because resuming charges their
-	// card that soon. Zero when the page was built without it.
+	// pre-dawn run. Paused cards name it before the customer commits, because
+	// resuming charges their card that soon. Computed at render: a page sat on
+	// across the anchor hour names a window that has since passed, and the
+	// resume books the next one instead — the card re-reads the stored date on
+	// the redirect, and the email quotes it. Zero when the page was built
+	// without it.
 	ResumeOrderOn time.Time
 	MerchantTZ    *time.Location
 }

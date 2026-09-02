@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -531,11 +532,18 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// The date the confirmation dialog promised was computed when the page was
+	// rendered, and the anchor may have rolled over since — an admin tab left
+	// open overnight is the realistic case. So the flash reports the date that
+	// was actually booked rather than repeating a bare "resumed": whatever the
+	// dialog said, this is the one the scheduler will act on.
+	var bookedOn time.Time
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		sub, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
 		if txErr != nil {
 			return txErr
 		}
+		bookedOn = sub.NextOrderAt
 		return d.enqueueResumeEmail(ctx, tx, sub)
 	})
 	if err != nil {
@@ -543,7 +551,9 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+resumed", http.StatusSeeOther)
+	flash := url.QueryEscape("Subscription resumed — next order " +
+		bookedOn.In(d.MerchantTZ).Format("Mon, Jan 2"))
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }
 
 // handleAdminSubscriptionRetry triggers an immediate renewal charge on a

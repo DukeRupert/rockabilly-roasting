@@ -88,6 +88,14 @@ func (s *SubscriptionService) anchorRenewal(t time.Time) time.Time {
 	return anchorRenewalTime(t, s.renewalLoc, s.renewalHour)
 }
 
+// ResumeOrderDate reports when a subscription resumed at t would have its next
+// order placed. Exported so the account page and the resume email can promise
+// the same date ResumeSubscription will actually set, rather than each
+// re-deriving the anchor arithmetic and drifting from it.
+func (s *SubscriptionService) ResumeOrderDate(t time.Time) time.Time {
+	return s.anchorRenewal(t)
+}
+
 // --- State machine helpers ---
 
 func canPauseSubscription(status domain.SubscriptionStatus) bool {
@@ -597,7 +605,9 @@ func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, 
 	return sub, nil
 }
 
-// ResumeSubscription resumes a paused subscription and resets the billing period.
+// ResumeSubscription resumes a paused subscription and puts its next order at
+// the next renewal window — the following pre-dawn run — rather than a fresh
+// interval out.
 func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
@@ -611,13 +621,18 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 		return nil, ErrSubscriptionNotResumable
 	}
 
-	plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
-	if err != nil {
-		return nil, fmt.Errorf("get plan for resume: %w", err)
-	}
-
+	// Resuming means "send my coffee", not "start me a fresh free interval".
+	// The next order is placed at the next renewal window — the following
+	// pre-dawn run, never a second one — and the cadence runs on from there.
+	// (Not "within 24 hours": the anchor is a wall-clock hour, and the night the
+	// clocks go back stretches that gap to 24h45m. See
+	// TestAnchorRenewalTimeAcrossDST.) Until this, resume handed out
+	// a whole new interval and *then* rounded up to the anchor, so a customer
+	// who resumed at 9am on a Sunday waited eight days and change for the
+	// shipment they had just asked to restart.
 	now := time.Now()
-	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
+	nextOrder := s.anchorRenewal(now)
+	previousNextOrder := sub.NextOrderAt
 
 	// Clear the end date BEFORE the status flip, not after. A resumed
 	// subscription must not keep one — the renewal scheduler reads ends_at, not
@@ -636,12 +651,14 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("resume subscription status: %w", err)
 	}
 
-	nextOrder := s.anchorRenewal(periodEnd)
-	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, now, periodEnd, nextOrder); err != nil {
+	// The period the resume opens ends when that order is placed; the renewal
+	// then walks the cadence forward from it, so the subscription settles onto
+	// the anchor hour rather than the minute the customer happened to click.
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, now, nextOrder, nextOrder); err != nil {
 		return nil, fmt.Errorf("reset billing period: %w", err)
 	}
 	sub.CurrentPeriodStart = now
-	sub.CurrentPeriodEnd = periodEnd
+	sub.CurrentPeriodEnd = nextOrder
 	sub.NextOrderAt = nextOrder
 
 	if err := s.subscriptions.UpdatePauseUntil(ctx, tx, id, nil); err != nil {
@@ -657,6 +674,10 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 		ResourceType: "subscription",
 		ResourceID:   id,
 		After:        sub,
+		Metadata: map[string]any{
+			"previous_next_order_at": previousNextOrder,
+			"next_order_at":          nextOrder,
+		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit subscription resumed: %w", err)
 	}

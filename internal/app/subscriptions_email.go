@@ -394,6 +394,88 @@ func (s *SubscriptionService) SendSkipUndoneEmail(ctx context.Context, pool *pgx
 	return nil
 }
 
+// SendResumeEmail tells the customer their paused subscription is live again
+// and — the part that matters — the date their card is charged for it. Resume
+// bills at the next renewal window rather than a full interval out, so this is
+// the only warning they get before money moves, and it is sent for staff
+// resumes too: it is the customer's card, whoever pressed the button.
+// Read → send → audit.
+func (s *SubscriptionService) SendResumeEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID) error {
+	var (
+		sub         *domain.Subscription
+		customer    *domain.Customer
+		plan        *domain.SubscriptionPlan
+		productName = "your subscription"
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var err error
+		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
+		if err != nil {
+			return fmt.Errorf("get subscription %s: %w", subscriptionID, err)
+		}
+		customer, err = s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		plan, err = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+		if err != nil {
+			return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
+		}
+		if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
+			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+				productName = product.Title
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// The stored next_order_at, never a recomputed one: the customer must be
+	// told the date the scheduler will actually act on.
+	html, text, err := s.email.Renderer.Render("subscription_resumed", emailtemplates.SubscriptionResumedData{
+		CustomerName: customer.FirstName,
+		ProductName:  productName,
+		PlanName:     plan.Name,
+		NextChargeOn: sub.NextOrderAt,
+		StoreName:    s.email.StoreName,
+		StoreURL:     s.email.BaseURL,
+		AccountURL:   s.email.BaseURL + "/account/subscriptions",
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_resumed", "failed").Inc()
+		return fmt.Errorf("render subscription resumed template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: "Your subscription is back on",
+		HTML:    html,
+		Text:    text,
+		Tag:     "subscription-resumed",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_resumed", "failed").Inc()
+		return fmt.Errorf("send subscription resumed email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "subscription_resumed_worker",
+			Action:       audit.AuditEmailSubscriptionResumed,
+			ResourceType: "subscription",
+			ResourceID:   sub.ID,
+		})
+	}); err != nil {
+		return fmt.Errorf("audit subscription resumed email sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("subscription_resumed", "sent").Inc()
+	return nil
+}
+
 // undoSkipURL mints the one-click undo link. Empty when no signer is wired or
 // the secret is unset — callers omit the link rather than emailing one that
 // could never be verified.

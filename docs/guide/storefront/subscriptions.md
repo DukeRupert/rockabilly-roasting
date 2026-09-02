@@ -140,9 +140,11 @@ Ready for more coffee? Resume your subscription at any time.
 
 1. Go to **Account > Subscriptions**.
 2. Find the paused subscription.
-3. Click **Resume**.
+3. Click **Resume**, then confirm.
 
-Your billing cycle restarts from the day you resume. For example, if you are on a 30-day plan and resume on March 15, your next order will be placed around April 14.
+The paused card and the confirmation both name the date your next order goes out, and you get an email saying the same thing.
+
+You are not made to wait out a whole cycle. Resuming puts your next order on the **next roasting run** -- the following morning -- and your usual rhythm picks up from there. So a 30-day subscriber who resumes on March 15 ships on the 16th and is next up around April 15, not on April 14 with nothing in between.
 
 ### Cancelling a Subscription
 

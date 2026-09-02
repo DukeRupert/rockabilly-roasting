@@ -32,9 +32,25 @@ type SubscriptionShowProps struct {
 	Orders          []EnrichedSubOrder
 	Activity        []domain.AuditEntry
 	Flash           string
-	MerchantTZ      *time.Location
+	// ResumeOrderOn is when a resume pressed now would place the next order —
+	// the next renewal window — the following pre-dawn run. Named on the Resume confirmation
+	// so staff know they are booking a charge today, not next cycle.
+	ResumeOrderOn time.Time
+	MerchantTZ    *time.Location
 	StaffName       string
 	StaffRole       string
+}
+
+// resumeHint states the consequence of pressing Resume in one line: the next
+// order lands at the next renewal window, not a cycle out. Falls back to the
+// shape of the promise when the date wasn't supplied, rather than an empty
+// hint that would read as "nothing happens".
+func resumeHint(props SubscriptionShowProps) string {
+	if props.ResumeOrderOn.IsZero() {
+		return "Puts the subscription back on. The next order is placed at the next renewal window — the following pre-dawn run."
+	}
+	return "Puts the subscription back on. The next order is placed on " +
+		props.ResumeOrderOn.In(props.MerchantTZ).Format("Monday, January 2") + " — the next renewal window."
 }
 
 func canChangeSubscriptionVariant(status domain.SubscriptionStatus) bool {
@@ -453,7 +469,24 @@ templ subscriptionActions(props SubscriptionShowProps) {
 				<div class="flex flex-wrap items-center gap-2">
 					if canResume(status) {
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
-							<button type="submit" class="btn-confirm">Resume</button>
+							@ActionWrap("hint-sub-resume", resumeHint(props)) {
+								<button
+									type="submit"
+									class="btn-confirm"
+									aria-describedby="hint-sub-resume"
+									{ ConfirmAttrs(ActionConfirm{
+										Title:  "Resume this subscription?",
+										Lead:   resumeHint(props),
+										Points: []string{
+											"The customer is emailed, and the mail names that date.",
+											"Nothing is charged now — the renewal runs at the usual pre-dawn window.",
+										},
+										Confirm: "Resume subscription",
+									})... }
+								>
+									Resume
+								</button>
+							}
 						</form>
 					}
 					if canPause(status) {

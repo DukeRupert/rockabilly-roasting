@@ -309,6 +309,7 @@ const (
 	AuditEmailSubscriptionCancelled        = "email.subscription_cancelled"
 	AuditEmailSubscriptionSkipped          = "email.subscription_skipped"
 	AuditEmailSubscriptionSkipUndone       = "email.subscription_skip_undone"
+	AuditEmailSubscriptionResumed          = "email.subscription_resumed"
 	AuditEmailSubscriptionEnded            = "email.subscription_ended"
 	AuditEmailRefundIssued                 = "email.refund_issued"
 	AuditEmailInvoiceSent                  = "email.invoice_sent"

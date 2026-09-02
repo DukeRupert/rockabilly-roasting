@@ -514,6 +514,20 @@ type SubscriptionSkipUndoneData struct {
 	AccountURL   string
 }
 
+// SubscriptionResumedData holds data for the notice sent when a paused
+// subscription is put back on. Resuming bills at the next renewal window rather
+// than a full interval out, so the customer is told the date their card is
+// charged before it happens — the whole reason this email exists.
+type SubscriptionResumedData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	NextChargeOn time.Time // when the resumed subscription's next order is placed
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
 // SubscriptionDunningEndedData holds data for the "we couldn't renew, your
 // subscription has ended" notice sent when dunning retries are exhausted.
 type SubscriptionDunningEndedData struct {

@@ -488,6 +488,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		Orders:          enrichedOrders,
 		Activity:        activity,
 		Flash:           r.URL.Query().Get("flash"),
+		ResumeOrderOn:   d.SubscriptionService.ResumeOrderDate(time.Now()),
 		MerchantTZ:      d.MerchantTZ,
 		StaffName:       name,
 		StaffRole:       role,
@@ -531,8 +532,11 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
-		return txErr
+		sub, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
+		if txErr != nil {
+			return txErr
+		}
+		return d.enqueueResumeEmail(ctx, tx, sub)
 	})
 	if err != nil {
 		Error(w, r, err)

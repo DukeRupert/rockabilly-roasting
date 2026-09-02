@@ -162,6 +162,7 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 		VariantLabel: variantLabel,
 		ThumbnailURL: thumbnailURL,
 		NextChargeAt: d.SubscriptionService.NextRenewalDate(time.Now(), plan),
+		MerchantTZ:   d.MerchantTZ,
 		StripeKey:    os.Getenv("STRIPE_PUBLISHABLE_KEY"),
 		CartCount:    d.cartItemCountFromCookie(r),
 	}

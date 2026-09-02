@@ -5,7 +5,7 @@ Hi {{.CustomerName}},
 An invoice has been issued for your order {{.OrderNumber}}.
 
 Amount Due: {{cents .Total}}{{if .DueDate}}
-Due Date:   {{date .DueDate}}{{end}}
+Due Date:   {{day .DueDate}}{{end}}
 
 View & pay: {{.PaymentURL}}
 

@@ -5,7 +5,7 @@ Hi {{.CustomerName}},
 A quick heads-up — invoice {{.InvoiceNumber}} for order {{.OrderNumber}} is past due. Settle up when you get a minute and we'll keep the coffee moving.
 
 Amount Due: {{cents .AmountDue}}{{if .DueDate}}
-Was Due:    {{date .DueDate}}{{end}}
+Was Due:    {{day .DueDate}}{{end}}
 
 View & pay: {{.PaymentURL}}
 

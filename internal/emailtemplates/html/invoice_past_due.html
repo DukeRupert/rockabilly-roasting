@@ -17,7 +17,7 @@
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr><td style="padding:4px 12px;font-weight:bold;">Amount Due</td><td style="padding:4px 12px;text-align:right;font-size:20px;font-weight:bold;">{{cents .AmountDue}}</td></tr>
-      {{if .DueDate}}<tr><td style="padding:4px 12px;font-weight:bold;">Was Due</td><td style="padding:4px 12px;text-align:right;">{{date .DueDate}}</td></tr>{{end}}
+      {{if .DueDate}}<tr><td style="padding:4px 12px;font-weight:bold;">Was Due</td><td style="padding:4px 12px;text-align:right;">{{day .DueDate}}</td></tr>{{end}}
     </table>
 
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">

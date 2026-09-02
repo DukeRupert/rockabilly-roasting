@@ -48,12 +48,18 @@ type SubscriptionShowProps struct {
 // order lands at the next renewal window, not a cycle out. Falls back to the
 // shape of the promise when the date wasn't supplied, rather than an empty
 // hint that would read as "nothing happens".
+//
+// "if you resume now" is doing real work. This string is both the dialog's lead
+// and the button's tooltip, and only the dialog carries the bullet explaining
+// that a page left open past the anchor hour books the following window — so a
+// staffer who hovers rather than clicks would otherwise get the date with no
+// hint that it has a shelf life.
 func resumeHint(props SubscriptionShowProps) string {
 	if props.ResumeOrderOn.IsZero() {
 		return "Puts the subscription back on. The next order is placed at the next renewal window — the next pre-dawn run."
 	}
-	return "Puts the subscription back on. The next order is placed on " +
-		props.ResumeOrderOn.In(props.MerchantTZ).Format("Monday, January 2") + " — the next renewal window."
+	return "Puts the subscription back on. The next order is placed at the next renewal window — " +
+		props.ResumeOrderOn.In(props.MerchantTZ).Format("Monday, January 2") + " if you resume now."
 }
 
 func canChangeSubscriptionVariant(status domain.SubscriptionStatus) bool {
@@ -481,7 +487,7 @@ templ subscriptionActions(props SubscriptionShowProps) {
 										Title:  "Resume this subscription?",
 										Lead:   resumeHint(props),
 										Points: []string{
-											"The customer is emailed the date that gets booked. If this page has been open a while, that can be later than the date above — the toast will say what was booked.",
+											"The customer is emailed the date that gets booked. If this page has been open a while, that can be later than the date above — the toast says what was booked, and the Next Order panel keeps it.",
 											"Nothing is charged now — the renewal runs at the usual pre-dawn window.",
 										},
 										Confirm: "Resume subscription",

@@ -195,7 +195,7 @@ Product swaps are not yet available through self-service. To change your coffee,
 Frequency changes are not yet available through self-service. Cancel and re-subscribe with your preferred schedule.
 
 **Can I skip just one delivery?**
-Skipping a single delivery is not yet supported. You can pause your subscription and resume it when you are ready for the next delivery.
+Yes. Go to **Account > Subscriptions** and click **Skip a shipment** -- see [Skipping a Shipment](#skipping-a-shipment) above. Nothing is charged for a skipped delivery, and the confirmation email has an undo link.
 
 **Do I need an account to subscribe?**
 An account is created for you automatically when you subscribe (using the email address you provide during checkout). You can sign in anytime using a magic link sent to that email. See the [Account Guide](account.md) for details.

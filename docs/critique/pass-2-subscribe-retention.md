@@ -254,7 +254,7 @@ instead of recreate-per-blur (or at least reuse the Stripe customer); dedupe add
 (customer, line1, zip) or offer the saved-address picker.
 **Command:** /harden (forms + endpoints), then /verify.
 
-### P6 — Retention copy promises powers the account page doesn't have — ⚠️ PARTIAL: copy-truth fixed 2026-06-12, features still open
+### P6 — Retention copy promises powers the account page doesn't have — ⚠️ PARTIAL: copy-truth fixed 2026-06-12, skip + resume-and-ship-now shipped, remaining features still open
 *(Copy-truth pass done — every customer-facing surface now promises only what the account page
 can actually do (pause / resume / cancel):
 - Subscribe page intro "skip, swap, or cancel" → "pause or cancel" (done in P4).
@@ -271,9 +271,12 @@ Left deliberately: the /subscriptions hero "Pick your cadence" / "Pick the roast
 cadence." is about CHOOSING a plan at signup (true), not changing it later — not touched. The
 admin "Paused until {date}" is staff tooling for a field staff set themselves — out of the
 customer-facing copy scope.
-STILL OPEN (features, separate pass): skip-a-delivery, pause-until + an auto-resume job,
-resume-and-ship-now, restart on cancelled/expired rows, and exposing the existing
-ChangeVariant/ChangePlan to customers. Until those ship, the copy no longer over-promises.)*
+STILL OPEN (features, separate pass): pause-until + an auto-resume job, restart on
+cancelled/expired rows, and exposing the existing ChangeVariant/ChangePlan to customers.
+Until those ship, the copy no longer over-promises.
+SHIPPED SINCE: skip-a-delivery (v1.102.0, 2026-08-20, with undo); resume-and-ship-now — resume
+now books the next renewal run rather than a fresh interval, and names the date on the card,
+in the confirmation and in a new email (2026-09-01, PRs #28/#29).)*
 **What:** The subscribe page says "skip, swap, or cancel anytime from your account"; the
 renewal receipt says "Pause, skip, or cancel anytime"; the confirm email says you can update
 "shipping, payment, or your delivery cadence." The account page offers pause, resume, cancel.
@@ -282,9 +285,10 @@ are admin-only). Beyond the copy gap, the pause/resume mechanics themselves figh
 customer pause is indefinite-only (handler passes `nil` pauseUntil — no "pause for 2
 deliveries" option, no pause email, no resume reminder, i.e. silent churn with extra steps);
 "Resumes {date}" renders when staff set pause_until, but *nothing auto-resumes* — no job reads
-pause_until, so that line is a false promise at the system level; and Resume resets the period
-from today, so a customer who's out of coffee and hits Resume gets their next bag a full
-interval later with no warning and no "resume and ship now" option. Cancelled cards are a dead
+pause_until, so that line is a false promise at the system level; and Resume reset the period
+from today, so a customer who was out of coffee and hit Resume got their next bag a full
+interval later with no warning and no "resume and ship now" option (fixed 2026-09-01: resume
+books the next renewal run, and every surface names the date). Cancelled cards are a dead
 end — no "Restart this subscription" even though every input still exists on the row.
 **Why it matters:** "Specificity builds trust" cuts both ways: promising skip/swap that don't
 exist is pass 1's fake-receipt problem relocated to the highest-LTV customers. And skip is not

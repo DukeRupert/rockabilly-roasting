@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -247,7 +248,7 @@ func TestSetPasswordWithToken_FlipsEmailVerified(t *testing.T) {
 
 func newAuthServiceWithEmail(t *testing.T) (*app.AuthService, *email.TestSender) {
 	t.Helper()
-	renderer, err := emailtemplates.New()
+	renderer, err := emailtemplates.New(time.UTC)
 	require.NoError(t, err)
 	sender := email.NewTestSender()
 	svc := newAuthService().WithEmail(app.EmailEnv{

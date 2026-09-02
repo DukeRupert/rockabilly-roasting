@@ -61,7 +61,7 @@ func commitTicket(t *testing.T, ctx context.Context, customerID uuid.UUID, numbe
 func notifyingService(t *testing.T, ctx context.Context, moduleOn bool) (*app.ServiceTicketService, *email.TestSender) {
 	t.Helper()
 
-	renderer, err := emailtemplates.New()
+	renderer, err := emailtemplates.New(time.UTC)
 	require.NoError(t, err)
 	sender := email.NewTestSender()
 

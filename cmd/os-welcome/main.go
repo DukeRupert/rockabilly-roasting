@@ -75,7 +75,7 @@ func run() error {
 	storeName := firstNonEmpty(os.Getenv("STORE_NAME"), defaultStoreName)
 	baseURL := firstNonEmpty(os.Getenv("BASE_URL"), defaultStoreURL)
 
-	renderer, err := emailtemplates.New()
+	renderer, err := emailtemplates.New(time.UTC) // no dated template; see New's doc
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
 	}

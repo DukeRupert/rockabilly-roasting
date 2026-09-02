@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/email"
@@ -53,7 +54,7 @@ func run() error {
 		return fmt.Errorf("--to is required")
 	}
 
-	r, err := emailtemplates.New()
+	r, err := emailtemplates.New(time.UTC) // no dated template; see New's doc
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
 	}

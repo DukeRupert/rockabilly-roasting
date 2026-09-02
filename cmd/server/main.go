@@ -172,15 +172,6 @@ func run() error {
 	}
 	shippoWebhookSecret := os.Getenv("SHIPPO_WEBHOOK_SECRET")
 	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
-	emailRenderer, err := emailtemplates.New()
-	if err != nil {
-		return fmt.Errorf("create email renderer: %w", err)
-	}
-	fromAddr := os.Getenv("EMAIL_FROM")
-	baseURL := os.Getenv("BASE_URL")
-	storeName := os.Getenv("STORE_NAME")
-	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
-
 	merchantTZName := os.Getenv("MERCHANT_TIMEZONE")
 	if merchantTZName == "" {
 		merchantTZName = "America/Los_Angeles"
@@ -190,6 +181,17 @@ func run() error {
 		return fmt.Errorf("load MERCHANT_TIMEZONE %q: %w", merchantTZName, err)
 	}
 	logger.Info("merchant timezone configured", "tz", merchantTZName)
+
+	// After the zone, not before: the renderer formats every date it prints in
+	// it, so a renderer built first would silently render in UTC.
+	emailRenderer, err := emailtemplates.New(merchantTZ)
+	if err != nil {
+		return fmt.Errorf("create email renderer: %w", err)
+	}
+	fromAddr := os.Getenv("EMAIL_FROM")
+	baseURL := os.Getenv("BASE_URL")
+	storeName := os.Getenv("STORE_NAME")
+	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
 	// Subscriptions renew at this hour (merchant-local) instead of each sub's
 	// signup time-of-day, so the day's renewals batch into one pre-dawn window

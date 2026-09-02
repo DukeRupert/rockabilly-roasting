@@ -134,6 +134,24 @@ func formatDate(t time.Time) string {
 	return t.Format("Jan 2, 2006")
 }
 
+// formatDateIn renders a date in the merchant's zone rather than the zone the
+// value happens to carry. Subscription dates need it: next_order_at arrives
+// from pgx in the database session zone (UTC on the server) while the resume
+// preview is built in merchant-local time, so the same card was formatting two
+// values from two zones. At the 2am renewal anchor both land on the same
+// calendar day, which is why nothing looked wrong; the anchor hour is
+// configurable, so that is a setting and not a guarantee.
+//
+// nil falls back to UTC rather than panicking. A wrong date on a coffee
+// subscription is a bad day; a nil dereference here is a 500 on the page a
+// customer opens to fix it.
+func formatDateIn(t time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return t.In(loc).Format("Jan 2, 2006")
+}
+
 // accountPageHeading renders the eyebrow + Alfa Slab title pattern used on each account sub-page.
 templ accountPageHeading(eyebrow, title string) {
 	<div class="mb-8">
@@ -716,13 +734,13 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 		if sub.Status == domain.SubscriptionStatusActive {
 			<div class="mb-5 pt-4 border-t-2 border-ink/20 flex flex-col sm:flex-row sm:items-baseline sm:gap-6 gap-1">
 				<p class="font-oswald font-bold text-candle text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Next order ships</p>
-				<p class="font-special text-ink text-base">{ formatDate(sub.NextOrderAt) }</p>
+				<p class="font-special text-ink text-base">{ formatDateIn(sub.NextOrderAt, tz) }</p>
 			</div>
 		} else if sub.Status == domain.SubscriptionStatusPastDue {
 			<div class="mb-5 pt-4 border-t-2 border-ink/20">
 				<p class="font-oswald font-bold text-rust text-[11px] mb-1" style="letter-spacing:0.24em; text-transform:uppercase;">Payment past due</p>
 				<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
-					Your last charge didn't go through. Update your card, then retry — we'll also try again automatically on <span class="font-special text-ink">{ formatDate(sub.NextOrderAt) }</span>.
+					Your last charge didn't go through. Update your card, then retry — we'll also try again automatically on <span class="font-special text-ink">{ formatDateIn(sub.NextOrderAt, tz) }</span>.
 				</p>
 			</div>
 		} else if sub.Status == domain.SubscriptionStatusPaused {
@@ -732,7 +750,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 				</p>
 				if !resumeOrderOn.IsZero() {
 					<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
-						Resume today and your next order is charged and packed on <span class="font-special text-ink">{ formatDate(resumeOrderOn) }</span> &mdash; the next roasting run. Your usual rhythm picks up from there.
+						Resume today and your next order is charged and packed on <span class="font-special text-ink">{ formatDateIn(resumeOrderOn, tz) }</span> &mdash; the next roasting run. Your usual rhythm picks up from there.
 					</p>
 				}
 			</div>
@@ -741,7 +759,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 				<p class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
 					Cancelled
 					if sub.CancelledAt != nil {
-						on <span class="font-special">{ formatDate(*sub.CancelledAt) }</span>
+						on <span class="font-special">{ formatDateIn(*sub.CancelledAt, tz) }</span>
 					}
 				</p>
 			</div>
@@ -765,7 +783,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 				if canUndo {
 					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/undo-skip") } class="w-full border-2 border-ink bg-paper p-3 mb-1 flex flex-wrap items-center justify-between gap-3">
 						<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
-							Skipped &mdash; didn't mean to? Put it back to <strong class="text-ink font-special">{ formatDate(restoreTo) }</strong>.
+							Skipped &mdash; didn't mean to? Put it back to <strong class="text-ink font-special">{ formatDateIn(restoreTo, tz) }</strong>.
 						</p>
 						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-cream-hi text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">
 							Undo skip
@@ -833,7 +851,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 							<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Set date</button>
 						</form>
 						<p class="font-special text-chrome-deep text-xs mt-3">
-							Any day after { formatDate(sub.NextOrderAt) } &mdash; the shipment already booked &mdash; up to { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out. Need longer? Pause instead.
+							Any day after { formatDateIn(sub.NextOrderAt, tz) } &mdash; the shipment already booked &mdash; up to { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out. Need longer? Pause instead.
 						</p>
 					} else {
 						<p class="font-special text-chrome-deep text-xs mt-3">
@@ -862,7 +880,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 						if resumeOrderOn.IsZero() {
 							Start this subscription back up?
 						} else {
-							Start it back up? We'll charge your card and pack it on <strong class="text-ink font-special">{ formatDate(resumeOrderOn) }</strong>.
+							Start it back up? We'll charge your card and pack it on <strong class="text-ink font-special">{ formatDateIn(resumeOrderOn, tz) }</strong>.
 						}
 					</span>
 					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>

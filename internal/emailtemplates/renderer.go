@@ -19,15 +19,34 @@ type Renderer struct {
 	text *text.Template
 }
 
-// New parses all embedded HTML and text templates and returns a Renderer.
-func New() (*Renderer, error) {
+// New parses all embedded HTML and text templates and returns a Renderer that
+// renders dates in loc.
+//
+// The zone is a constructor argument because a date in a customer's inbox has
+// to be the merchant's date. Timestamps arrive from pgx in the database session
+// zone (UTC on the server), so formatting them as they arrive prints the
+// merchant's evening as the following day — silently, and only for whoever is
+// far enough east. It stayed invisible while renewals were anchored at 2am,
+// where Los Angeles and UTC share a calendar day; RENEWAL_ANCHOR_HOUR takes any
+// hour 0–23, so that agreement is a setting, not a property.
+//
+// nil is an error rather than a UTC default. A renderer that quietly falls back
+// is how this bug shipped in the first place — the zone was never chosen, so
+// nothing looked wrong until an anchor hour moved. Callers that genuinely have
+// no merchant zone (the one-off senders under cmd/, none of whose templates
+// print a date) say time.UTC out loud.
+func New(loc *time.Location) (*Renderer, error) {
+	if loc == nil {
+		return nil, fmt.Errorf("email renderer: nil location (pass the merchant zone, or time.UTC for a sender with no dated template)")
+	}
+	dateIn := func(t any) string { return formatDateIn(t, loc) }
 	funcMap := template.FuncMap{
 		"cents": formatCents,
-		"date":  formatDate,
+		"date":  dateIn,
 	}
 	textFuncMap := text.FuncMap{
 		"cents": formatCents,
-		"date":  formatDate,
+		"date":  dateIn,
 	}
 
 	htmlTmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFiles, "html/*.html")
@@ -590,15 +609,15 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("%s$%d.%02d", sign, dollars, remainder)
 }
 
-func formatDate(t any) string {
+func formatDateIn(t any, loc *time.Location) string {
 	switch v := t.(type) {
 	case time.Time:
-		return v.Format("January 2, 2006")
+		return v.In(loc).Format("January 2, 2006")
 	case *time.Time:
 		if v == nil {
 			return ""
 		}
-		return v.Format("January 2, 2006")
+		return v.In(loc).Format("January 2, 2006")
 	default:
 		return ""
 	}

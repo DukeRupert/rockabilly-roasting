@@ -10,13 +10,13 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 	assert.NotNil(t, r)
 }
 
 func TestRender_OrderConfirm(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := OrderConfirmData{
@@ -59,7 +59,7 @@ func TestRender_OrderConfirm(t *testing.T) {
 // The delivery block is the whole point of the cutoff feature: it tells the
 // customer which run they made and offers the way out if it's too far off.
 func TestRender_OrderConfirmLocalDelivery(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	base := OrderConfirmData{
@@ -110,7 +110,7 @@ func TestRender_OrderConfirmLocalDelivery(t *testing.T) {
 }
 
 func TestRender_OrderShipped(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	shipDate := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
@@ -141,7 +141,7 @@ func TestRender_OrderShipped(t *testing.T) {
 }
 
 func TestRender_OrderShipped_OmitsTrackingCTAWhenURLEmpty(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, _, err := r.Render("order_shipped", OrderShippedData{
@@ -158,7 +158,7 @@ func TestRender_OrderShipped_OmitsTrackingCTAWhenURLEmpty(t *testing.T) {
 }
 
 func TestRender_PasswordSetup(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	setup := PasswordSetupData{
@@ -186,7 +186,7 @@ func TestRender_PasswordSetup(t *testing.T) {
 }
 
 func TestRender_MagicLink(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := MagicLinkData{
@@ -206,7 +206,7 @@ func TestRender_MagicLink(t *testing.T) {
 }
 
 func TestRender_InvoiceSent(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	due := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
@@ -232,7 +232,7 @@ func TestRender_InvoiceSent(t *testing.T) {
 }
 
 func TestRender_SubscriptionConfirm(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := SubscriptionConfirmData{
@@ -261,7 +261,7 @@ func TestRender_SubscriptionConfirm(t *testing.T) {
 }
 
 func TestRender_WholesaleApproved(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := WholesaleApprovedData{
@@ -281,7 +281,7 @@ func TestRender_WholesaleApproved(t *testing.T) {
 }
 
 func TestRender_WholesaleApplication(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := WholesaleApplicationData{
@@ -300,7 +300,7 @@ func TestRender_WholesaleApplication(t *testing.T) {
 }
 
 func TestRender_SubscriptionRenewalReceipt(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	next := time.Date(2026, 5, 6, 0, 0, 0, 0, time.UTC)
@@ -334,7 +334,7 @@ func TestRender_SubscriptionRenewalReceipt(t *testing.T) {
 }
 
 func TestRender_SubscriptionPastDue(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := SubscriptionPastDueData{
@@ -362,7 +362,7 @@ func TestRender_SubscriptionPastDue(t *testing.T) {
 // signer is unconfigured UpdateCardURL is empty, and the templates have to fall
 // back to the sign-in link rather than rendering href="".
 func TestRender_SubscriptionPastDueLadder(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	base := SubscriptionPastDueData{
@@ -424,7 +424,7 @@ func TestRender_SubscriptionPastDueLadder(t *testing.T) {
 }
 
 func TestRender_SubscriptionCancelled(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := SubscriptionCancelledData{
@@ -445,7 +445,7 @@ func TestRender_SubscriptionCancelled(t *testing.T) {
 }
 
 func TestRender_RefundConfirmation(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := RefundConfirmationData{
@@ -479,7 +479,7 @@ func TestFormatAddress(t *testing.T) {
 }
 
 func TestRender_QBInvoiceAlert(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("qb_invoice_alert", QBInvoiceAlertData{
@@ -506,7 +506,7 @@ func TestRender_QBInvoiceAlert(t *testing.T) {
 }
 
 func TestRender_QBInvoiceAlert_NoCompany(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, _, err := r.Render("qb_invoice_alert", QBInvoiceAlertData{
@@ -524,7 +524,7 @@ func TestRender_QBInvoiceAlert_NoCompany(t *testing.T) {
 }
 
 func TestRender_QBTokenAlert(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	expiring, _, err := r.Render("qb_token_alert", QBTokenAlertData{
@@ -551,7 +551,7 @@ func TestRender_QBTokenAlert(t *testing.T) {
 }
 
 func TestRender_SubscriptionSkipped(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	data := SubscriptionSkippedData{
@@ -584,7 +584,7 @@ func TestRender_SubscriptionSkipped(t *testing.T) {
 // Without a signing secret the link is empty; the mail must still make sense
 // and must not print a bare or broken href.
 func TestRender_SubscriptionSkipped_NoUndoLink(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("subscription_skipped", SubscriptionSkippedData{
@@ -610,7 +610,7 @@ func TestRender_SubscriptionSkipped_NoUndoLink(t *testing.T) {
 }
 
 func TestRender_SubscriptionSkipUndone(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("subscription_skip_undone", SubscriptionSkipUndoneData{
@@ -633,8 +633,64 @@ func TestRender_SubscriptionSkipUndone(t *testing.T) {
 	}
 }
 
+// A nil zone is refused rather than defaulted, so a wiring slip fails at
+// startup instead of quietly mailing UTC dates to customers. main.go builds the
+// renderer from MERCHANT_TIMEZONE, and there is no test over main; this is what
+// stands between that wiring and a silent regression.
+func TestNewRefusesANilLocation(t *testing.T) {
+	r, err := New(nil)
+	require.Error(t, err)
+	assert.Nil(t, r)
+	assert.Contains(t, err.Error(), "merchant zone")
+}
+
+// A date in a customer's inbox has to be the merchant's date.
+//
+// Timestamps reach the renderer in the database session zone — UTC on the
+// server — so formatting them as they arrive prints a merchant evening as the
+// following day. That stayed invisible only because renewals are anchored at
+// 2am, where Los Angeles and UTC agree on the date; RENEWAL_ANCHOR_HOUR accepts
+// any hour, so the agreement was a setting rather than a property, and the card
+// and the email would have drifted a day from the admin toast with nothing
+// failing loudly.
+func TestRender_FormatsDatesInTheConfiguredZone(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+
+	// 10pm in Los Angeles is already the next day in UTC.
+	evening := time.Date(2027, 3, 12, 22, 0, 0, 0, la)
+	data := SubscriptionResumedData{
+		CustomerName: "Jane",
+		ProductName:  "Switchblade Espresso",
+		PlanName:     "Weekly",
+		NextChargeOn: evening.UTC(),
+		StoreName:    "Rockabilly Roasting",
+		StoreURL:     "https://rockabillyroasting.com",
+		AccountURL:   "https://rockabillyroasting.com/account/subscriptions",
+	}
+
+	merchant, err := New(la)
+	require.NoError(t, err)
+	html, text, err := merchant.Render("subscription_resumed", data)
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "March 12, 2027", "the merchant's day, not the stored value's")
+		assert.NotContains(t, body, "March 13, 2027")
+	}
+
+	// And the zone is the renderer's, not the value's: same instant, UTC
+	// renderer, the other date.
+	utc, err := New(time.UTC)
+	require.NoError(t, err)
+	html, text, err = utc.Render("subscription_resumed", data)
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "March 13, 2027")
+	}
+}
+
 func TestRender_SubscriptionResumed(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("subscription_resumed", SubscriptionResumedData{
@@ -676,7 +732,7 @@ func staleDigestTicket(number string, quietDays int, down bool) ServiceStaleDige
 }
 
 func TestRender_ServiceStaleDigest(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("service_stale_digest", ServiceStaleDigestData{
@@ -706,7 +762,7 @@ func TestRender_ServiceStaleDigest(t *testing.T) {
 // The digest is capped, and a capped list that implied it was the whole set
 // would be worse than no digest — staff would work the list and stop.
 func TestRender_ServiceStaleDigest_SaysWhatItLeftOut(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	listed := []ServiceStaleDigestTicket{
@@ -732,7 +788,7 @@ func TestRender_ServiceStaleDigest_SaysWhatItLeftOut(t *testing.T) {
 
 // One day is singular; the row must not say "quiet for 1 days".
 func TestRender_ServiceStaleDigest_SingularDay(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("service_stale_digest", ServiceStaleDigestData{
@@ -757,7 +813,7 @@ func TestRender_ServiceStaleDigest_SingularDay(t *testing.T) {
 }
 
 func TestQBShadowDigestRenders(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	due := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
@@ -790,7 +846,7 @@ func TestQBShadowDigestRenders(t *testing.T) {
 }
 
 func TestQBShadowDigestSingularInvoice(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := r.Render("qb_shadow_digest", QBShadowDigestData{
@@ -809,7 +865,7 @@ func TestQBShadowDigestSingularInvoice(t *testing.T) {
 }
 
 func TestQBShadowDigestAllManualWeek(t *testing.T) {
-	r, err := New()
+	r, err := New(time.UTC)
 	require.NoError(t, err)
 
 	// The shape every shop starts in: nothing is billed automatically because

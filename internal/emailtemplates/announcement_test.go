@@ -2,6 +2,7 @@ package emailtemplates_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,7 +80,7 @@ func TestParseAnnouncementBody_DoesNotLinkifySchemelessOrNonHTTP(t *testing.T) {
 }
 
 func TestRenderAnnouncement_EscapesStaffInputAndOmitsEmptyGreeting(t *testing.T) {
-	renderer, err := emailtemplates.New()
+	renderer, err := emailtemplates.New(time.UTC)
 	require.NoError(t, err)
 
 	html, text, err := renderer.Render("announcement", emailtemplates.AnnouncementData{

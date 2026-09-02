@@ -33,10 +33,14 @@ type CreateQBInvoiceWorker struct {
 	// "nothing is chosen in the admin but the environment still supplies one".
 	envSalesItemID string
 	qb             quickbooks.Client
-	audit          *audit.AuditWriter
-	pool           *pgxpool.Pool
-	riverClient    *river.Client[pgx.Tx]
-	metrics        *metrics.Registry
+	// loc is the merchant's zone. It decides which calendar day an order was
+	// placed on, and therefore which day a NET-terms invoice falls due — an
+	// evening order is already tomorrow in UTC.
+	loc         *time.Location
+	audit       *audit.AuditWriter
+	pool        *pgxpool.Pool
+	riverClient *river.Client[pgx.Tx]
+	metrics     *metrics.Registry
 }
 
 // NewCreateQBInvoiceWorker creates a new CreateQBInvoiceWorker.
@@ -48,11 +52,15 @@ func NewCreateQBInvoiceWorker(
 	previews *store.QBPreviewStore,
 	envSalesItemID string,
 	qb quickbooks.Client,
+	loc *time.Location,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
 	riverClient *river.Client[pgx.Tx],
 	m *metrics.Registry,
 ) *CreateQBInvoiceWorker {
+	if loc == nil {
+		loc = time.UTC
+	}
 	return &CreateQBInvoiceWorker{
 		orders:         orders,
 		customers:      customers,
@@ -61,6 +69,7 @@ func NewCreateQBInvoiceWorker(
 		previews:       previews,
 		envSalesItemID: envSalesItemID,
 		qb:             qb,
+		loc:            loc,
 		audit:          auditWriter,
 		pool:           pool,
 		riverClient:    riverClient,
@@ -244,7 +253,7 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		params := quickbooks.InvoiceParams{
 			CustomerID:     job.Args.QBCustomerID,
 			DocNumber:      docNumber,
-			DueDate:        order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
+			DueDate:        app.InvoiceDueDate(order.PlacedAt, termsDays, w.loc),
 			Lines:          lines,
 			Shipping:       order.ShippingTotal,
 			SalesItemID:    qbItems.SalesItemID,
@@ -351,7 +360,7 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 		CustomerID:    order.CustomerID,
 		DocNumber:     docNumber,
 		TermsDays:     termsDays,
-		DueDate:       order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
+		DueDate:       app.InvoiceDueDate(order.PlacedAt, termsDays, w.loc),
 		SubtotalCents: order.Subtotal,
 		ShippingCents: order.ShippingTotal,
 		TotalCents:    order.Total,

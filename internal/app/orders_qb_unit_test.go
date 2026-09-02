@@ -85,6 +85,98 @@ func TestInvoicePastDue(t *testing.T) {
 	}
 }
 
+// NET terms are counted on the shop's calendar, not on UTC's.
+//
+// PlacedAt arrives from pgx in UTC, where an evening order in Los Angeles is
+// already tomorrow. Adding 24-hour spans to that instant gave a NET 7 invoice a
+// due date of day eight — but only for orders placed after about 4pm local,
+// which is why nothing looked systematically wrong. Both QuickBooks and our own
+// preview row were fed the same expression, so the two systems agreed with each
+// other while both disagreed with the cafe's calendar.
+func TestInvoiceDueDateCountsTheMerchantsDays(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+
+	day := func(y int, m time.Month, d int) time.Time {
+		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
+
+	cases := []struct {
+		name   string
+		placed time.Time
+		terms  int
+		want   time.Time
+		wasBug bool // the old expression disagreed here
+	}{
+		{
+			name:   "evening order is still that day for the shop",
+			placed: time.Date(2026, 9, 1, 19, 0, 0, 0, la),
+			terms:  7,
+			want:   day(2026, 9, 8),
+			wasBug: true,
+		},
+		{
+			name:   "late evening, minutes before the UTC rollover was already tomorrow",
+			placed: time.Date(2026, 9, 1, 23, 30, 0, 0, la),
+			terms:  7,
+			want:   day(2026, 9, 8),
+			wasBug: true,
+		},
+		{
+			name:   "midday order was never affected",
+			placed: time.Date(2026, 9, 1, 12, 0, 0, 0, la),
+			terms:  7,
+			want:   day(2026, 9, 8),
+		},
+		{
+			name:   "due on receipt means the day it was ordered",
+			placed: time.Date(2026, 9, 1, 19, 0, 0, 0, la),
+			terms:  0,
+			want:   day(2026, 9, 1),
+			wasBug: true,
+		},
+		{
+			name:   "NET 30 rolls the month over on the calendar",
+			placed: time.Date(2026, 8, 31, 20, 0, 0, 0, la),
+			terms:  30,
+			want:   day(2026, 9, 30),
+			wasBug: true,
+		},
+		{
+			name:   "a span containing the spring DST change is still seven days",
+			placed: time.Date(2027, 3, 10, 23, 30, 0, 0, la),
+			terms:  7,
+			want:   day(2027, 3, 17),
+			wasBug: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// As pgx hands it over, which is where the fault lived.
+			got := InvoiceDueDate(tc.placed.UTC(), tc.terms, la)
+			assert.True(t, got.Equal(tc.want), "got %s want %s", got, tc.want)
+
+			// A calendar date carries no time of day and no zone to be
+			// re-interpreted in: it is stored in a date column and formatted
+			// straight into QuickBooks' YYYY-MM-DD.
+			assert.Equal(t, time.UTC, got.Location())
+			assert.Zero(t, got.Hour()+got.Minute()+got.Second()+got.Nanosecond())
+
+			if tc.wasBug {
+				old := tc.placed.UTC().Add(time.Duration(tc.terms) * 24 * time.Hour)
+				assert.NotEqual(t, tc.want.Format("2006-01-02"), old.Format("2006-01-02"),
+					"this case is here because the old expression got it wrong; if they now agree the case has stopped guarding anything")
+			}
+		})
+	}
+
+	// No zone configured must not silently shift the answer to some third
+	// thing; UTC is the documented fallback.
+	placed := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	assert.True(t, InvoiceDueDate(placed, 7, nil).Equal(day(2026, 9, 8)))
+}
+
 func TestInvoicePastDueUsesTheMerchantsDay(t *testing.T) {
 	la, err := time.LoadLocation("America/Los_Angeles")
 	require.NoError(t, err)

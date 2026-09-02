@@ -450,6 +450,39 @@ func overdueReminderStageFor(daysPastDue int) int {
 	return stage
 }
 
+// InvoiceDueDate returns the day a NET-terms invoice falls due: termsDays
+// calendar days after the order's own day, in the merchant's zone.
+//
+// Counted in days on the merchant's calendar rather than by adding 24-hour
+// spans to an instant. PlacedAt arrives from pgx in UTC, where an order placed
+// at 7pm in Los Angeles is already tomorrow, so Add(7*24h) returned the 9th for
+// an order the shop booked on the 1st: NET 7 falling due on day eight. Any
+// order after ~4pm local was affected and no other order was, which is a
+// quiet way to be wrong — and it was invisible from inside because the same
+// expression fed both QuickBooks and our own preview row, so the two systems
+// agreed with each other while both disagreed with the calendar the shop and
+// the cafe were reading.
+//
+// (Only the starting day was ever wrong. Adding 24-hour spans to a UTC instant
+// does not drift across a DST boundary, because UTC has none; a midday order
+// spanning the March change came out the same either way.)
+//
+// The result is midnight UTC, which is how a SQL date column round-trips and
+// what QuickBooks' YYYY-MM-DD wants — a calendar day carries no time of day and
+// must not be re-zoned on the way out (see the {{day}} template func).
+//
+// The basis is deliberately the order date, unchanged: this fixes which day
+// that is, not what the terms are counted from.
+func InvoiceDueDate(placedAt time.Time, termsDays int, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	y, m, d := placedAt.In(loc).Date()
+	// time.Date normalizes an out-of-range day, so month and year ends need no
+	// special case: 28 February + 7 is 7 March.
+	return time.Date(y, m, d+termsDays, 0, 0, 0, 0, time.UTC)
+}
+
 // EffectivePaymentTermsDays returns a customer's NET payment terms in days,
 // falling back to the house default (net-7) when none are set. The QB invoice
 // job uses it to set the invoice due date; from then on QB's due date is

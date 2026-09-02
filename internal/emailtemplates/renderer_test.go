@@ -649,7 +649,7 @@ func TestRender_SubscriptionResumed(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, body := range []string{html, text} {
-		// A resume charges within 24 hours, so the date is the message. An email
+		// A resume charges on the next renewal run, so the date is the message. An email
 		// that only said "you're back on" would be the same silence the customer
 		// got before.
 		assert.Contains(t, body, "September 1, 2026")

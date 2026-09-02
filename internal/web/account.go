@@ -450,7 +450,7 @@ func (d *Deps) handleAccountSubscriptionResume(w http.ResponseWriter, r *http.Re
 // enqueueResumeEmail queues the customer's resume notification in the same
 // transaction as the resume itself, so the mail can never name a charge date a
 // rolled-back resume never set. Shared by the account and admin handlers: a
-// resume books a charge within 24 hours, and the customer needs to hear that
+// resume books a charge on the next renewal run, and the customer needs to hear that
 // whoever pressed the button.
 func (d *Deps) enqueueResumeEmail(ctx context.Context, tx pgx.Tx, sub *domain.Subscription) error {
 	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionResumedArgs{

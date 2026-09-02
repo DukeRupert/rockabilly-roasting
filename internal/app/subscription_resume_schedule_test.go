@@ -63,16 +63,15 @@ func TestResumeSubscriptionBillsAtNextAnchor(t *testing.T) {
 	assert.Equal(t, subs.ResumeOrderDate(before), resumed.NextOrderAt,
 		"resume must land on the date ResumeOrderDate advertises")
 
-	// The property that matters regardless of what time the test runs: an order
-	// inside a day, not inside a cadence.
+	// The property that matters regardless of what time the test runs: the next
+	// renewal run, not the next cadence. The ceiling is a calendar day rather
+	// than 24 hours, because a resume in the small hours before the clocks go
+	// back is followed by a 25-hour day — which is also why nothing here or in
+	// the copy promises "within 24 hours". Anchor behaviour across both DST
+	// transitions is pinned exactly in TestAnchorRenewalTimeAcrossDST.
 	assert.True(t, resumed.NextOrderAt.After(before), "the order must still be in the future")
-	assert.True(t, resumed.NextOrderAt.Before(before.Add(24*time.Hour+time.Minute)),
+	assert.True(t, resumed.NextOrderAt.Before(before.Add(25*time.Hour+time.Minute)),
 		"a resume must not park the next order more than a day out, got %s", resumed.NextOrderAt)
-
-	// It is the anchor hour, so resumed subscriptions batch into the same
-	// pre-dawn window as every other renewal rather than firing on the minute
-	// the customer clicked.
-	assert.Equal(t, 2, resumed.NextOrderAt.In(la).Hour())
 
 	// Re-read: the struct is easy to patch in memory and miss the write.
 	stored, err := subStore.GetByIDAsStaff(ctx, tx, sub.ID)

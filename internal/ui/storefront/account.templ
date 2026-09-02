@@ -503,7 +503,8 @@ type AccountSubscriptionsProps struct {
 	Rows      []AccountSubscriptionRow
 	CartCount int
 	// ResumeOrderOn is when an order would be placed if a paused subscription
-	// were resumed right now — the next renewal window, within 24 hours. Paused
+	// were resumed right now — the next renewal window, which is the following
+	// pre-dawn run. Paused
 	// cards name it before the customer commits, because resuming charges their
 	// card that soon. Zero when the page was built without it.
 	ResumeOrderOn time.Time
@@ -841,7 +842,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 			</div>
 		}
 		if sub.Status == domain.SubscriptionStatusPaused {
-			<!-- Resume books a charge within 24 hours, so it confirms like pause
+			<!-- Resume books a charge on the next run, so it confirms like pause
 			     and cancel do, and the confirmation names the date rather than
 			     asking the customer to trust a generic "are you sure". -->
 			<div class="flex flex-wrap items-center gap-2" x-data="{ confirming: false }">

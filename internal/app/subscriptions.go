@@ -606,7 +606,8 @@ func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, 
 }
 
 // ResumeSubscription resumes a paused subscription and puts its next order at
-// the next renewal window — within 24 hours — rather than a fresh interval out.
+// the next renewal window — the following pre-dawn run — rather than a fresh
+// interval out.
 func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
@@ -621,8 +622,11 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	}
 
 	// Resuming means "send my coffee", not "start me a fresh free interval".
-	// The next order is placed at the next renewal window — always within 24
-	// hours — and the cadence runs on from there. Until this, resume handed out
+	// The next order is placed at the next renewal window — the following
+	// pre-dawn run, never a second one — and the cadence runs on from there.
+	// (Not "within 24 hours": the anchor is a wall-clock hour, and the night the
+	// clocks go back stretches that gap to 24h45m. See
+	// TestAnchorRenewalTimeAcrossDST.) Until this, resume handed out
 	// a whole new interval and *then* rounded up to the anchor, so a customer
 	// who resumed at 9am on a Sunday waited eight days and change for the
 	// shipment they had just asked to restart.

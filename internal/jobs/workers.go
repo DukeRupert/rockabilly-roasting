@@ -572,8 +572,8 @@ type SubscriptionCancelledArgs struct {
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
 // SubscriptionResumedArgs tells the customer their paused subscription is live
-// again and names the date the next order is placed — within 24 hours of the
-// resume, so the notice has to go out promptly rather than wait for the order
+// again and names the date the next order is placed — the next renewal run,
+// so the notice has to go out promptly rather than wait for the order
 // confirmation.
 type SubscriptionResumedArgs struct {
 	SubscriptionID uuid.UUID `json:"subscription_id"`

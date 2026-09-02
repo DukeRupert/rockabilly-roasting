@@ -146,10 +146,12 @@ Use this when a customer asks to skip deliveries temporarily.
 Available when status is **Paused**. Resuming a subscription:
 
 - Sets the status back to **Active**.
-- Books the next order at the **next renewal window** — the following pre-dawn run, never a second one — not a full interval out. Resuming means the customer wants coffee, so they get it on the next run rather than waiting a whole cycle. The normal cadence then continues from that order.
+- Books the next order at the **next renewal window** — the next pre-dawn run, never a second one — not a full interval out. Resuming means the customer wants coffee, so they get it on the next run rather than waiting a whole cycle. The normal cadence then continues from that order.
 - Clears any "pause until" date.
 
-The confirmation dialog names the exact date the order will be placed, and the customer is emailed that same date — for your resume as well as theirs. Nothing is charged at the moment you press Resume; the charge happens when the renewal runs.
+Nothing is charged at the moment you press Resume; the charge happens when the renewal runs. The customer is emailed either way — your resume as well as theirs — and the mail names the booked date.
+
+**Go by the date in the green toast, not the one in the dialog.** The confirmation dialog names the window as of the moment the page was *rendered*. If the page has been open across the renewal hour — an overnight tab is the usual way — the run it named has already gone, and the resume books the next one. That is why the toast after Resume reads "Subscription resumed — next order Friday, September 11": it reports what was actually booked, and it is the date the customer's email will carry. Reload the page before resuming if you want the dialog and the booking to agree.
 
 ### Cancel
 

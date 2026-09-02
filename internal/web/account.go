@@ -378,8 +378,10 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 		Customer:  customer,
 		Rows:      rows,
 		CartCount: d.cartItemCountFromCookie(r),
-		// Asked of the service rather than derived here, so the date a paused
-		// card promises is the one ResumeSubscription would actually set.
+		// Asked of the service rather than derived here, so the card quotes the
+		// same arithmetic the resume runs. Advisory, not a booking: this is the
+		// window as of *now*, and a card sat on across the anchor hour will name
+		// one that has passed by the time it is clicked.
 		ResumeOrderOn: d.SubscriptionService.ResumeOrderDate(time.Now()),
 		MerchantTZ:    d.MerchantTZ,
 	}

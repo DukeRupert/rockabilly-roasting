@@ -1557,7 +1557,7 @@ type AccountSubscriptionsProps struct {
 	Rows      []AccountSubscriptionRow
 	CartCount int
 	// ResumeOrderOn is when an order would be placed if a paused subscription
-	// were resumed right now — the next renewal window, which is the following
+	// were resumed right now — the next renewal window, which is the next
 	// pre-dawn run. Paused cards name it before the customer commits, because
 	// resuming charges their card that soon. Computed at render: a page sat on
 	// across the anchor hour names a window that has since passed, and the

@@ -3,7 +3,6 @@ package web
 import (
 	"errors"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -489,10 +488,13 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		Orders:          enrichedOrders,
 		Activity:        activity,
 		Flash:           r.URL.Query().Get("flash"),
-		ResumeOrderOn:   d.SubscriptionService.ResumeOrderDate(time.Now()),
-		MerchantTZ:      d.MerchantTZ,
-		StaffName:       name,
-		StaffRole:       role,
+		// Advisory, as on the storefront card: the window as of this render, not
+		// the one a click hours later will book. The flash after Resume reports
+		// what was actually booked.
+		ResumeOrderOn: d.SubscriptionService.ResumeOrderDate(time.Now()),
+		MerchantTZ:    d.MerchantTZ,
+		StaffName:     name,
+		StaffRole:     role,
 	}
 
 	if IsHTMX(r) {
@@ -523,6 +525,18 @@ func (d *Deps) handleAdminSubscriptionPause(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+paused", http.StatusSeeOther)
 }
 
+// resumeFlash names the date the resume actually booked. Kept out of the
+// handler and pure so the one thing worth asserting about it — that it reports
+// the booking rather than repeating whatever the confirmation dialog said —
+// can be tested without a database. Same date format as that dialog, so staff
+// are comparing like with like when the two disagree.
+func resumeFlash(bookedOn time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return "Subscription resumed — next order " + bookedOn.In(loc).Format("Monday, January 2")
+}
+
 func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -551,9 +565,7 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	flash := url.QueryEscape("Subscription resumed — next order " +
-		bookedOn.In(d.MerchantTZ).Format("Mon, Jan 2"))
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), resumeFlash(bookedOn, d.MerchantTZ))
 }
 
 // handleAdminSubscriptionRetry triggers an immediate renewal charge on a

@@ -26,8 +26,11 @@ type SubscribePageProps struct {
 	ProductSlug  string
 	VariantLabel string
 	ThumbnailURL string
-	// NextChargeAt previews when the first renewal would land.
+	// NextChargeAt previews when the first renewal would land. Rendered in
+	// MerchantTZ: it is built from the server clock, so formatting it as it
+	// arrives shows an evening visitor tomorrow's date.
 	NextChargeAt time.Time
+	MerchantTZ   *time.Location
 	StripeKey    string
 	CartCount    int
 }
@@ -114,7 +117,7 @@ templ SubscribeContent(props SubscribePageProps) {
 				<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
 					First bag ships now, then renews { subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }.
 					if !props.NextChargeAt.IsZero() {
-						<span>Next charge around <span class="font-bold text-ink">{ formatDate(props.NextChargeAt) }</span>.</span>
+						<span>Next charge around <span class="font-bold text-ink">{ formatDateIn(props.NextChargeAt, props.MerchantTZ) }</span>.</span>
 					}
 					<span>Shipping and tax shown at payment.</span>
 				</p>

@@ -130,6 +130,13 @@ func mobileNavClass(path, active string) string {
 	return base + " bg-paper text-ink hover:bg-paper-warm"
 }
 
+// formatDate renders a timestamp in whatever zone it already carries. Fine for
+// a date that is only ever built from the merchant's own clock; wrong for
+// anything read back from the database, which arrives in the session zone (UTC
+// on the server) and will print the merchant's evening as the next day.
+//
+// For subscription dates use formatDateIn. This one is still live on order
+// history and the wholesale pages, whose props carry no zone.
 func formatDate(t time.Time) string {
 	return t.Format("Jan 2, 2006")
 }
@@ -144,7 +151,10 @@ func formatDate(t time.Time) string {
 //
 // nil falls back to UTC rather than panicking. A wrong date on a coffee
 // subscription is a bad day; a nil dereference here is a 500 on the page a
-// customer opens to fix it.
+// customer opens to fix it. (skipRestartBounds below falls back to time.Local
+// instead — deliberate, and a different question: it is picking the day
+// boundaries for a date input, where the visitor's own clock is the better
+// guess than UTC. Display copies the merchant; input bounds copy the reader.)
 func formatDateIn(t time.Time, loc *time.Location) string {
 	if loc == nil {
 		loc = time.UTC

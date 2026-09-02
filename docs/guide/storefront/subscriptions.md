@@ -142,9 +142,9 @@ Ready for more coffee? Resume your subscription at any time.
 2. Find the paused subscription.
 3. Click **Resume**, then confirm.
 
-The paused card and the confirmation both name the date your next order goes out, and you get an email saying the same thing.
+The paused card and the confirmation show you the date your next order would go out, and an email afterwards confirms the one we booked.
 
-You are not made to wait out a whole cycle. Resuming puts your next order on the **next roasting run**, and your usual rhythm picks up from there. So a 30-day subscriber who resumes on the afternoon of March 15 goes out on the 16th and is next up around April 15 -- not April 14 with nothing in between. The card names the exact date before you confirm, which is the one to go by: resume in the small hours and the run that morning may still catch you.
+You are not made to wait out a whole cycle. Resuming puts your next order on the **next roasting run**, and your usual rhythm picks up from there. So a 30-day subscriber who resumes on the afternoon of March 15 goes out on the 16th and is next up around April 15 -- not April 14 with nothing in between. Resume in the small hours and that morning's run may still catch you. The date shown before you confirm is worked out when the page loads, so if it has been sitting open a while, go by the date on the card afterwards and in your email -- that is the run we booked you onto.
 
 ### Cancelling a Subscription
 

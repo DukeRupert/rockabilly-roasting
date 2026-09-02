@@ -592,7 +592,7 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 			return txErr
 		}
 		if sub.Status != domain.SubscriptionStatusPastDue {
-			flash = "Subscription+is+not+past+due"
+			flash = "Subscription is not past due"
 			return nil
 		}
 		// jobs.RenewalInsertOpts, never a literal — it is what stops this from
@@ -611,10 +611,10 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 			// for this subscription is already in flight or already ran today,
 			// and this click is riding on it — staff who are told "queued" would
 			// otherwise wait for a charge that no second job is going to make.
-			flash = "Charge+attempt+already+queued+today"
+			flash = "Charge attempt already queued today"
 			return nil
 		}
-		flash = "Renewal+charge+queued"
+		flash = "Renewal charge queued"
 		return nil
 	})
 	if err != nil {
@@ -622,7 +622,7 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), flash)
 }
 
 // handleAdminSubscriptionGrandfatherShipping toggles a subscription's
@@ -649,11 +649,11 @@ func (d *Deps) handleAdminSubscriptionGrandfatherShipping(w http.ResponseWriter,
 		return
 	}
 
-	flash := "Free-shipping+exception+removed"
+	flash := "Free-shipping exception removed"
 	if enabled {
-		flash = "Free-shipping+exception+applied"
+		flash = "Free-shipping exception applied"
 	}
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), flash)
 }
 
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
@@ -683,7 +683,7 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+cancelled", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Subscription cancelled")
 }
 
 func (d *Deps) handleAdminSubscriptionPlanUpdate(w http.ResponseWriter, r *http.Request) {
@@ -714,7 +714,7 @@ func (d *Deps) handleAdminSubscriptionPlanUpdate(w http.ResponseWriter, r *http.
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Plan+updated", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Plan updated")
 }
 
 func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *http.Request) {
@@ -746,5 +746,5 @@ func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *ht
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Variant+updated", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Variant updated")
 }

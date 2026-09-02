@@ -488,10 +488,13 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		Orders:          enrichedOrders,
 		Activity:        activity,
 		Flash:           r.URL.Query().Get("flash"),
-		ResumeOrderOn:   d.SubscriptionService.ResumeOrderDate(time.Now()),
-		MerchantTZ:      d.MerchantTZ,
-		StaffName:       name,
-		StaffRole:       role,
+		// Advisory, as on the storefront card: the window as of this render, not
+		// the one a click hours later will book. The flash after Resume reports
+		// what was actually booked.
+		ResumeOrderOn: d.SubscriptionService.ResumeOrderDate(time.Now()),
+		MerchantTZ:    d.MerchantTZ,
+		StaffName:     name,
+		StaffRole:     role,
 	}
 
 	if IsHTMX(r) {
@@ -519,7 +522,23 @@ func (d *Deps) handleAdminSubscriptionPause(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+paused", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Subscription paused")
+}
+
+// resumeFlash names the date the resume actually booked.
+//
+// It takes the resumed subscription rather than a date so that the booking is
+// the only thing it can report: a caller cannot hand it the render-time
+// advisory date without first inventing a subscription to carry it, which is
+// the mistake this whole line of work exists to prevent. Same date format as
+// the confirmation dialog, so staff compare like with like when the two
+// disagree.
+//
+// loc must not be nil — main.go fails startup on an unloadable
+// MERCHANT_TIMEZONE, and every other date on this page dereferences it the
+// same way.
+func resumeFlash(sub *domain.Subscription, loc *time.Location) string {
+	return "Subscription resumed — next order " + sub.NextOrderAt.In(loc).Format("Monday, January 2")
 }
 
 func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Request) {
@@ -531,11 +550,18 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// The date the confirmation dialog promised was computed when the page was
+	// rendered, and the anchor may have rolled over since — an admin tab left
+	// open overnight is the realistic case. So the flash reports the date that
+	// was actually booked rather than repeating a bare "resumed": whatever the
+	// dialog said, this is the one the scheduler will act on.
+	var resumed *domain.Subscription
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		sub, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
 		if txErr != nil {
 			return txErr
 		}
+		resumed = sub
 		return d.enqueueResumeEmail(ctx, tx, sub)
 	})
 	if err != nil {
@@ -543,7 +569,7 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+resumed", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), resumeFlash(resumed, d.MerchantTZ))
 }
 
 // handleAdminSubscriptionRetry triggers an immediate renewal charge on a
@@ -566,7 +592,7 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 			return txErr
 		}
 		if sub.Status != domain.SubscriptionStatusPastDue {
-			flash = "Subscription+is+not+past+due"
+			flash = "Subscription is not past due"
 			return nil
 		}
 		// jobs.RenewalInsertOpts, never a literal — it is what stops this from
@@ -585,10 +611,10 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 			// for this subscription is already in flight or already ran today,
 			// and this click is riding on it — staff who are told "queued" would
 			// otherwise wait for a charge that no second job is going to make.
-			flash = "Charge+attempt+already+queued+today"
+			flash = "Charge attempt already queued today"
 			return nil
 		}
-		flash = "Renewal+charge+queued"
+		flash = "Renewal charge queued"
 		return nil
 	})
 	if err != nil {
@@ -596,7 +622,7 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), flash)
 }
 
 // handleAdminSubscriptionGrandfatherShipping toggles a subscription's
@@ -623,11 +649,11 @@ func (d *Deps) handleAdminSubscriptionGrandfatherShipping(w http.ResponseWriter,
 		return
 	}
 
-	flash := "Free-shipping+exception+removed"
+	flash := "Free-shipping exception removed"
 	if enabled {
-		flash = "Free-shipping+exception+applied"
+		flash = "Free-shipping exception applied"
 	}
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), flash)
 }
 
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
@@ -657,7 +683,7 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+cancelled", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Subscription cancelled")
 }
 
 func (d *Deps) handleAdminSubscriptionPlanUpdate(w http.ResponseWriter, r *http.Request) {
@@ -688,7 +714,7 @@ func (d *Deps) handleAdminSubscriptionPlanUpdate(w http.ResponseWriter, r *http.
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Plan+updated", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Plan updated")
 }
 
 func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *http.Request) {
@@ -720,5 +746,5 @@ func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *ht
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Variant+updated", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Variant updated")
 }

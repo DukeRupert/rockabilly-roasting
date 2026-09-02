@@ -33,8 +33,11 @@ type SubscriptionShowProps struct {
 	Activity        []domain.AuditEntry
 	Flash           string
 	// ResumeOrderOn is when a resume pressed now would place the next order —
-	// the next renewal window — the following pre-dawn run. Named on the Resume confirmation
-	// so staff know they are booking a charge today, not next cycle.
+	// the next renewal window — the next pre-dawn run. Named on the Resume
+	// confirmation so staff know they are booking a charge today, not next cycle.
+	// Computed at render, so a tab left open across the anchor hour promises a
+	// window that has passed; the flash after the resume reports the date that
+	// was actually booked.
 	ResumeOrderOn time.Time
 	MerchantTZ    *time.Location
 	StaffName       string
@@ -47,7 +50,7 @@ type SubscriptionShowProps struct {
 // hint that would read as "nothing happens".
 func resumeHint(props SubscriptionShowProps) string {
 	if props.ResumeOrderOn.IsZero() {
-		return "Puts the subscription back on. The next order is placed at the next renewal window — the following pre-dawn run."
+		return "Puts the subscription back on. The next order is placed at the next renewal window — the next pre-dawn run."
 	}
 	return "Puts the subscription back on. The next order is placed on " +
 		props.ResumeOrderOn.In(props.MerchantTZ).Format("Monday, January 2") + " — the next renewal window."
@@ -478,7 +481,7 @@ templ subscriptionActions(props SubscriptionShowProps) {
 										Title:  "Resume this subscription?",
 										Lead:   resumeHint(props),
 										Points: []string{
-											"The customer is emailed, and the mail names that date.",
+											"The customer is emailed the date that gets booked. If this page has been open a while, that can be later than the date above — the toast will say what was booked.",
 											"Nothing is charged now — the renewal runs at the usual pre-dawn window.",
 										},
 										Confirm: "Resume subscription",

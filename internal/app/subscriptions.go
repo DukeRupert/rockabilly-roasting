@@ -89,9 +89,15 @@ func (s *SubscriptionService) anchorRenewal(t time.Time) time.Time {
 }
 
 // ResumeOrderDate reports when a subscription resumed at t would have its next
-// order placed. Exported so the account page and the resume email can promise
-// the same date ResumeSubscription will actually set, rather than each
-// re-deriving the anchor arithmetic and drifting from it.
+// order placed. Exported so the screens that offer Resume can name that date
+// without re-deriving the anchor arithmetic and drifting from it.
+//
+// It answers for the instant you pass, which is not a promise about the instant
+// the customer clicks: a page rendered before the anchor hour and confirmed
+// after it gets the window that has since passed, and ResumeSubscription books
+// the next one. Callers displaying it must treat it as advisory. What was
+// actually booked is next_order_at, which is what the resumed email reads and
+// what the scheduler acts on.
 func (s *SubscriptionService) ResumeOrderDate(t time.Time) time.Time {
 	return s.anchorRenewal(t)
 }
@@ -606,7 +612,7 @@ func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, 
 }
 
 // ResumeSubscription resumes a paused subscription and puts its next order at
-// the next renewal window — the following pre-dawn run — rather than a fresh
+// the next renewal window — the next pre-dawn run — rather than a fresh
 // interval out.
 func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
@@ -622,8 +628,8 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	}
 
 	// Resuming means "send my coffee", not "start me a fresh free interval".
-	// The next order is placed at the next renewal window — the following
-	// pre-dawn run, never a second one — and the cadence runs on from there.
+	// The next order is placed at the next renewal window — the next pre-dawn
+	// run, never a second one — and the cadence runs on from there.
 	// (Not "within 24 hours": the anchor is a wall-clock hour, and the night the
 	// clocks go back stretches that gap to 24h45m. See
 	// TestAnchorRenewalTimeAcrossDST.) Until this, resume handed out

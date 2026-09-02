@@ -59,9 +59,19 @@ func TestResumeSubscriptionBillsAtNextAnchor(t *testing.T) {
 	resumed, err := subs.ResumeSubscription(ctx, tx, sub.ID, testutil.TestActor())
 	require.NoError(t, err)
 
-	// The promise the account page and the email both make.
-	assert.Equal(t, subs.ResumeOrderDate(before), resumed.NextOrderAt,
-		"resume must land on the date ResumeOrderDate advertises")
+	// The screens quote ResumeOrderDate before the click, so a resume must book
+	// what that helper names for the same instant. Not a promise to the
+	// customer: a page rendered before the anchor hour and confirmed after it
+	// gets the next window instead, which is why the card, the toast and the
+	// email all read next_order_at rather than re-deriving this. Either side of
+	// the call is accepted because the resume takes its own time.Now(), and the
+	// anchor can roll between the two.
+	after := time.Now()
+	assert.True(t,
+		resumed.NextOrderAt.Equal(subs.ResumeOrderDate(before)) ||
+			resumed.NextOrderAt.Equal(subs.ResumeOrderDate(after)),
+		"a resume must book the window ResumeOrderDate names for the instant it ran, got %s",
+		resumed.NextOrderAt)
 
 	// The property that matters regardless of what time the test runs: the next
 	// renewal run, not the next cadence. The ceiling is a calendar day rather

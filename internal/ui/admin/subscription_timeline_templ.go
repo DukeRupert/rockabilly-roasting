@@ -35,6 +35,8 @@ func subscriptionEventLabel(action string) string {
 		return "Skip notification sent"
 	case audit.AuditEmailSubscriptionSkipUndone:
 		return "Skip-undone notification sent"
+	case audit.AuditEmailSubscriptionResumed:
+		return "Resume notification sent"
 	case audit.AuditSubscriptionCancelled:
 		return "Cancelled"
 	case audit.AuditSubscriptionRenewed:

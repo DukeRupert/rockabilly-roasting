@@ -116,7 +116,7 @@ Note: Status badges display lowercase values as stored in the system (e.g., "act
 ### Actions You Can Take
 
 - **Pause** -- Temporarily stop deliveries. Click Pause, then confirm.
-- **Resume** -- Restart a paused subscription. Your billing cycle resets from the resume date.
+- **Resume** -- Restart a paused subscription. Click Resume, then confirm. Your next order goes out on the next roasting run -- within a day -- and the card names that date before you commit.
 - **Cancel** -- Permanently end the subscription. Click Cancel, then confirm.
 
 If you do not have any subscriptions yet, you will see a link to browse available subscription plans.

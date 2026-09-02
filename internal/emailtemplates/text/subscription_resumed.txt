@@ -1,0 +1,17 @@
+{{define "subscription_resumed.txt"}}Your Subscription Is Back On
+
+Hi {{.CustomerName}},
+
+Your {{.ProductName}} subscription ({{.PlanName}}) is active again -- and we're not making you wait a full cycle for it.
+
+Next order: {{date .NextChargeOn}}
+
+That's the next roast-and-ship window, so your card is charged then and the coffee goes out with that day's batch. Your usual rhythm runs on from there.
+
+Manage your subscription: {{.AccountURL}}
+
+Changed your mind? Pause it again or push the shipment out from your account -- any time before that date.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

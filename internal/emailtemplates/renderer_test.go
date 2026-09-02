@@ -633,6 +633,31 @@ func TestRender_SubscriptionSkipUndone(t *testing.T) {
 	}
 }
 
+func TestRender_SubscriptionResumed(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("subscription_resumed", SubscriptionResumedData{
+		CustomerName: "Jane",
+		ProductName:  "Switchblade Espresso",
+		PlanName:     "Weekly",
+		NextChargeOn: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+		StoreName:    "Rockabilly Roasting",
+		StoreURL:     "https://rockabillyroasting.com",
+		AccountURL:   "https://rockabillyroasting.com/account/subscriptions",
+	})
+	require.NoError(t, err)
+
+	for _, body := range []string{html, text} {
+		// A resume charges within 24 hours, so the date is the message. An email
+		// that only said "you're back on" would be the same silence the customer
+		// got before.
+		assert.Contains(t, body, "September 1, 2026")
+		assert.Contains(t, body, "Switchblade Espresso")
+		assert.Contains(t, body, "Jane")
+	}
+}
+
 func staleDigestTicket(number string, quietDays int, down bool) ServiceStaleDigestTicket {
 	sev := "routine"
 	if down {

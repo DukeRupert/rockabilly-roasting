@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -374,10 +375,13 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	}
 
 	props := storefront.AccountSubscriptionsProps{
-		Customer:   customer,
-		Rows:       rows,
-		CartCount:  d.cartItemCountFromCookie(r),
-		MerchantTZ: d.MerchantTZ,
+		Customer:  customer,
+		Rows:      rows,
+		CartCount: d.cartItemCountFromCookie(r),
+		// Asked of the service rather than derived here, so the date a paused
+		// card promises is the one ResumeSubscription would actually set.
+		ResumeOrderOn: d.SubscriptionService.ResumeOrderDate(time.Now()),
+		MerchantTZ:    d.MerchantTZ,
 	}
 
 	if IsHTMX(r) {
@@ -426,13 +430,14 @@ func (d *Deps) handleAccountSubscriptionResume(w http.ResponseWriter, r *http.Re
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		sub, txErr := d.SubscriptionService.GetSubscriptionByCustomer(ctx, tx, id, customer.ID)
+		if _, txErr := d.SubscriptionService.GetSubscriptionByCustomer(ctx, tx, id, customer.ID); txErr != nil {
+			return txErr
+		}
+		resumed, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, customerActor(r))
 		if txErr != nil {
 			return txErr
 		}
-		_ = sub
-		_, txErr = d.SubscriptionService.ResumeSubscription(ctx, tx, id, customerActor(r))
-		return txErr
+		return d.enqueueResumeEmail(ctx, tx, resumed)
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -440,6 +445,19 @@ func (d *Deps) handleAccountSubscriptionResume(w http.ResponseWriter, r *http.Re
 	}
 
 	http.Redirect(w, r, "/account/subscriptions", http.StatusSeeOther)
+}
+
+// enqueueResumeEmail queues the customer's resume notification in the same
+// transaction as the resume itself, so the mail can never name a charge date a
+// rolled-back resume never set. Shared by the account and admin handlers: a
+// resume books a charge within 24 hours, and the customer needs to hear that
+// whoever pressed the button.
+func (d *Deps) enqueueResumeEmail(ctx context.Context, tx pgx.Tx, sub *domain.Subscription) error {
+	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionResumedArgs{
+		SubscriptionID: sub.ID,
+		CustomerID:     sub.CustomerID,
+	}, nil)
+	return err
 }
 
 // handleAccountSubscriptionRetry lets a customer trigger an immediate renewal

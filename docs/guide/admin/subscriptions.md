@@ -146,8 +146,10 @@ Use this when a customer asks to skip deliveries temporarily.
 Available when status is **Paused**. Resuming a subscription:
 
 - Sets the status back to **Active**.
-- Resets the billing period to start from now, with the next order scheduled one full interval into the future.
+- Books the next order at the **next renewal window** — the pre-dawn run, always within 24 hours — not a full interval out. Resuming means the customer wants coffee, so they get it on the next run rather than waiting a whole cycle. The normal cadence then continues from that order.
 - Clears any "pause until" date.
+
+The confirmation dialog names the exact date the order will be placed, and the customer is emailed that same date — for your resume as well as theirs. Nothing is charged at the moment you press Resume; the charge happens when the renewal runs.
 
 ### Cancel
 

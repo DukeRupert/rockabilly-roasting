@@ -571,6 +571,18 @@ type SubscriptionCancelledArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
+// SubscriptionResumedArgs tells the customer their paused subscription is live
+// again and names the date the next order is placed — within 24 hours of the
+// resume, so the notice has to go out promptly rather than wait for the order
+// confirmation.
+type SubscriptionResumedArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionResumedArgs) Kind() string { return "email:subscription_resumed" }
+
 // SubscriptionSkippedArgs tells the customer their next shipment was skipped,
 // when the following one bills, and how to undo it. SkippedCount is the number
 // of shipments skipped, or 0 when the customer named a restart date instead.

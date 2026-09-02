@@ -1,0 +1,85 @@
+package app_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/testutil"
+)
+
+// Resuming must book the next order at the next renewal window, not a fresh
+// interval out.
+//
+// The live case: a weekly subscriber paused, resumed at 9:51am on a Sunday, and
+// got nothing for eight days. Resume granted a whole new 7-day period and then
+// rounded the anchor *up* a day, because 2am on the period-end Sunday had
+// already passed. Nobody was told, and from the customer's side "resume" had
+// simply done nothing.
+func TestResumeSubscriptionBillsAtNextAnchor(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+
+	subStore := store.NewSubscriptionStore(nil)
+	subs := app.NewSubscriptionService(
+		subStore,
+		store.NewOrderStore(nil),
+		audit.NewAuditWriter(),
+		metrics.NewRegistry(),
+	).WithRenewalAnchor(la, 2)
+
+	customer := testutil.CreateCustomer(t, tx)
+	addr := testutil.CreateAddress(t, tx, customer.ID)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("RESUME-SCHED-12OZ"))
+	plan, err := subStore.CreatePlan(ctx, tx, store.CreatePlanParams{
+		Name:          "Weekly",
+		Interval:      domain.SubscriptionIntervalEvery7Days,
+		IntervalCount: 1,
+		IsActive:      true,
+	})
+	require.NoError(t, err)
+
+	sub := createTestSubscription(t, tx, customer.ID, plan.ID, variant.ID, addr.ID)
+	_, err = subStore.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPaused)
+	require.NoError(t, err)
+
+	before := time.Now()
+	resumed, err := subs.ResumeSubscription(ctx, tx, sub.ID, testutil.TestActor())
+	require.NoError(t, err)
+
+	// The promise the account page and the email both make.
+	assert.Equal(t, subs.ResumeOrderDate(before), resumed.NextOrderAt,
+		"resume must land on the date ResumeOrderDate advertises")
+
+	// The property that matters regardless of what time the test runs: an order
+	// inside a day, not inside a cadence.
+	assert.True(t, resumed.NextOrderAt.After(before), "the order must still be in the future")
+	assert.True(t, resumed.NextOrderAt.Before(before.Add(24*time.Hour+time.Minute)),
+		"a resume must not park the next order more than a day out, got %s", resumed.NextOrderAt)
+
+	// It is the anchor hour, so resumed subscriptions batch into the same
+	// pre-dawn window as every other renewal rather than firing on the minute
+	// the customer clicked.
+	assert.Equal(t, 2, resumed.NextOrderAt.In(la).Hour())
+
+	// Re-read: the struct is easy to patch in memory and miss the write.
+	stored, err := subStore.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+	assert.True(t, stored.NextOrderAt.Equal(resumed.NextOrderAt))
+	assert.True(t, stored.CurrentPeriodEnd.Equal(resumed.NextOrderAt),
+		"the period the resume opens must end when that order is placed, so the renewal walks the cadence on from it")
+	assert.Equal(t, domain.SubscriptionStatusActive, stored.Status)
+	assert.False(t, stored.RenewalBlocked(time.Now()))
+}

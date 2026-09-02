@@ -5,7 +5,7 @@ Nothing below was billed. No invoice was created in QuickBooks and no customer w
 {{if eq .Total 1}}One invoice{{else}}{{.Total}} invoices{{end}} totalling {{cents .TotalAmtCents}}.{{if gt .AwaitingManual 0}} {{.AwaitingManual}} more {{if eq .AwaitingManual 1}}order is{{else}}orders are{{end}} on accounts nothing invoices automatically - those need invoicing by hand.{{end}} {{if gt .Attention 0}}{{.Attention}} need{{if eq .Attention 1}}s{{end}} attention before going live.{{else}}Nothing needs attention.{{end}}
 
 {{range .Invoices}}{{if .Manual}}[MANUAL] {{end}}{{if .Problem}}[CHECK] {{end}}{{.OrderNumber}} - {{.Customer}} - {{cents .TotalCents}}
-  {{.Terms}} | due {{date .DueDate}}{{if .BillEmail}} | to {{.BillEmail}}{{end}}
+  {{.Terms}} | due {{day .DueDate}}{{if .BillEmail}} | to {{.BillEmail}}{{end}}
 {{if .Problem}}  {{.Problem}}
 {{end}}  {{.URL}}
 

@@ -19,8 +19,12 @@ type Renderer struct {
 	text *text.Template
 }
 
-// New parses all embedded HTML and text templates and returns a Renderer that
-// renders dates in loc.
+// New parses all embedded HTML and text templates and returns a Renderer whose
+// {{date}} func renders in loc. That is every dated field in every template —
+// order and shipment dates, renewal and skip dates, token expiry — so
+// MERCHANT_TIMEZONE is load-bearing for what customers read, not just for
+// dashboard boundaries. Calendar dates go through {{day}} instead and are not
+// converted; see formatDay.
 //
 // The zone is a constructor argument because a date in a customer's inbox has
 // to be the merchant's date. Timestamps arrive from pgx in the database session
@@ -43,10 +47,12 @@ func New(loc *time.Location) (*Renderer, error) {
 	funcMap := template.FuncMap{
 		"cents": formatCents,
 		"date":  dateIn,
+		"day":   formatDay,
 	}
 	textFuncMap := text.FuncMap{
 		"cents": formatCents,
 		"date":  dateIn,
+		"day":   formatDay,
 	}
 
 	htmlTmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFiles, "html/*.html")
@@ -609,6 +615,33 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("%s$%d.%02d", sign, dollars, remainder)
 }
 
+// formatDay renders a calendar date that was never an instant — a SQL `date`
+// column, or a "2006-01-02" string from an API. pgx hands those over as
+// midnight UTC, so converting them to a western zone lands at 5pm the *previous
+// day* and prints an invoice as due a day before QuickBooks says it is. A
+// calendar date has no zone to convert to: April 1st is April 1st.
+//
+// Templates say {{day .DueDate}} for these and {{date .X}} for anything that is
+// a real moment (placed_at, shipped_at, next_order_at). Getting the two mixed
+// up is silent — both compile, both print a plausible date — so the rule is
+// worth checking against the column type rather than guessing from the field
+// name.
+func formatDay(t any) string {
+	switch v := t.(type) {
+	case time.Time:
+		return v.Format("January 2, 2006")
+	case *time.Time:
+		if v == nil {
+			return ""
+		}
+		return v.Format("January 2, 2006")
+	default:
+		return ""
+	}
+}
+
+// formatDateIn renders an instant in loc. See formatDay for why a calendar date
+// must not come through here.
 func formatDateIn(t any, loc *time.Location) string {
 	switch v := t.(type) {
 	case time.Time:

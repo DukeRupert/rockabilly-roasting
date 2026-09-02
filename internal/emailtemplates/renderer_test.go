@@ -633,6 +633,57 @@ func TestRender_SubscriptionSkipUndone(t *testing.T) {
 	}
 }
 
+// A SQL `date` is not an instant, and must not be moved by the renderer's zone.
+//
+// pgx decodes `date` as midnight UTC. Converting that to America/Los_Angeles
+// lands at 5pm the previous day, which turned an invoice due April 1 into one
+// due March 31 — on wholesale billing mail, where the date is a payment
+// obligation and QuickBooks says otherwise. Caught in review after the zone
+// conversion was added for subscription dates and applied to every dated field
+// without checking which of them were calendar dates.
+func TestRender_CalendarDatesAreNotShiftedByTheZone(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	merchant, err := New(la)
+	require.NoError(t, err)
+
+	// Exactly what pgx produces for DATE '2026-04-01'.
+	due := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	html, text, err := merchant.Render("invoice_sent", InvoiceSentData{
+		CustomerName:  "Blue Heron Cafe",
+		InvoiceNumber: "INV-1001",
+		OrderNumber:   "ORD-1001",
+		Total:         12500,
+		DueDate:       &due,
+		StoreName:     "Rockabilly Roasting",
+		StoreURL:      "https://rockabillyroasting.com",
+	})
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "April 1, 2026", "the day on the invoice, not the day before")
+		assert.NotContains(t, body, "March 31, 2026")
+	}
+
+	// The same guard on the two other calendar-date surfaces: the past-due
+	// notice a customer reads, and the digest staff reconcile against QB.
+	html, text, err = merchant.Render("invoice_past_due", InvoicePastDueData{
+		CustomerName:  "Blue Heron Cafe",
+		InvoiceNumber: "INV-1001",
+		OrderNumber:   "ORD-1001",
+		AmountDue:     12500,
+		DueDate:       &due,
+		Stage:         1,
+		StoreName:     "Rockabilly Roasting",
+		StoreURL:      "https://rockabillyroasting.com",
+	})
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "April 1, 2026")
+		assert.NotContains(t, body, "March 31, 2026")
+	}
+}
+
 // A nil zone is refused rather than defaulted, so a wiring slip fails at
 // startup instead of quietly mailing UTC dates to customers. main.go builds the
 // renderer from MERCHANT_TIMEZONE, and there is no test over main; this is what

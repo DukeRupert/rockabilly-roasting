@@ -119,6 +119,11 @@ templ machineCard(m WholesaleMachineView, props WholesaleEquipmentProps) {
 		</div>
 		<div class="flex flex-wrap gap-x-8 gap-y-2 px-5 py-3 border-b-2 border-ink/20">
 			@machineFact("Last serviced", lastServicedLabel(m.LastServiced))
+			<!-- formatDate, not formatDateIn: installed_on and warranty_expires_on
+			     are `date` columns (migration 077), so they arrive as midnight UTC
+			     and converting them to a western zone would print the day before.
+			     A calendar date has no zone. Don't "fix" these by analogy with the
+			     subscription card. -->
 			if m.Equipment.InstalledOn != nil {
 				@machineFact("Installed", formatDate(*m.Equipment.InstalledOn))
 			}

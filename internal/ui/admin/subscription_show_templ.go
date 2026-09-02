@@ -1388,7 +1388,7 @@ func subscriptionActions(props SubscriptionShowProps) templ.Component {
 						Title: "Resume this subscription?",
 						Lead:  resumeHint(props),
 						Points: []string{
-							"The customer is emailed, and the mail names that date.",
+							"The customer is emailed the date that gets booked, which the toast will confirm — if this page has been open a while, that can be a day later than the one above.",
 							"Nothing is charged now — the renewal runs at the usual pre-dawn window.",
 						},
 						Confirm: "Resume subscription",

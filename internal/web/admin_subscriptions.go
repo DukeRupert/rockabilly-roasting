@@ -522,19 +522,23 @@ func (d *Deps) handleAdminSubscriptionPause(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+paused", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), "Subscription paused")
 }
 
-// resumeFlash names the date the resume actually booked. Kept out of the
-// handler and pure so the one thing worth asserting about it — that it reports
-// the booking rather than repeating whatever the confirmation dialog said —
-// can be tested without a database. Same date format as that dialog, so staff
-// are comparing like with like when the two disagree.
-func resumeFlash(bookedOn time.Time, loc *time.Location) string {
-	if loc == nil {
-		loc = time.UTC
-	}
-	return "Subscription resumed — next order " + bookedOn.In(loc).Format("Monday, January 2")
+// resumeFlash names the date the resume actually booked.
+//
+// It takes the resumed subscription rather than a date so that the booking is
+// the only thing it can report: a caller cannot hand it the render-time
+// advisory date without first inventing a subscription to carry it, which is
+// the mistake this whole line of work exists to prevent. Same date format as
+// the confirmation dialog, so staff compare like with like when the two
+// disagree.
+//
+// loc must not be nil — main.go fails startup on an unloadable
+// MERCHANT_TIMEZONE, and every other date on this page dereferences it the
+// same way.
+func resumeFlash(sub *domain.Subscription, loc *time.Location) string {
+	return "Subscription resumed — next order " + sub.NextOrderAt.In(loc).Format("Monday, January 2")
 }
 
 func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Request) {
@@ -551,13 +555,13 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 	// open overnight is the realistic case. So the flash reports the date that
 	// was actually booked rather than repeating a bare "resumed": whatever the
 	// dialog said, this is the one the scheduler will act on.
-	var bookedOn time.Time
+	var resumed *domain.Subscription
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		sub, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
 		if txErr != nil {
 			return txErr
 		}
-		bookedOn = sub.NextOrderAt
+		resumed = sub
 		return d.enqueueResumeEmail(ctx, tx, sub)
 	})
 	if err != nil {
@@ -565,7 +569,7 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), resumeFlash(bookedOn, d.MerchantTZ))
+	redirectFlash(w, r, "/admin/subscriptions/"+id.String(), resumeFlash(resumed, d.MerchantTZ))
 }
 
 // handleAdminSubscriptionRetry triggers an immediate renewal charge on a

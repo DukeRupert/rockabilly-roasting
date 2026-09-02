@@ -628,8 +628,8 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	}
 
 	// Resuming means "send my coffee", not "start me a fresh free interval".
-	// The next order is placed at the next renewal window — the following
-	// pre-dawn run, never a second one — and the cadence runs on from there.
+	// The next order is placed at the next renewal window — the next pre-dawn
+	// run, never a second one — and the cadence runs on from there.
 	// (Not "within 24 hours": the anchor is a wall-clock hour, and the night the
 	// clocks go back stretches that gap to 24h45m. See
 	// TestAnchorRenewalTimeAcrossDST.) Until this, resume handed out

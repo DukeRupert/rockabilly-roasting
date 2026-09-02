@@ -151,7 +151,7 @@ Available when status is **Paused**. Resuming a subscription:
 
 Nothing is charged at the moment you press Resume; the charge happens when the renewal runs. The customer is emailed either way — your resume as well as theirs — and the mail names the booked date.
 
-**Go by the date in the green toast, not the one in the dialog.** The confirmation dialog names the window as of the moment the page was *rendered*. If the page has been open across the renewal hour — an overnight tab is the usual way — the run it named has already gone, and the resume books the next one. That is why the toast after Resume reads "Subscription resumed — next order Friday, September 11": it reports what was actually booked, and it is the date the customer's email will carry. Reload the page before resuming if you want the dialog and the booking to agree.
+**Go by the date in the green toast, not the one in the dialog.** The confirmation dialog names the window as of the moment the page was *rendered*. If the page has been open across the renewal hour — an overnight tab is the usual way — the run it named has already gone, and the resume books the next one. That is why the toast after Resume reads "Subscription resumed — next order Friday, September 11": it reports what was actually booked. Reload the page before resuming if you want the dialog and the booking to agree.
 
 ### Cancel
 

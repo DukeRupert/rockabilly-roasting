@@ -615,11 +615,16 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("%s$%d.%02d", sign, dollars, remainder)
 }
 
-// formatDay renders a calendar date that was never an instant — a SQL `date`
-// column, or a "2006-01-02" string from an API. pgx hands those over as
-// midnight UTC, so converting them to a western zone lands at 5pm the *previous
-// day* and prints an invoice as due a day before QuickBooks says it is. A
-// calendar date has no zone to convert to: April 1st is April 1st.
+// formatDay renders a calendar date that was never an instant: a SQL `date`
+// column, or an API's "2006-01-02" once a caller has parsed it — QuickBooks'
+// due dates arrive as strings and are parsed in platform/quickbooks before they
+// reach a template. Only time.Time and *time.Time are handled; a raw string
+// falls through to "", so parse at the boundary rather than passing one here.
+//
+// pgx hands calendar dates over as midnight UTC, so converting them to a
+// western zone lands at 5pm the *previous day* and prints an invoice as due a
+// day before QuickBooks says it is. A calendar date has no zone to convert to:
+// April 1st is April 1st.
 //
 // Templates say {{day .DueDate}} for these and {{date .X}} for anything that is
 // a real moment (placed_at, shipped_at, next_order_at). Getting the two mixed

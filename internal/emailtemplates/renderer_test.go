@@ -666,7 +666,10 @@ func TestRender_CalendarDatesAreNotShiftedByTheZone(t *testing.T) {
 	}
 
 	// The same guard on the two other calendar-date surfaces: the past-due
-	// notice a customer reads, and the digest staff reconcile against QB.
+	// notice a customer reads, and the digest staff reconcile against QB. Both
+	// rendered, not just named — a previous round of this branch claimed a
+	// surface in a comment and asserted nothing about it, and reverting that
+	// template stayed green.
 	html, text, err = merchant.Render("invoice_past_due", InvoicePastDueData{
 		CustomerName:  "Blue Heron Cafe",
 		InvoiceNumber: "INV-1001",
@@ -676,6 +679,31 @@ func TestRender_CalendarDatesAreNotShiftedByTheZone(t *testing.T) {
 		Stage:         1,
 		StoreName:     "Rockabilly Roasting",
 		StoreURL:      "https://rockabillyroasting.com",
+	})
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "April 1, 2026")
+		assert.NotContains(t, body, "March 31, 2026")
+	}
+
+	// The digest reads qb_invoice_previews.due_date, also a date column. Staff
+	// reconcile these rows against QuickBooks line by line, so a day's drift
+	// here reads as a discrepancy in the books rather than in the mail.
+	html, text, err = merchant.Render("qb_shadow_digest", QBShadowDigestData{
+		Invoices: []QBShadowDigestInvoice{{
+			OrderNumber: "ORD-1001",
+			Customer:    "Blue Heron Cafe",
+			TotalCents:  12500,
+			Terms:       "Net 7",
+			DueDate:     due,
+			BillEmail:   "ap@blueheron.example",
+			URL:         "https://rockabillyroasting.com/admin/orders/1001",
+		}},
+		Total:         1,
+		TotalAmtCents: 12500,
+		Listed:        1,
+		Days:          7,
+		ReviewURL:     "https://rockabillyroasting.com/admin/orders",
 	})
 	require.NoError(t, err)
 	for _, body := range []string{html, text} {

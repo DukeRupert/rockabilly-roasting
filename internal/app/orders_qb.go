@@ -450,6 +450,46 @@ func overdueReminderStageFor(daysPastDue int) int {
 	return stage
 }
 
+// InvoiceDueDate returns the day a NET-terms invoice falls due: termsDays
+// calendar days after the order's own day, in the merchant's zone.
+//
+// Counted in days on the merchant's calendar rather than by adding spans to an
+// instant. PlacedAt arrives from pgx in UTC, where an order placed in the
+// merchant's evening is already tomorrow, so Add(7*24h) returned the 9th for an
+// order the shop booked on the 1st: NET 7 falling due on day eight. Only orders
+// placed after the zone's UTC-midnight crossing were affected and no others,
+// which is a quiet way to be wrong.
+//
+// It was not, however, unobserved. Three places used to compute this: the
+// QuickBooks payload and our shadow preview row shared the faulty expression,
+// while the admin order page counted the same terms its own way and re-zoned
+// for display, landing on the right day. So the order detail page could show a
+// Due row of September 8 beside a QuickBooks invoice due September 9 — the
+// disagreement was on screen, next to the invoice number, for anyone who
+// happened to compare them. All three now come through here.
+//
+// Two distinct faults, worth keeping apart. Adding 24-hour spans to a UTC
+// instant does not drift across a DST change, because UTC has none — only the
+// starting day was ever wrong there. The admin page's AddDate did drift: it
+// preserves the UTC time-of-day, so re-zoning the result moved by the offset
+// whenever a term spanned a transition.
+//
+// The result is midnight UTC, which is how a SQL date column round-trips and
+// what QuickBooks' YYYY-MM-DD wants — a calendar day carries no time of day and
+// must not be re-zoned on the way out (see the {{day}} template func).
+//
+// The basis is deliberately the order date, unchanged: this fixes which day
+// that is, not what the terms are counted from.
+func InvoiceDueDate(placedAt time.Time, termsDays int, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	y, m, d := placedAt.In(loc).Date()
+	// time.Date normalizes an out-of-range day, so month and year ends need no
+	// special case: 28 February + 7 is 7 March.
+	return time.Date(y, m, d+termsDays, 0, 0, 0, 0, time.UTC)
+}
+
 // EffectivePaymentTermsDays returns a customer's NET payment terms in days,
 // falling back to the house default (net-7) when none are set. The QB invoice
 // job uses it to set the invoice due date; from then on QB's due date is

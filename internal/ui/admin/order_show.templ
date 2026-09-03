@@ -56,8 +56,14 @@ type OrderShowProps struct {
 	// Activity is the order's audit history — entries against the order itself
 	// merged with those against its shipments, newest first.
 	Activity []domain.AuditEntry
-	// PaymentDueAt is when a terms-billed (wholesale) order is due, computed
-	// from the customer's NET terms. Nil for card-paid retail orders.
+	// PaymentDueAt is when a terms-billed (wholesale) order is due, counted from
+	// the customer's NET terms by app.InvoiceDueDate. Nil for card-paid retail
+	// orders.
+	//
+	// A calendar date, carried as midnight UTC — the shop's day was already
+	// resolved when it was computed. Render it with a bare .Format: re-zoning it
+	// westward prints the day before, and this row sits beside the QuickBooks
+	// invoice number, which staff read as one answer.
 	PaymentDueAt *time.Time
 	// CouponCode is the code redeemed against this order, if any. The
 	// adjustments table shows the discount's *name*; support calls are about
@@ -1197,10 +1203,14 @@ templ orderPaymentCard(props OrderShowProps) {
 			}
 			if props.PaymentDueAt != nil {
 				@railRow("Due") {
+					<!-- No .In(MerchantTZ): PaymentDueAt is a calendar date, already
+					     resolved in the shop's zone by app.InvoiceDueDate and carried
+					     as midnight UTC — the same shape the date column and QuickBooks
+					     use. Re-zoning it westward would print the day before. -->
 					if props.AccountPastDue {
-						<span class="font-semibold text-rr-red">{ props.PaymentDueAt.In(props.MerchantTZ).Format("January 2, 2006") }</span>
+						<span class="font-semibold text-rr-red">{ props.PaymentDueAt.Format("January 2, 2006") }</span>
 					} else {
-						{ props.PaymentDueAt.In(props.MerchantTZ).Format("January 2, 2006") }
+						{ props.PaymentDueAt.Format("January 2, 2006") }
 					}
 				}
 			}

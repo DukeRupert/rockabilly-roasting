@@ -11,10 +11,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// termsArithmetic matches anyone counting payment terms by hand: adding a
-// multiple of a day, or AddDate-ing a terms count, onto an order timestamp.
-var termsArithmetic = regexp.MustCompile(
-	`(?:PlacedAt|placedAt)\s*\.\s*(?:Add\s*\([^)]*(?:termsDays|TermsDays|PaymentTermsDays)|AddDate\s*\([^)]*(?:termsDays|TermsDays|PaymentTermsDays))`)
+// termsArithmetic matches any arithmetic on an order's placement time.
+//
+// Deliberately wider than "an expression mentioning payment terms": the first
+// version of this only matched when the terms identifier appeared inline before
+// the closing paren, so hoisting it into a local variable — days :=
+// EffectivePaymentTermsDays(customer); order.PlacedAt.AddDate(0, 0, days) —
+// reintroduced the bug invisibly. No production code adds anything to PlacedAt
+// for any other purpose, so the broad form costs nothing; a future legitimate
+// use should read this failure and decide deliberately.
+var termsArithmetic = regexp.MustCompile(`(?:PlacedAt|placedAt)\s*\.\s*Add(?:Date)?\s*\(`)
+
+// knownBad are shapes this check exists to reject. Asserted against the regex
+// itself, because everything below looks for the *absence* of matches: neuter
+// the pattern and a healthy repo and a broken one become indistinguishable.
+// (This is the positive control the renewal-options test gets from its
+// GreaterOrEqual on the number of call sites found — that guard cannot work
+// here, where zero matches is the healthy state.)
+var knownBad = []string{
+	`due := order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour)`,
+	`due := order.PlacedAt.AddDate(0, 0, app.EffectivePaymentTermsDays(customer))`,
+	`due := order.PlacedAt.AddDate(0, 0, days)`,
+	`x := placedAt.Add(7 * 24 * time.Hour)`,
+	`y := order.PlacedAt .AddDate( 0, 0, n )`,
+}
+
+func TestTermsArithmeticPatternStillMatchesTheBugItLooksFor(t *testing.T) {
+	for _, sample := range knownBad {
+		assert.Regexpf(t, termsArithmetic, sample,
+			"the pattern no longer recognises %q, so the sweep below is passing "+
+				"over call sites it can no longer see", sample)
+	}
+	// And does not fire on the shape that replaced them.
+	assert.NotRegexp(t, termsArithmetic,
+		`due := app.InvoiceDueDate(order.PlacedAt, termsDays, loc)`,
+		"the fixed form must not be reported as the bug")
+}
 
 // TestEveryInvoiceDueDateGoesThroughInvoiceDueDate reads the source, because
 // this bug did not live in any one call site.
@@ -29,8 +61,13 @@ var termsArithmetic = regexp.MustCompile(
 //
 // Each of the three was locally reasonable. What was wrong was that there were
 // three. A test over InvoiceDueDate's return value cannot see that, so this
-// asserts the property that actually matters: nobody counts payment terms
-// anywhere else.
+// reads the source instead: nothing does arithmetic on an order's placement
+// time, anywhere.
+//
+// It asserts an absence, which is a weaker thing than it looks — a pattern that
+// has quietly stopped matching produces the same green as a clean repo. The
+// matcher is therefore kept honest separately, by
+// TestTermsArithmeticPatternStillMatchesTheBugItLooksFor.
 func TestEveryInvoiceDueDateGoesThroughInvoiceDueDate(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)

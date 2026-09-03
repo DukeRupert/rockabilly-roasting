@@ -56,8 +56,14 @@ type OrderShowProps struct {
 	// Activity is the order's audit history — entries against the order itself
 	// merged with those against its shipments, newest first.
 	Activity []domain.AuditEntry
-	// PaymentDueAt is when a terms-billed (wholesale) order is due, computed
-	// from the customer's NET terms. Nil for card-paid retail orders.
+	// PaymentDueAt is when a terms-billed (wholesale) order is due, counted from
+	// the customer's NET terms by app.InvoiceDueDate. Nil for card-paid retail
+	// orders.
+	//
+	// A calendar date, carried as midnight UTC — the shop's day was already
+	// resolved when it was computed. Render it with a bare .Format: re-zoning it
+	// westward prints the day before, and this row sits beside the QuickBooks
+	// invoice number, which staff read as one answer.
 	PaymentDueAt *time.Time
 	// CouponCode is the code redeemed against this order, if any. The
 	// adjustments table shows the discount's *name*; support calls are about

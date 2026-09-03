@@ -35,7 +35,10 @@ type CreateQBInvoiceWorker struct {
 	qb             quickbooks.Client
 	// loc is the merchant's zone. It decides which calendar day an order was
 	// placed on, and therefore which day a NET-terms invoice falls due — an
-	// evening order is already tomorrow in UTC.
+	// evening order is already tomorrow in UTC. Unguarded here: main.go fails
+	// startup on an unloadable zone, and app.InvoiceDueDate treats nil as UTC,
+	// so a second fallback would only hide a wiring mistake that
+	// TestCreateQBInvoiceWorkerIsWiredWithTheMerchantZone exists to catch.
 	loc         *time.Location
 	audit       *audit.AuditWriter
 	pool        *pgxpool.Pool
@@ -58,9 +61,6 @@ func NewCreateQBInvoiceWorker(
 	riverClient *river.Client[pgx.Tx],
 	m *metrics.Registry,
 ) *CreateQBInvoiceWorker {
-	if loc == nil {
-		loc = time.UTC
-	}
 	return &CreateQBInvoiceWorker{
 		orders:         orders,
 		customers:      customers,

@@ -453,19 +453,26 @@ func overdueReminderStageFor(daysPastDue int) int {
 // InvoiceDueDate returns the day a NET-terms invoice falls due: termsDays
 // calendar days after the order's own day, in the merchant's zone.
 //
-// Counted in days on the merchant's calendar rather than by adding 24-hour
-// spans to an instant. PlacedAt arrives from pgx in UTC, where an order placed
-// at 7pm in Los Angeles is already tomorrow, so Add(7*24h) returned the 9th for
-// an order the shop booked on the 1st: NET 7 falling due on day eight. Any
-// order after ~4pm local was affected and no other order was, which is a
-// quiet way to be wrong — and it was invisible from inside because the same
-// expression fed both QuickBooks and our own preview row, so the two systems
-// agreed with each other while both disagreed with the calendar the shop and
-// the cafe were reading.
+// Counted in days on the merchant's calendar rather than by adding spans to an
+// instant. PlacedAt arrives from pgx in UTC, where an order placed in the
+// merchant's evening is already tomorrow, so Add(7*24h) returned the 9th for an
+// order the shop booked on the 1st: NET 7 falling due on day eight. Only orders
+// placed after the zone's UTC-midnight crossing were affected and no others,
+// which is a quiet way to be wrong.
 //
-// (Only the starting day was ever wrong. Adding 24-hour spans to a UTC instant
-// does not drift across a DST boundary, because UTC has none; a midday order
-// spanning the March change came out the same either way.)
+// It was not, however, unobserved. Three places used to compute this: the
+// QuickBooks payload and our shadow preview row shared the faulty expression,
+// while the admin order page counted the same terms its own way and re-zoned
+// for display, landing on the right day. So the order detail page could show a
+// Due row of September 8 beside a QuickBooks invoice due September 9 — the
+// disagreement was on screen, next to the invoice number, for anyone who
+// happened to compare them. All three now come through here.
+//
+// Two distinct faults, worth keeping apart. Adding 24-hour spans to a UTC
+// instant does not drift across a DST change, because UTC has none — only the
+// starting day was ever wrong there. The admin page's AddDate did drift: it
+// preserves the UTC time-of-day, so re-zoning the result moved by the offset
+// whenever a term spanned a transition.
 //
 // The result is midnight UTC, which is how a SQL date column round-trips and
 // what QuickBooks' YYYY-MM-DD wants — a calendar day carries no time of day and

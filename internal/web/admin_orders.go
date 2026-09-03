@@ -604,7 +604,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		BillingAddress:     billingAddress,
 		CustomerOrderCount: customerOrderCount,
 		CouponCode:         couponCode,
-		PaymentDueAt:       orderPaymentDueAt(order, customer),
+		PaymentDueAt:       orderPaymentDueAt(order, customer, d.MerchantTZ),
 		Activity:           activity,
 	}
 
@@ -618,14 +618,20 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 // orderPaymentDueAt is when a terms-billed order is due: placement plus the
 // customer's NET terms. Card-paid retail orders settle at checkout and have no
 // due date, so they get nil.
-func orderPaymentDueAt(order *domain.Order, customer *domain.Customer) *time.Time {
+func orderPaymentDueAt(order *domain.Order, customer *domain.Customer, loc *time.Location) *time.Time {
 	if order.Channel != domain.OrderChannelWholesale || customer == nil {
 		return nil
 	}
 	switch order.PaymentStatus {
 	case domain.PaymentStatusPendingInvoice, domain.PaymentStatusInvoiced,
 		domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
-		due := order.PlacedAt.AddDate(0, 0, app.EffectivePaymentTermsDays(customer))
+		// app.InvoiceDueDate, not arithmetic of its own: this row sits beside
+		// the QuickBooks invoice number, and staff read the two as one answer.
+		// It used to AddDate on the UTC instant and re-zone for display, which
+		// agreed with QB on ordinary orders and disagreed by a day whenever a
+		// term spanned a DST change — AddDate keeps the UTC time-of-day, so
+		// re-zoning it moves by the offset.
+		due := app.InvoiceDueDate(order.PlacedAt, app.EffectivePaymentTermsDays(customer), loc)
 		return &due
 	default:
 		return nil

@@ -1197,10 +1197,14 @@ templ orderPaymentCard(props OrderShowProps) {
 			}
 			if props.PaymentDueAt != nil {
 				@railRow("Due") {
+					<!-- No .In(MerchantTZ): PaymentDueAt is a calendar date, already
+					     resolved in the shop's zone by app.InvoiceDueDate and carried
+					     as midnight UTC — the same shape the date column and QuickBooks
+					     use. Re-zoning it westward would print the day before. -->
 					if props.AccountPastDue {
-						<span class="font-semibold text-rr-red">{ props.PaymentDueAt.In(props.MerchantTZ).Format("January 2, 2006") }</span>
+						<span class="font-semibold text-rr-red">{ props.PaymentDueAt.Format("January 2, 2006") }</span>
 					} else {
-						{ props.PaymentDueAt.In(props.MerchantTZ).Format("January 2, 2006") }
+						{ props.PaymentDueAt.Format("January 2, 2006") }
 					}
 				}
 			}

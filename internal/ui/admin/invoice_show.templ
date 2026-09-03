@@ -44,7 +44,10 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<p class="mt-1 text-sm text-rr-muted">
 				Created { props.Invoice.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 				if props.Invoice.DueDate != nil {
-					— Due { props.Invoice.DueDate.In(props.MerchantTZ).Format("January 2, 2006") }
+					<!-- No .In(MerchantTZ): invoices.due_date is a date column, so pgx
+					     hands it over as midnight UTC and re-zoning westward prints the
+					     day before. CreatedAt above is a timestamptz and does want it. -->
+					— Due { props.Invoice.DueDate.Format("January 2, 2006") }
 				}
 				<!-- A voided invoice said so in its badge but never said when. -->
 				if props.Invoice.VoidedAt != nil {

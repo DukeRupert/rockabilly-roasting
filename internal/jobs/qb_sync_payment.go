@@ -19,16 +19,25 @@ import (
 
 // SyncQBPaymentWorker records a manual payment in QBO against the linked invoice.
 //
-// Deliberately not gated on the billing mode, unlike SyncQBCustomerWorker.
-// It only ever acts on an invoice that already exists in QuickBooks, which
-// test mode cannot produce — so reaching it means a real invoice is owed and
-// a real payment has been recorded against it. Refusing that write because the
-// shop happens to be in test mode would strand money that has actually
-// changed hands, which is a worse failure than the guarantee is worth here.
+// Gated on the billing mode like every other worker that writes to the
+// merchant's books. The gate reads as redundant — this worker only acts on an
+// order that already carries a QB invoice id, and only a live run ever sets
+// one — but "redundant" here rests on the whole history of a column rather
+// than on a check. Go live, bill some orders, switch back to test mode, and
+// recording a payment against one of those orders would post a Payment into
+// the real company while the admin says nothing is being written. Test mode
+// is worth stating outright rather than inferring.
+//
+// The earlier reasoning for leaving it ungated was that refusing would strand
+// money that had actually changed hands. It does not: RecordPayment has
+// already committed the payment in Hiri before this job runs, and the skip
+// writes an audit entry naming the invoice and amount, so what is owed in
+// QuickBooks can be settled by hand or after going live.
 type SyncQBPaymentWorker struct {
 	river.WorkerDefaults[SyncQBPaymentArgs]
 	orders    *store.OrderStore
 	customers *store.CustomerStore
+	settings  *store.SettingsStore
 	qb        quickbooks.Client
 	audit     *audit.AuditWriter
 	pool      *pgxpool.Pool
@@ -39,6 +48,7 @@ type SyncQBPaymentWorker struct {
 func NewSyncQBPaymentWorker(
 	orders *store.OrderStore,
 	customers *store.CustomerStore,
+	settings *store.SettingsStore,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
@@ -47,6 +57,7 @@ func NewSyncQBPaymentWorker(
 	return &SyncQBPaymentWorker{
 		orders:    orders,
 		customers: customers,
+		settings:  settings,
 		qb:        qb,
 		audit:     auditWriter,
 		pool:      pool,
@@ -80,11 +91,17 @@ func (w *SyncQBPaymentWorker) Work(ctx context.Context, job *river.Job[SyncQBPay
 }
 
 func (w *SyncQBPaymentWorker) work(ctx context.Context, job *river.Job[SyncQBPaymentArgs]) error {
-	// Read order to get QB invoice ID and customer ID
+	// Read order to get QB invoice ID and customer ID, and the billing mode
+	// alongside it — both are needed before anything can be decided.
 	var order *domain.Order
+	var mode domain.QBBillingMode
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
+		if txErr != nil {
+			return txErr
+		}
+		mode, txErr = w.settings.GetQBBillingMode(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -98,6 +115,39 @@ func (w *SyncQBPaymentWorker) work(ctx context.Context, job *river.Job[SyncQBPay
 			"job_id", job.ID,
 		)
 		return nil
+	}
+
+	// Test mode writes nothing to the merchant's books. Checked after the
+	// no-invoice return above, not before it: during a genuine proof period no
+	// order carries a QB invoice at all, and announcing a skipped sync for
+	// every wholesale payment would bury the case this is here for — an
+	// invoice really does exist in QuickBooks and the switch says don't touch
+	// it. The payment is already recorded in Hiri; this says what QuickBooks
+	// still shows as owed.
+	if !mode.IsLive() {
+		slog.WarnContext(ctx, "qb sync payment: skipped, billing is in test mode — apply this payment in QuickBooks by hand",
+			"order_id", order.ID,
+			"invoice_id", job.Args.InvoiceID,
+			"qb_invoice_id", *order.QBInvoiceID,
+			"amount_cents", job.Args.Amount,
+			"job_id", job.ID,
+		)
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			return w.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    "qb_sync_payment",
+				Action:       audit.AuditQBPaymentSyncSkipped,
+				ResourceType: "invoice",
+				ResourceID:   job.Args.InvoiceID,
+				Metadata: map[string]any{
+					"reason":        "billing is in test mode",
+					"qb_invoice_id": *order.QBInvoiceID,
+					"amount_cents":  job.Args.Amount,
+					"method":        job.Args.Method,
+					"river_job_id":  job.ID,
+				},
+			})
+		})
 	}
 
 	if order.CustomerID == nil {

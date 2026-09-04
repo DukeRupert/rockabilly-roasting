@@ -181,6 +181,14 @@ assuming the integration is broken.
 immediately; invoices already in QuickBooks are untouched, and reconciliation
 of them carries on.
 
+One thing to watch after backing out: recording a payment against an order
+that *was* billed while live no longer posts that payment to QuickBooks —
+test mode writes nothing to the merchant's books, without exception. The
+payment is still recorded in Hiri, and the audit log carries a
+`qb.payment_sync_skipped` entry naming the invoice and amount, but the
+QuickBooks invoice keeps showing the full balance owed until someone applies
+the payment there by hand.
+
 **Disconnect** drops the OAuth connection entirely and stops all automated
 invoicing until someone reconnects. Nothing is deleted on Intuit's side.
 

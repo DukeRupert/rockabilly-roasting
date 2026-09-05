@@ -28,12 +28,10 @@ import (
 // from environment variables a test cannot see, and this checklist is the only
 // thing pinning them.
 //
-// What privacy_hosts_test.go enforces for real is the other kind: hosts the
-// rendered page tells the browser to fetch from. Today that is Google Fonts,
-// Google Analytics, jsDelivr, Sentry and Cloudflare's CDN domain. Rather than
-// restate that split here — the last two attempts at describing it were both
-// wrong, once in each direction — read the map in that file, which is the
-// enumeration rather than a claim about it.
+// Hosts the rendered page tells the browser to fetch from are enforced for
+// real in privacy_hosts_test.go. Which vendors those are is written in that
+// file's maps; three attempts to restate the split here were wrong in three
+// different ways, so this one points instead of summarising.
 func renderPrivacy(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer

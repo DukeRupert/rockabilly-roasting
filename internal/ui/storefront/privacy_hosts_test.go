@@ -11,41 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Four rounds of review on this page went the same way: a correction landed,
-// and the correction stated something about the code that nothing enforced.
-// This file is the attempt to stop asserting and start measuring — it renders
-// the real page and reads what is actually in the markup.
-//
-// It covers what the storefront layout loads. Vendors reached from the server —
-// Shippo, Stripe, Postmark, Intuit, Broadwave, Google Geocoding — are built in
-// run() from environment variables and are invisible here; those are pinned
-// only by the checklist in privacy_vendors_test.go, which says so.
+// Five rounds of review on this page went the same way: a correction landed,
+// and the correction described the code in a sentence nothing enforced. So the
+// comments here are kept to what the code does, and the checks read the
+// rendered markup rather than a list of names kept alongside it.
 
-// resourceTag matches any element except an anchor. Anchors are excluded
-// because a link in prose is something the reader may click, not something the
-// browser fetches — quickbooks.intuit.com is named in the policy text and is
-// not a resource load.
-var resourceTag = regexp.MustCompile(`(?is)<([a-z][a-z0-9]*)\b([^>]*)>`)
+// anchorTag matches a link's opening tag. Links are cut out before scanning:
+// a URL a reader may click is not a host the browser fetches, and the policy
+// prose links to intuit.com and google.com by name.
+var anchorTag = regexp.MustCompile(`(?is)<a\b[^>]*>`)
 
-// attrHost pulls a host out of any attribute value in a tag: src, href, srcset,
-// poster, content, data-whatever. Deliberately attribute-agnostic, and
-// deliberately accepting protocol-relative "//host" as well as "https://host",
-// because the previous version of this test looked only for src/href with an
-// explicit https:// and a reviewer walked a tracker past it twice — once in a
-// <source srcset>, once protocol-relative.
+// attrHost pulls hosts out of an attribute string, from any attribute name and
+// from protocol-relative URLs as well as https:// ones.
 var attrHost = regexp.MustCompile(`(?i)(?:https:)?//([a-z0-9][a-z0-9.-]*\.[a-z]{2,})`)
 
-// disclosedAs maps a host the browser contacts to the name the privacy page
-// must call it by.
-//
-// cdn.rockabillyroasting.shop is ours by domain name only: it fronts Cloudflare
-// R2 through Image Transformations, so a visitor loading from it is contacting
-// Cloudflare, and the page says so. Treating it as "ours" is what let a
-// reviewer rename Cloudflare to Fastly on the policy with this test still green.
-//
-// A host absent from this map fails too. That is the point — a new external
-// host is a decision about disclosure, and the failure is what forces someone
-// to make it.
+// disclosedAs is the register of disclosure decisions: for each external host
+// any storefront page contacts, the name the privacy policy must call it by.
+// It is not scoped to the page under test — challenges.cloudflare.com is loaded
+// by the wholesale application form and js.stripe.com by the checkout bundle,
+// and both belong on the record whether or not a test here can reach them.
 var disclosedAs = map[string]string{
 	"fonts.googleapis.com":        "Google Fonts",
 	"fonts.gstatic.com":           "Google Fonts",
@@ -53,38 +37,77 @@ var disclosedAs = map[string]string{
 	"cdn.jsdelivr.net":            "jsDelivr",
 	"js.sentry-cdn.com":           "Sentry",
 	"cdn.rockabillyroasting.shop": "Cloudflare",
+	"challenges.cloudflare.com":   "Cloudflare",
+	"js.stripe.com":               "Stripe",
 }
 
-// hostsLoadedBy returns every external host the rendered markup tells the
-// browser to fetch from.
-func hostsLoadedBy(t *testing.T, page string) map[string]bool {
-	t.Helper()
+// hostsThePrivacyPageLoads is what this page is known to pull in today, kept
+// separate from disclosedAs so that recording a disclosure for a host another
+// page loads cannot break this one. Its purpose is to fail when the extractor
+// goes blind — a smaller set means tags stopped matching, not that a vendor
+// left.
+var hostsThePrivacyPageLoads = []string{
+	"fonts.googleapis.com",
+	"fonts.gstatic.com",
+	"www.googletagmanager.com",
+	"cdn.jsdelivr.net",
+	"js.sentry-cdn.com",
+	"cdn.rockabillyroasting.shop",
+}
+
+// namedNotFetched are hosts the markup mentions as data rather than as
+// something to fetch. The JSON-LD block lists the shop's social profiles under
+// sameAs and cites schema.org by URL; none of it causes a request, so none of
+// it is a disclosure question. Everything else that appears outside a link is
+// treated as a fetch.
+//
+// This is a judgement, and it is written down because scanning element bodies
+// means judgements like it are unavoidable — the alternative is scanning only
+// attributes, which is what let a reviewer put a tracker in an inline script
+// and walk it past.
+var namedNotFetched = map[string]bool{
+	"www.facebook.com":  true, // JSON-LD sameAs
+	"www.instagram.com": true, // JSON-LD sameAs
+	"schema.org":        true, // JSON-LD vocabulary
+
+	// Our own origin, in canonical URLs and JSON-LD. Reaching us is not a
+	// third-party disclosure. Note this is the apex domain only:
+	// cdn.rockabillyroasting.shop is our name in front of Cloudflare R2 and is
+	// disclosed as Cloudflare, which is why it is in disclosedAs and not here.
+	"rockabillyroasting.com": true,
+}
+
+// externalHosts returns every host named anywhere in the page except inside a
+// link or in namedNotFetched. Attributes and element bodies alike, so a pixel
+// appended by an inline <script> or pulled in by an @import inside <style> is
+// caught — the layout already carries three inline script blocks, which makes
+// that the likeliest way the next undisclosed host arrives.
+func externalHosts(page string) map[string]bool {
 	hosts := map[string]bool{}
-	for _, tag := range resourceTag.FindAllStringSubmatch(page, -1) {
-		if strings.EqualFold(tag[1], "a") {
-			continue
-		}
-		for _, m := range attrHost.FindAllStringSubmatch(tag[2], -1) {
-			hosts[strings.ToLower(m[1])] = true
+	for _, m := range attrHost.FindAllStringSubmatch(anchorTag.ReplaceAllString(page, ""), -1) {
+		host := strings.ToLower(m[1])
+		if !namedNotFetched[host] {
+			hosts[host] = true
 		}
 	}
 	return hosts
 }
 
-func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
+func renderPrivacyPage(t *testing.T) string {
+	t.Helper()
 	var buf bytes.Buffer
 	require.NoError(t, PrivacyPage(PrivacyProps{}).Render(context.Background(), &buf))
-	page := buf.String()
+	return buf.String()
+}
 
-	hosts := hostsLoadedBy(t, page)
+func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
+	page := renderPrivacyPage(t)
+	hosts := externalHosts(page)
 
-	// A floor, not a smoke check. If the regex stops matching some tags the
-	// count drops and this fails, where an "is it empty" guard would have
-	// passed — partial blindness is the failure mode that matters for a test
-	// whose job is to notice something new.
-	assert.GreaterOrEqual(t, len(hosts), len(disclosedAs),
-		"found only %d external hosts (%v) but %d are known to be loaded — the extractor has gone blind to some tags",
-		len(hosts), hosts, len(disclosedAs))
+	for _, want := range hostsThePrivacyPageLoads {
+		assert.True(t, hosts[want],
+			"%s is loaded by this page but the extractor did not find it — it has gone blind to some tags, which is how a new host would slip past", want)
+	}
 
 	for host := range hosts {
 		vendor, known := disclosedAs[host]
@@ -96,19 +119,34 @@ func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 	}
 }
 
-// googleEntry finds the vendor list items naming Google. The policy states a
-// count, and a stated count is only worth more than a vague phrase if something
-// checks it — the previous version of this test counted a hardcoded list of
-// three names, so it could detect a Google being removed and never one being
-// added, which is the direction that makes the page false.
-var googleEntry = regexp.MustCompile(`(?i)<li>.*?Google.*?</li>`)
+// vendorList returns the contents of the third-party <ul>, located by an entry
+// only it contains. Cutting the list out is what makes the count below mean
+// what the policy says it means: an earlier version matched across list items
+// and section boundaries, so it counted runs of markup rather than entries, and
+// its passing was arithmetic luck.
+func vendorList(t *testing.T, html string) string {
+	t.Helper()
+	const anchor = "Stripe</strong>"
+	at := strings.Index(html, anchor)
+	require.NotEqual(t, -1, at, "cannot find the vendor list: no Stripe entry")
+	open := strings.LastIndex(html[:at], "<ul")
+	require.NotEqual(t, -1, open, "vendor list entry is not inside a <ul>")
+	end := strings.Index(html[open:], "</ul>")
+	require.NotEqual(t, -1, end, "vendor list <ul> is never closed")
+	return html[open : open+end]
+}
 
+// The policy states how many of its vendors are Google. A stated count beats a
+// vague phrase only if something checks it, and it has to count the same thing
+// the sentence does — services named, not list items, so that merging two
+// Google entries into one bullet cannot slip past.
 func TestGoogleCountMatchesTheProse(t *testing.T) {
 	html := renderPrivacy(t)
 
-	found := googleEntry.FindAllString(html, -1)
-	assert.Len(t, found, 3,
-		"the policy says Google appears three times in the vendor list; the list has %d entries naming Google (%v). Change the sentence and this number together, or drop the sentence.",
-		len(found), found)
-	assert.Contains(t, html, "Google appears three times")
+	const claimed = "Google appears three times"
+	require.Contains(t, html, claimed, "the sentence this test pins has been reworded; update both together")
+
+	got := strings.Count(vendorList(t, html), "Google")
+	assert.Equal(t, 3, got,
+		"the policy says %q but the vendor list names Google %d times", claimed, got)
 }

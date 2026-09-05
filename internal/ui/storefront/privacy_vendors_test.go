@@ -21,10 +21,14 @@ import (
 // Be clear about what it cannot do: the map below is a literal, so it binds the
 // page to this file rather than to the wiring. Swap the label provider in
 // cmd/server/main.go and these tests stay green — a reviewer proved exactly that
-// by doing it. Catching that would mean asserting against the constructed
-// providers, which are assembled in main() and not reachable from a test. Until
-// that changes, the vendor list is maintained by whoever changes a provider
-// remembering to come here, and this file is the reminder.
+// by doing it.
+//
+// That limit applies to the Go-side vendors only — Shippo, Stripe, Postmark,
+// Intuit — which are constructed in run() from environment variables a test
+// cannot see. The browser-side half is enforced for real in privacy_hosts_test.go,
+// which renders the page and fails on any external host the policy does not
+// name; an earlier version of this comment generalised the limit to everything
+// and was wrong about five of these entries.
 func renderPrivacy(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -59,11 +63,17 @@ func TestPrivacyNamesEveryVendorWeSendDataTo(t *testing.T) {
 func TestPrivacyDoesNotNameRetiredVendors(t *testing.T) {
 	html := renderPrivacy(t)
 
-	// EasyPost stayed on the page long after Shippo replaced it. Naming a
-	// vendor that no longer touches customer data is its own kind of wrong:
-	// it tells a reader their address went somewhere it did not.
+	// EasyPost stayed on the page long after Shippo replaced it, telling readers
+	// their address went somewhere it did not.
+	//
+	// Precisely: cmd/server/main.go still falls back to EasyPost when
+	// SHIPPO_API_KEY is unset, so this asserts a fact about production config
+	// rather than about the code — every deployed environment sets that key. An
+	// environment that did not would make the page wrong with nothing failing
+	// here, which is an argument for the fallback going away, not for hedging
+	// the policy.
 	assert.NotContains(t, html, "EasyPost",
-		"Shippo replaced EasyPost as the label provider; the privacy page should not still name it")
+		"Shippo is the label provider everywhere this deploys; the privacy page should not still name EasyPost")
 }
 
 // The QuickBooks section enumerates what wholesale billing sends Intuit, and an
@@ -75,7 +85,7 @@ func TestPrivacyQuickBooksSectionCoversThePersonalFields(t *testing.T) {
 	html := renderPrivacy(t)
 
 	for _, claim := range []string{
-		"phone",         // PrimaryPhone.FreeFormNumber
+		"phone number",  // PrimaryPhone.FreeFormNumber ("phone" alone matches "telephone")
 		"business name", // DisplayName
 		"check number",  // PaymentRefNum on CreatePayment
 	} {

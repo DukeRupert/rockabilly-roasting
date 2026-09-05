@@ -181,6 +181,18 @@ assuming the integration is broken.
 immediately; invoices already in QuickBooks are untouched, and reconciliation
 of them carries on.
 
+Orders billed while you were live keep their QuickBooks invoice, and Hiri's
+manual invoice flow will not touch them in either mode — recording a payment
+against such an order is refused outright: *"order is managed by QuickBooks;
+use the QuickBooks invoice flow"*. The way to settle one is **Mark as paid** on the order, or
+recording the payment in QuickBooks itself.
+
+Worth knowing, and not specific to test mode: **Mark as paid** settles the
+order in Hiri and sends nothing to QuickBooks. The QBO invoice goes on showing
+the full balance owed until someone applies the payment there. If you are
+reconciling a month that spans a go-live or a back-out, that is the gap to
+look for.
+
 **Disconnect** drops the OAuth connection entirely and stops all automated
 invoicing until someone reconnects. Nothing is deleted on Intuit's side.
 

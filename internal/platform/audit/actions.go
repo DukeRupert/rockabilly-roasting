@@ -283,9 +283,18 @@ const (
 	// AuditQBItemsUpdated records a change to which QuickBooks items invoices
 	// bill against — in effect, which income account the shop's wholesale
 	// revenue lands in.
-	AuditQBItemsUpdated            = "qb.items_updated"
-	AuditQBInvoiceEmailed          = "qb.invoice_emailed"
-	AuditQBPaymentSynced           = "qb.payment_synced"
+	AuditQBItemsUpdated   = "qb.items_updated"
+	AuditQBInvoiceEmailed = "qb.invoice_emailed"
+	AuditQBPaymentSynced  = "qb.payment_synced"
+	// AuditQBPaymentSyncSkipped records a payment that was NOT mirrored into
+	// QuickBooks because the shop is in test mode.
+	//
+	// Nothing writes it today, and nothing can: RecordPayment refuses on an
+	// order that carries a qb_invoice_id, so the worker holding this gate
+	// never reaches it — see SyncQBPaymentWorker, which explains why the gate
+	// is kept anyway. Finding one of these in an audit log means that fence
+	// has moved, which is worth knowing on its own.
+	AuditQBPaymentSyncSkipped      = "qb.payment_sync_skipped"
 	AuditQBConnected               = "qb.connected"
 	AuditQBDisconnected            = "qb.disconnected"
 	AuditQBInvoiceVoided           = "qb.invoice_voided"

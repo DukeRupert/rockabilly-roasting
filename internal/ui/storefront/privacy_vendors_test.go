@@ -44,23 +44,26 @@ func TestPrivacyNamesEveryVendorWeSendDataTo(t *testing.T) {
 
 	// Each entry pairs the vendor with the code that hands it customer data,
 	// so a failure says where to go and look rather than only what is missing.
-	vendors := map[string]string{
-		"Stripe":            "platform/payments/stripe.go — card processing at checkout",
-		"Shippo":            "platform/shipping/shippo.go — labels and tracking",
-		"Postmark":          "platform/email/postmark.go — order and account mail",
-		"Intuit QuickBooks": "platform/quickbooks — wholesale customers and invoices",
-		"Broadwave":         "platform/newsletter — footer signups",
-		"Google Analytics":  "layouts/storefront.templ — the GA4 tag",
-		"Google Geocoding":  "platform/geocode/google.go — local-delivery addresses",
-		"Google Fonts":      "layouts/storefront.templ — the fonts.googleapis.com stylesheet",
-		"Cloudflare":        "media delivery, and platform/turnstile on the wholesale form",
-		"jsDelivr":          "layouts/storefront.templ — the Alpine.js script tag",
-		"Sentry":            "platform/sentry — error reports",
-	}
-	for vendor, where := range vendors {
+	for vendor, where := range vendorsOnThePage {
 		assert.Contains(t, html, vendor,
 			"privacy page does not name %s (%s) — if the shop still uses it, say so on the page", vendor, where)
 	}
+}
+
+// vendorsOnThePage is shared with privacy_hosts_test.go's vendor-list shape
+// guard, so emptying it fails there rather than quietly checking nothing.
+var vendorsOnThePage = map[string]string{
+	"Stripe":             "platform/payments/stripe.go — card processing at checkout",
+	"Shippo":             "platform/shipping/shippo.go — labels and tracking",
+	"Postmark":           "platform/email/postmark.go — order and account mail",
+	"Intuit QuickBooks":  "platform/quickbooks — wholesale customers and invoices",
+	"Broadwave":          "platform/newsletter — footer signups",
+	"Google Analytics 4": "layouts/storefront.templ — the GA4 tag",
+	"Google Geocoding":   "platform/geocode/google.go — local-delivery addresses",
+	"Google Fonts":       "layouts/storefront.templ — the fonts.googleapis.com stylesheet",
+	"Cloudflare":         "media delivery, and platform/turnstile on the wholesale form",
+	"jsDelivr":           "layouts/storefront.templ — the Alpine.js script tag",
+	"Sentry":             "platform/sentry — error reports",
 }
 
 func TestPrivacyDoesNotNameRetiredVendors(t *testing.T) {

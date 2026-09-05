@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -86,8 +87,15 @@ const ourOrigin = "rockabillyroasting.com"
 // Sourced from docs/security/csp-audit.md, which enumerates the origins the
 // browser actually fetches. Several — the GA pixel host, Stripe's API and
 // Elements frames — are reached by scripts rather than written into markup, so
-// no test here can discover them; when that audit gains an origin, this map
-// needs the same entry by hand.
+// no test here can discover them. TestDisclosedHostsMatchTheCSPAudit binds the
+// keys to that file, so an origin added there fails here.
+//
+// The values are a different matter and nothing checks them: which company
+// operates a host is a fact about the world, not about this repository.
+// Mis-attributing cdn.jsdelivr.net to Cloudflare passes, because the policy
+// names Cloudflare for other reasons — and the page would then tell a reader
+// something false. Getting a value right is a human check, done when the entry
+// is added.
 var disclosedAs = map[string]string{
 	"fonts.googleapis.com":        "Google Fonts",
 	"fonts.gstatic.com":           "Google Fonts",
@@ -231,7 +239,8 @@ func vendorList(t *testing.T, html string) string {
 	require.NotEqual(t, -1, end, "vendor list <ul> is never closed")
 	list := html[open : open+end]
 
-	for _, entry := range []string{"Stripe", "Shippo", "Postmark", "Intuit QuickBooks", "Broadwave", "Sentry"} {
+	require.NotEmpty(t, vendorsOnThePage, "the vendor checklist is empty, so the shape guard below checks nothing")
+	for entry := range vendorsOnThePage {
 		require.Contains(t, list, entry,
 			"the extracted vendor list is missing %s — either that vendor was renamed or removed, or the list's markup changed shape and this helper is reading the wrong span. Either way the count below it is meaningless until someone looks", entry)
 	}
@@ -327,5 +336,69 @@ func TestStructuredDataCannotCarryALoad(t *testing.T) {
 			assert.Error(t, err,
 				"a tag claiming ld+json while loading via %s was removed, taking its host with it", attr)
 		})
+	}
+}
+
+// vendorFor's suffix branch is exercised from both sides. Only the negative
+// case catches the worst failure: strings.HasSuffix(host, "") is true for every
+// host, so an emptied sentryIngest makes vendorFor claim every host is
+// disclosed and the undisclosed-host gate — the property this file exists for —
+// silently stops firing. A reviewer shipped a live tracker past it that way.
+func TestVendorForSuffixBranch(t *testing.T) {
+	vendor, known := vendorFor("o123456.ingest.sentry.io")
+	assert.True(t, known, "the Sentry ingest suffix is no longer recognised")
+	assert.Equal(t, "Sentry", vendor)
+
+	_, known = vendorFor("tracker.evilcorp.example")
+	assert.False(t, known,
+		"an unknown host was reported as disclosed — if sentryIngest is empty, every host matches the suffix and nothing is ever undisclosed")
+}
+
+// cspOrigin pulls the backticked origins out of the CSP audit's allowlist table.
+var cspOrigin = regexp.MustCompile("`([a-z0-9*][a-z0-9.*-]*\\.[a-z]{2,})`")
+
+// The register is bound to docs/security/csp-audit.md — a file this branch does
+// not own — so a host added there and not here fails, rather than waiting for
+// someone to notice. Round 7 found four missing entries by reading that table
+// by hand; this is that check, run.
+func TestDisclosedHostsMatchTheCSPAudit(t *testing.T) {
+	doc, err := os.ReadFile("../../../docs/security/csp-audit.md")
+	require.NoError(t, err)
+
+	table := string(doc)
+	start := strings.Index(table, "## External origins")
+	require.NotEqual(t, -1, start, "the CSP audit no longer has an External origins section")
+	end := strings.Index(table[start:], "\n---")
+	require.NotEqual(t, -1, end, "cannot find the end of the origins section")
+
+	for _, m := range cspOrigin.FindAllStringSubmatch(table[start:start+end], -1) {
+		host := strings.ToLower(m[1])
+		if strings.HasPrefix(host, "*") {
+			host = "o1" + strings.TrimPrefix(host, "*") // *.sentry.io -> a concrete ingest host
+		}
+		_, known := vendorFor(host)
+		assert.True(t, known,
+			"docs/security/csp-audit.md lists %s as an origin the browser fetches, but disclosedAs has no entry for it", host)
+	}
+}
+
+// vendorName pulls the bolded name out of each vendor list entry.
+var vendorName = regexp.MustCompile(`(?is)<li><strong[^>]*>(.*?)</strong>`)
+
+// The checklist is bound to the page in both directions. Its own test asserts
+// every listed vendor is named on the page; without this, dropping an entry
+// from the checklist silently stops checking that vendor while the page goes on
+// naming it — a reviewer removed Broadwave and the suite stayed green.
+func TestEveryVendorOnThePageIsOnTheChecklist(t *testing.T) {
+	list := vendorList(t, renderPrivacy(t))
+
+	names := vendorName.FindAllStringSubmatch(list, -1)
+	require.NotEmpty(t, names, "no vendor names found in the list — its markup has changed shape")
+
+	for _, m := range names {
+		name := strings.TrimSpace(m[1])
+		_, listed := vendorsOnThePage[name]
+		assert.True(t, listed,
+			"the policy names %s but the checklist in privacy_vendors_test.go does not, so nothing verifies it belongs there", name)
 	}
 }

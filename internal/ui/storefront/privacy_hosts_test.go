@@ -45,14 +45,18 @@ var anchorHref = regexp.MustCompile(`(?is)(<a\b[^>]*?)\shref\s*=\s*"[^"]*"`)
 //
 // A regex still cannot tell an attribute from an attribute's value, so a tag
 // carrying data-x=' type="application/ld+json"' would match. Structured data
-// never has a src, and a tag worth hiding always does, so tags with one are
-// refused below rather than removed. Not reachable through templ, which
+// never carries a fetching attribute and a tag worth hiding always does, so
+// such tags are refused below rather than removed. Not reachable through templ, which
 // escapes quotes and never single-quotes an attribute — closed because the
 // same shape one layer up was reachable.
 var jsonLD = regexp.MustCompile(`(?is)<script[^>]*\stype\s*=\s*"application/ld\+json"[^>]*>(.*?)</script>`)
 
-// srcAttr detects a src on a tag claiming to be structured data.
-var srcAttr = regexp.MustCompile(`(?is)\ssrc\s*=`)
+// loadingAttr detects any fetching attribute on a tag claiming to be
+// structured data. The same four fetchingAttr recognises, deliberately: a
+// guard that covered src alone would let the identical trick through on
+// srcset, poster or href, which is the mistake this file keeps making one
+// name to the right.
+var loadingAttr = regexp.MustCompile(`(?is)\s(?:src|srcset|href|poster)\s*=`)
 
 // urlHost pulls hosts out of written URLs, from any attribute and from element
 // bodies, accepting protocol-relative as well as https://.
@@ -64,8 +68,14 @@ var srcAttr = regexp.MustCompile(`(?is)\ssrc\s*=`)
 // toast.classList.add. Inline scripts are covered for written URLs only.
 var urlHost = regexp.MustCompile(`(?i)(?:https:)?//([a-z0-9][a-z0-9.-]*\.[a-z]{2,})`)
 
-// ourOrigin is the shop's own domain, in canonical URLs and meta tags.
-// Contacting us is not a third-party disclosure. The apex only:
+// ourOrigin is the shop's own domain. Contacting us is not a third-party
+// disclosure.
+//
+// Every occurrence on the page today is inside the structured-data block,
+// which is removed before this applies, so the exemption is currently inert —
+// it exists for the canonical URL and og:image the layout will emit once a
+// page passes CanonicalURL, which the fixture below stands in for. The apex
+// only:
 // cdn.rockabillyroasting.shop is our name in front of Cloudflare R2 and is
 // disclosed as Cloudflare.
 const ourOrigin = "rockabillyroasting.com"
@@ -110,8 +120,8 @@ func scannable(page string) (string, error) {
 	out := anchorHref.ReplaceAllString(page, "$1")
 	for _, block := range jsonLD.FindAllStringSubmatch(out, -1) {
 		opening := block[0][:strings.Index(block[0], ">")+1]
-		if srcAttr.MatchString(opening) {
-			return "", errors.New("a script tagged application/ld+json also carries a src, which structured data never does — refusing to remove it, since doing so would hide whatever that src loads")
+		if loadingAttr.MatchString(opening) {
+			return "", errors.New("a script tagged application/ld+json also carries a fetching attribute, which structured data never does — refusing to remove it, since doing so would hide whatever it loads")
 		}
 		if !json.Valid([]byte(strings.TrimSpace(block[1]))) {
 			return "", errors.New("a script tagged application/ld+json does not contain valid JSON, so removing it before scanning would delete an unknown amount of real markup. Either the block is unclosed and has swallowed the tags after it, or its JSON is wrapped in a CDATA or comment guard that this check does not unwrap")
@@ -184,6 +194,12 @@ func renderPrivacyPage(t *testing.T) string {
 
 func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 	page := renderPrivacyPage(t)
+	// The disclosure has to be made by the policy, not by the page. Checking
+	// the whole document meant the layout's own "Sentry browser SDK (loader)"
+	// comment satisfied the Sentry requirement: deleting the Sentry bullet
+	// from the policy left this test green. Loader chrome names its vendor for
+	// every vendor loaded that way, which is most of them.
+	policy := renderPrivacy(t)
 
 	fetched := hostsFetchedByMarkup(t, page)
 	for _, want := range loadedByThePrivacyPage {
@@ -196,8 +212,8 @@ func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 		if !assert.True(t, known, "the page names %s, which is not in disclosedAs — decide whether it belongs on the privacy policy, then record the decision here", host) {
 			continue
 		}
-		assert.Contains(t, page, vendor,
-			"the page names %s but never names %s in its policy", host, vendor)
+		assert.Contains(t, policy, vendor,
+			"the page loads from %s but the policy never names %s", host, vendor)
 	}
 }
 
@@ -217,7 +233,7 @@ func vendorList(t *testing.T, html string) string {
 
 	for _, entry := range []string{"Stripe", "Shippo", "Postmark", "Intuit QuickBooks", "Broadwave", "Sentry"} {
 		require.Contains(t, list, entry,
-			"the extracted vendor list is missing %s — the list's markup has changed shape, so this helper is reading the wrong span and any count below it is meaningless", entry)
+			"the extracted vendor list is missing %s — either that vendor was renamed or removed, or the list's markup changed shape and this helper is reading the wrong span. Either way the count below it is meaningless until someone looks", entry)
 	}
 	return list
 }
@@ -274,6 +290,11 @@ func TestExtractorReach(t *testing.T) {
 		// rather than requests.
 		{"link target itself", `<a href="https://k.example.com/page">text</a>`, "k.example.com", false, false},
 		{"structured data", `<script type="application/ld+json">{"sameAs":["https://l.example.com/us"]}</script>`, "l.example.com", false, false},
+		// Written out rather than built from ourOrigin: a fixture that takes
+		// both its markup and its expectation from the constant agrees with
+		// itself whatever the constant says, and passes with it pointed at a
+		// domain we do not own.
+		{"our own origin", `<link rel="canonical" href="https://rockabillyroasting.com/privacy"/>`, "rockabillyroasting.com", false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -292,4 +313,19 @@ func TestUnclosedStructuredDataIsReported(t *testing.T) {
 	_, err := scannable(html)
 	assert.Error(t, err,
 		"an unclosed ld+json block swallowed the script tag after it and nothing complained")
+}
+
+// A tag claiming to be structured data while also fetching something is
+// refused, not removed — otherwise the removal hides whatever it loads. Pinned
+// per attribute because the first version of this guard checked src alone, and
+// the same trick worked unchanged on the other three.
+func TestStructuredDataCannotCarryALoad(t *testing.T) {
+	for _, attr := range []string{"src", "srcset", "href", "poster"} {
+		t.Run(attr, func(t *testing.T) {
+			html := `<script ` + attr + `="https://tracker.example.com/px.js" data-x=' type="application/ld+json"'>0</script>`
+			_, err := scannable(html)
+			assert.Error(t, err,
+				"a tag claiming ld+json while loading via %s was removed, taking its host with it", attr)
+		})
+	}
 }

@@ -14,10 +14,17 @@ import (
 // and the last time it drifted it named a shipping vendor the shop had stopped
 // using and omitted the one it had moved to, for months, with nothing failing.
 //
-// So this test does not check that the page renders. It checks that each vendor
-// the code actually calls is named on it, and it is meant to be edited in the
-// same commit as any change to who those vendors are. A provider swapped in
-// cmd/server/main.go with this list left alone should fail here.
+// So this test does not check that the page renders. It is a checklist of the
+// vendors the shop was known to use when it was written, pinned so that editing
+// the page means deliberately editing the list too.
+//
+// Be clear about what it cannot do: the map below is a literal, so it binds the
+// page to this file rather than to the wiring. Swap the label provider in
+// cmd/server/main.go and these tests stay green — a reviewer proved exactly that
+// by doing it. Catching that would mean asserting against the constructed
+// providers, which are assembled in main() and not reachable from a test. Until
+// that changes, the vendor list is maintained by whoever changes a provider
+// remembering to come here, and this file is the reminder.
 func renderPrivacy(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -38,7 +45,9 @@ func TestPrivacyNamesEveryVendorWeSendDataTo(t *testing.T) {
 		"Broadwave":         "platform/newsletter — footer signups",
 		"Google Analytics":  "layouts/storefront.templ — the GA4 tag",
 		"Google Geocoding":  "platform/geocode/google.go — local-delivery addresses",
+		"Google Fonts":      "layouts/storefront.templ — the fonts.googleapis.com stylesheet",
 		"Cloudflare":        "media delivery, and platform/turnstile on the wholesale form",
+		"jsDelivr":          "layouts/storefront.templ — the Alpine.js script tag",
 		"Sentry":            "platform/sentry — error reports",
 	}
 	for vendor, where := range vendors {

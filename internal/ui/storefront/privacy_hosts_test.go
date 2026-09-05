@@ -344,15 +344,22 @@ func TestUnclosedStructuredDataIsReported(t *testing.T) {
 // per attribute because the first version of this guard checked src alone, and
 // the same trick worked unchanged on the other three.
 func TestStructuredDataCannotCarryALoad(t *testing.T) {
-	// Derived from loadingAttr rather than repeated beside it: written out, the
-	// list could be cut back to src — exactly the case that passed while the
-	// bug was live — with nothing to say so.
-	attrs := regexp.MustCompile(`\(\?:([a-z|]+)\)`).FindStringSubmatch(loadingAttr.String())
-	require.Len(t, attrs, 2, "loadingAttr no longer has a readable alternation; this test cannot tell what it covers")
-	names := strings.Split(attrs[1], "|")
-	require.Len(t, names, 4, "loadingAttr covers %d attributes, not 4 — if that is deliberate, say so here and in fetchingAttr", len(names))
+	// Anchored to fetchingAttr, not to loadingAttr. Writing the four out here
+	// was shrinkable; deriving them from loadingAttr was worse, since the list
+	// then mirrored the thing under test — swapping in three attributes that do
+	// not exist kept the arity and passed, leaving srcset, href and poster
+	// unguarded with nothing to say so.
+	//
+	// fetchingAttr is the one of the pair with an outside oracle:
+	// TestExtractorReach exercises script src, link href, source srcset and
+	// video poster individually. The two must cover the same attributes — a tag
+	// that can fetch is a tag whose removal can hide a fetch — so equality
+	// borrows that anchor.
+	loading, fetching := alternation(t, loadingAttr), alternation(t, fetchingAttr)
+	require.Equal(t, fetching, loading,
+		"loadingAttr and fetchingAttr disagree about which attributes fetch: the ld+json guard refuses %v while the floor counts %v, so whichever is narrower is a hole", loading, fetching)
 
-	for _, attr := range names {
+	for _, attr := range loading {
 		t.Run(attr, func(t *testing.T) {
 			html := `<script ` + attr + `="https://tracker.example.com/px.js" data-x=' type="application/ld+json"'>0</script>`
 			_, err := scannable(html)
@@ -453,6 +460,14 @@ func TestEveryVendorOnThePageIsOnTheChecklist(t *testing.T) {
 var operatorInDomain = map[string]string{
 	"fonts.gstatic.com":           "Google serves its font files from gstatic",
 	"cdn.rockabillyroasting.shop": "our domain in front of Cloudflare R2",
+}
+
+// alternation pulls the (?:a|b|c) members out of a pattern.
+func alternation(t *testing.T, re *regexp.Regexp) []string {
+	t.Helper()
+	m := regexp.MustCompile(`\(\?:([a-z|]+)\)`).FindStringSubmatch(re.String())
+	require.Len(t, m, 2, "no readable alternation in %s", re)
+	return strings.Split(m[1], "|")
 }
 
 func TestDisclosedVendorsMatchTheirDomains(t *testing.T) {

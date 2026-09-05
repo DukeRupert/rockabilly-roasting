@@ -287,10 +287,13 @@ const (
 	AuditQBInvoiceEmailed = "qb.invoice_emailed"
 	AuditQBPaymentSynced  = "qb.payment_synced"
 	// AuditQBPaymentSyncSkipped records a payment that was NOT mirrored into
-	// QuickBooks because the shop is in test mode. The payment itself is
-	// recorded in Hiri either way; this is the trail that says QuickBooks
-	// still shows the invoice as owed, and someone has to apply the payment
-	// there by hand (or after going live).
+	// QuickBooks because the shop is in test mode.
+	//
+	// Nothing writes it today, and nothing can: RecordPayment refuses on an
+	// order that carries a qb_invoice_id, so the worker holding this gate
+	// never reaches it — see SyncQBPaymentWorker, which explains why the gate
+	// is kept anyway. Finding one of these in an audit log means that fence
+	// has moved, which is worth knowing on its own.
 	AuditQBPaymentSyncSkipped      = "qb.payment_sync_skipped"
 	AuditQBConnected               = "qb.connected"
 	AuditQBDisconnected            = "qb.disconnected"

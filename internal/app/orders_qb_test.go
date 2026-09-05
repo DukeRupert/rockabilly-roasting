@@ -397,3 +397,50 @@ func TestInvoiceService_FenceQBManagedOrder(t *testing.T) {
 	_, err := invoiceSvc.CreateFromOrder(ctx, tx, order.ID, nil, nil, testutil.TestActor())
 	assert.ErrorIs(t, err, app.ErrOrderQBManaged, "manual invoice creation must be fenced on QB-owned orders")
 }
+
+// RecordPayment is the fence that actually keeps manual payments off a
+// QuickBooks-owned order, and until now nothing tested it — the sibling test
+// above covers CreateFromOrder's inline check, which is a different guard on a
+// different method.
+//
+// It is worth pinning because other code leans on it. SyncQBPaymentWorker's
+// billing-mode gate is unreachable precisely because this refusal happens
+// first, in the same transaction as the job insert; if this fence moved, that
+// worker would start receiving jobs it has never received, and the reasoning
+// written in its comment would be silently wrong. This test is what detects
+// the move.
+//
+// The order needs a Hiri invoice created *before* it becomes QB-owned, since
+// CreateFromOrder would refuse afterwards — that ordering is the only way such
+// an order exists at all.
+func TestInvoiceService_RecordPaymentFencedOnQBManagedOrder(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+
+	invoiceSvc := app.NewInvoiceService(store.NewInvoiceStore(), store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry())
+
+	cust := testutil.CreateCustomer(t, tx)
+	addr := testutil.CreateAddress(t, tx, cust.ID)
+	order := testutil.CreateOrder(t, tx, cust.ID, addr.ID, addr.ID,
+		testutil.WithOrderStatus(domain.OrderStatusConfirmed),
+		testutil.WithPaymentStatus(domain.PaymentStatusPendingInvoice),
+		testutil.WithOrderTotals(10000, 0, 0, 0, 10000),
+	)
+
+	// A real staff row: invoices.created_by is a foreign key, so the anonymous
+	// TestActor cannot author one.
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+	invoice, err := invoiceSvc.CreateFromOrder(ctx, tx, order.ID, nil, nil, staffActor)
+	require.NoError(t, err, "an order with no QB invoice takes a Hiri invoice normally")
+
+	// The order is billed through QuickBooks afterwards — what CreateQBInvoice's
+	// SetQBInvoice does on a live run.
+	_, err = tx.Exec(ctx, `UPDATE orders SET qb_invoice_id=$2, qb_invoice_no=$3 WHERE id=$1`,
+		order.ID, "QBINV-"+uuid.New().String()[:8], "1001")
+	require.NoError(t, err)
+
+	_, err = invoiceSvc.RecordPayment(ctx, tx, invoice.ID, 10000, "check", nil, nil, staffActor)
+	assert.ErrorIs(t, err, app.ErrOrderQBManaged,
+		"recording a manual payment on a QB-owned order must be refused; SyncQBPaymentWorker's reachability argument depends on it")
+}

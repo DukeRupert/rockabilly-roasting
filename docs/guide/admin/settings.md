@@ -79,6 +79,8 @@ Going live does **not** bill orders recorded during test mode -- those were almo
 
 Switching back to test mode stops new billing immediately. Invoices already in QuickBooks are untouched.
 
+An order that already has a QuickBooks invoice cannot be paid off through Hiri's own invoice screen -- it will tell you the order is managed by QuickBooks. Use **Mark as paid** on the order instead. Note that this settles the order here and sends nothing to QuickBooks, so the invoice there keeps showing the full balance until someone applies the payment in QuickBooks too.
+
 The full connection procedure, including production keys and the trial period, is in the [QuickBooks go-live runbook](../../quickbooks-go-live.md).
 
 #### Disconnecting

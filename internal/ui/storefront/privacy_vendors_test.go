@@ -23,12 +23,17 @@ import (
 // cmd/server/main.go and these tests stay green — a reviewer proved exactly that
 // by doing it.
 //
-// That limit applies to the Go-side vendors only — Shippo, Stripe, Postmark,
-// Intuit — which are constructed in run() from environment variables a test
-// cannot see. The browser-side half is enforced for real in privacy_hosts_test.go,
-// which renders the page and fails on any external host the policy does not
-// name; an earlier version of this comment generalised the limit to everything
-// and was wrong about five of these entries.
+// The limit applies to every vendor reached from the server: Shippo, Stripe,
+// Postmark, Intuit, Broadwave and Google Geocoding are all constructed in run()
+// from environment variables a test cannot see, and this checklist is the only
+// thing pinning them.
+//
+// What privacy_hosts_test.go enforces for real is the other kind: hosts the
+// rendered page tells the browser to fetch from. Today that is Google Fonts,
+// Google Analytics, jsDelivr, Sentry and Cloudflare's CDN domain. Rather than
+// restate that split here — the last two attempts at describing it were both
+// wrong, once in each direction — read the map in that file, which is the
+// enumeration rather than a claim about it.
 func renderPrivacy(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -85,7 +90,7 @@ func TestPrivacyQuickBooksSectionCoversThePersonalFields(t *testing.T) {
 	html := renderPrivacy(t)
 
 	for _, claim := range []string{
-		"phone number",  // PrimaryPhone.FreeFormNumber ("phone" alone matches "telephone")
+		"phone number",  // PrimaryPhone.FreeFormNumber; the full phrase, since "phone" alone is a substring of other words
 		"business name", // DisplayName
 		"check number",  // PaymentRefNum on CreatePayment
 	} {

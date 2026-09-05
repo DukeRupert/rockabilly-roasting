@@ -371,17 +371,20 @@ func TestDisclosedHostsMatchTheCSPAudit(t *testing.T) {
 	end := strings.Index(table[start:], "\n---")
 	require.NotEqual(t, -1, end, "cannot find the end of the origins section")
 
-	origins := cspOrigin.FindAllStringSubmatch(table[start:start+end], -1)
-	// The audit is a markdown document this branch does not own, and the only
-	// loop here whose length comes from outside. Reformatting it — an extra
-	// --- rule after the heading, backticks dropped from the table — used to
-	// leave this scanning nothing and passing.
-	require.GreaterOrEqual(t, len(origins), len(disclosedAs),
-		"found only %d origins in the CSP audit but disclosedAs has %d entries — the document has been reformatted and this check is reading nothing",
-		len(origins), len(disclosedAs))
+	listed := map[string]bool{}
+	for _, m := range cspOrigin.FindAllStringSubmatch(table[start:start+end], -1) {
+		listed[strings.ToLower(m[1])] = true
+	}
 
-	for _, m := range origins {
-		host := strings.ToLower(m[1])
+	// Both directions, and neither is a count. A count let seven of the
+	// eighteen occurrences vanish while still clearing a floor of eleven —
+	// un-backticking two Stripe origins stopped them being checked with the
+	// suite green, which is the partial blindness this file keeps rediscovering.
+	for host := range disclosedAs {
+		assert.True(t, listed[host],
+			"disclosedAs has an entry for %s but docs/security/csp-audit.md no longer lists it — either the origin is gone and this entry is stale, or the audit's table has been reformatted and this check is reading less than it looks", host)
+	}
+	for host := range listed {
 		_, known := vendorFor(host)
 		assert.True(t, known,
 			"docs/security/csp-audit.md lists %s as an origin the browser fetches, but disclosedAs has no entry for it", host)
@@ -431,6 +434,19 @@ var operatorInDomain = map[string]string{
 
 func TestDisclosedVendorsMatchTheirDomains(t *testing.T) {
 	require.NotEmpty(t, disclosedAs)
+
+	// The exemption map is pinned, because it is the one way to make this
+	// check iterate nothing: listing all eleven hosts in it left the
+	// jsDelivr-filed-under-Cloudflare mutation green. Adding an exemption
+	// should cost a deliberate edit here, which is what every other guard in
+	// this file asks for.
+	require.Len(t, operatorInDomain, 2,
+		"an exemption was added or removed — each one takes a host out of the attribution check below, so change this number in the same commit and say why in the map")
+	for host := range operatorInDomain {
+		require.Contains(t, disclosedAs, host,
+			"%s is exempted from the attribution check but is no longer a disclosed host — a stale exemption is a hole waiting for the name to come back", host)
+	}
+
 	for host, vendor := range disclosedAs {
 		if why, exempt := operatorInDomain[host]; exempt {
 			t.Logf("%s exempt: %s", host, why)

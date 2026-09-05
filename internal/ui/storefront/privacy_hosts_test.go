@@ -185,11 +185,15 @@ func hostsFetchedByMarkup(t *testing.T, page string) map[string]bool {
 // means tags stopped matching, not that a vendor left.
 //
 // It is compared for set equality with what the extractor actually finds, not
-// used as a floor. This is the fourth list in these two files that gated a loop
-// and could be quietly shrunk — vendorsOnThePage, operatorInDomain and
-// disclosedAs were the others, each found a round apart. Any list added here
-// that decides how much of something else gets checked needs binding to a
-// source outside itself, or it will be the fifth.
+// used as a floor.
+//
+// It is one of several lists here that decide how much of something else gets
+// checked, and every one of them has at some point been shrinkable for free —
+// each found a round apart, and each time the enumeration of "the others" was
+// wrong. So the rule, rather than the roll-call: a list that gates a loop must
+// be bound to a source outside itself. The exception is a table of cases that
+// are themselves the assertions, like TestExtractorReach, where shrinking it
+// deletes tests rather than weakening the ones that remain.
 var loadedByThePrivacyPage = []string{
 	"fonts.googleapis.com",
 	"fonts.gstatic.com",
@@ -340,7 +344,15 @@ func TestUnclosedStructuredDataIsReported(t *testing.T) {
 // per attribute because the first version of this guard checked src alone, and
 // the same trick worked unchanged on the other three.
 func TestStructuredDataCannotCarryALoad(t *testing.T) {
-	for _, attr := range []string{"src", "srcset", "href", "poster"} {
+	// Derived from loadingAttr rather than repeated beside it: written out, the
+	// list could be cut back to src — exactly the case that passed while the
+	// bug was live — with nothing to say so.
+	attrs := regexp.MustCompile(`\(\?:([a-z|]+)\)`).FindStringSubmatch(loadingAttr.String())
+	require.Len(t, attrs, 2, "loadingAttr no longer has a readable alternation; this test cannot tell what it covers")
+	names := strings.Split(attrs[1], "|")
+	require.Len(t, names, 4, "loadingAttr covers %d attributes, not 4 — if that is deliberate, say so here and in fetchingAttr", len(names))
+
+	for _, attr := range names {
 		t.Run(attr, func(t *testing.T) {
 			html := `<script ` + attr + `="https://tracker.example.com/px.js" data-x=' type="application/ld+json"'>0</script>`
 			_, err := scannable(html)

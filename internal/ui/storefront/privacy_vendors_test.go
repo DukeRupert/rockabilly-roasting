@@ -90,11 +90,18 @@ func TestPrivacyDoesNotNameRetiredVendors(t *testing.T) {
 func TestPrivacyQuickBooksSectionCoversThePersonalFields(t *testing.T) {
 	html := renderPrivacy(t)
 
-	for _, claim := range []string{
+	claims := []string{
 		"phone number",  // PrimaryPhone.FreeFormNumber; the full phrase, since "phone" alone is a substring of other words
 		"business name", // DisplayName
 		"check number",  // PaymentRefNum on CreatePayment
-	} {
+	}
+	// Pinned: the list is what makes this test an enumeration rather than a
+	// spot-check, and cut to one entry it went on passing while covering a
+	// third of what the comment above promises.
+	require.Len(t, claims, 3,
+		"a claim was added or dropped — qbCustomerRequest and PaymentRefNum decide what belongs here, so change the count in the same edit")
+
+	for _, claim := range claims {
 		assert.Contains(t, html, claim,
 			"the QuickBooks disclosure should account for %q — see platform/quickbooks/customers.go and payments.go", claim)
 	}

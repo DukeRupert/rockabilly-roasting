@@ -3,6 +3,8 @@ package storefront
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -15,20 +17,28 @@ import (
 // the correction described the code in a sentence nothing enforced. The comments
 // here try to state only what is checked, and to name what is not.
 
-// anchorElement matches a link and its text. Links are removed before scanning:
-// a URL a reader may click is not a host the browser fetches, and the policy
-// prose links to intuit.com and google.com by name.
-var anchorElement = regexp.MustCompile(`(?is)<a\b[^>]*>.*?</a>`)
-
-// jsonLD matches the structured-data block, removed before scanning: it
-// declares facts about the shop — social profiles, the schema.org vocabulary,
-// our own URL — and causes no request.
+// anchorHref matches the href of a link. Only the href is removed, not the
+// link: a URL a reader may click is not a host the browser fetches, and the
+// policy prose links to intuit.com and google.com by name — but everything
+// between <a> and </a> is ordinary markup that can load whatever it likes.
 //
-// Removing the block rather than exempting its hosts by name is deliberate.
-// Exempting the names globally made an Instagram embed or a Meta pixel
-// invisible anywhere on the page, which a reviewer demonstrated with four
-// separate tags.
-var jsonLD = regexp.MustCompile(`(?is)<script[^>]*application/ld\+json[^>]*>.*?</script>`)
+// An earlier version deleted the whole element, which meant 16% of the page
+// went unscanned and a tracking pixel inside a link was invisible. The header
+// logo is an <img> inside an <a> today, so that was not a hypothetical shape.
+var anchorHref = regexp.MustCompile(`(?is)(<a\b[^>]*?)\shref\s*=\s*"[^"]*"`)
+
+// jsonLD matches a structured-data block, removed before scanning: it declares
+// facts about the shop — social profiles, the schema.org vocabulary, our own
+// URL — and causes no request.
+//
+// Removing the block rather than exempting its hosts by name is deliberate:
+// exempting names globally made an Instagram embed or a Meta pixel invisible
+// anywhere on the page. But the removal is itself a hole if it can be aimed,
+// so the type attribute is matched exactly rather than as a substring — a
+// tracker at .../application/ld+json/px.js used to delete its own tag — and
+// what it removes must parse as JSON, so an unclosed block cannot swallow the
+// script tag that follows it.
+var jsonLD = regexp.MustCompile(`(?is)<script[^>]*\stype\s*=\s*"application/ld\+json"[^>]*>(.*?)</script>`)
 
 // urlHost pulls hosts out of written URLs, from any attribute and from element
 // bodies, accepting protocol-relative as well as https://.
@@ -80,15 +90,27 @@ func vendorFor(host string) (string, bool) {
 	return vendor, ok
 }
 
-func scannable(page string) string {
-	return jsonLD.ReplaceAllString(anchorElement.ReplaceAllString(page, ""), "")
+// scannable strips the two things that are not fetches: link targets, and
+// structured data. Everything else the page contains is scanned.
+func scannable(page string) (string, error) {
+	out := anchorHref.ReplaceAllString(page, "$1")
+	for _, block := range jsonLD.FindAllStringSubmatch(out, -1) {
+		if !json.Valid([]byte(strings.TrimSpace(block[1]))) {
+			return "", errors.New("a script tagged application/ld+json does not contain valid JSON, so removing it before scanning would delete an unknown amount of real markup — most likely the block is unclosed and has swallowed the tags after it")
+		}
+		out = strings.Replace(out, block[0], "", 1)
+	}
+	return out, nil
 }
 
 // hostsWritten returns every host written as a URL in the page, outside links
 // and outside the structured-data block — attributes and element bodies alike.
-func hostsWritten(page string) map[string]bool {
+func hostsWritten(t *testing.T, page string) map[string]bool {
+	t.Helper()
+	scanned, err := scannable(page)
+	require.NoError(t, err)
 	hosts := map[string]bool{}
-	for _, m := range urlHost.FindAllStringSubmatch(scannable(page), -1) {
+	for _, m := range urlHost.FindAllStringSubmatch(scanned, -1) {
 		if host := strings.ToLower(m[1]); host != ourOrigin {
 			hosts[host] = true
 		}
@@ -96,18 +118,24 @@ func hostsWritten(page string) map[string]bool {
 	return hosts
 }
 
-// fetchingAttr matches the attributes that cause the browser to go and get
-// something. Restricted to these rather than to attributes in general: a host
-// in a meta content= is prose, and letting prose satisfy the floor would let
-// the privacy page disarm its own check by naming a vendor host in a sentence.
+// fetchingAttr matches double-quoted src/srcset/href/poster values — enough to
+// recognise the loads this layout actually makes, not an exhaustive list of
+// ways a browser can be told to fetch (object data, imagesrcset and a meta
+// refresh are all absent). Restricted to these rather than to attributes in
+// general so that a host named in a meta content= cannot satisfy the floor:
+// otherwise the privacy page could disarm its own check by naming a vendor
+// host in a sentence.
 var fetchingAttr = regexp.MustCompile(`(?is)\b(?:src|srcset|href|poster)\s*=\s*"([^"]*)"`)
 
 // hostsFetchedByMarkup is the hosts this page's markup actually loads from.
 // The floor uses it, so a host merely mentioned cannot stand in for one the
 // page stopped loading.
-func hostsFetchedByMarkup(page string) map[string]bool {
+func hostsFetchedByMarkup(t *testing.T, page string) map[string]bool {
+	t.Helper()
+	scanned, err := scannable(page)
+	require.NoError(t, err)
 	hosts := map[string]bool{}
-	for _, attr := range fetchingAttr.FindAllStringSubmatch(scannable(page), -1) {
+	for _, attr := range fetchingAttr.FindAllStringSubmatch(scanned, -1) {
 		for _, m := range urlHost.FindAllStringSubmatch(attr[1], -1) {
 			if host := strings.ToLower(m[1]); host != ourOrigin {
 				hosts[host] = true
@@ -139,13 +167,13 @@ func renderPrivacyPage(t *testing.T) string {
 func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 	page := renderPrivacyPage(t)
 
-	fetched := hostsFetchedByMarkup(page)
+	fetched := hostsFetchedByMarkup(t, page)
 	for _, want := range loadedByThePrivacyPage {
 		assert.True(t, fetched[want],
 			"%s is loaded by this page's markup but the extractor did not find it — it has gone blind to some tags, which is how a new host would slip past", want)
 	}
 
-	for host := range hostsWritten(page) {
+	for host := range hostsWritten(t, page) {
 		vendor, known := vendorFor(host)
 		if !assert.True(t, known, "the page names %s, which is not in disclosedAs — decide whether it belongs on the privacy policy, then record the decision here", host) {
 			continue
@@ -177,9 +205,11 @@ func vendorList(t *testing.T, html string) string {
 }
 
 // The policy states how many of its vendors are Google. A stated count beats a
-// vague phrase only if something checks it, and it has to count what the
-// sentence counts — services named, not list items, so merging two Google
-// entries into one bullet cannot slip past.
+// vague phrase only if something checks it.
+//
+// It counts the token in the vendor list, which is how many Google services are
+// named there — the thing the sentence is about. Two of those names moving into
+// one bullet does not change the count and does not make the sentence false.
 func TestGoogleCountMatchesTheProse(t *testing.T) {
 	html := renderPrivacy(t)
 
@@ -189,4 +219,44 @@ func TestGoogleCountMatchesTheProse(t *testing.T) {
 	got := strings.Count(vendorList(t, html), "Google")
 	assert.Equal(t, 3, got,
 		"the policy says %q but the vendor list names Google %d times", claimed, got)
+}
+
+// The extractor's reach is pinned here rather than only through the real page,
+// because the real page happens not to exercise most of it: a reviewer reverted
+// hostsWritten to attributes-only — the exact regression the body scan was
+// added to prevent — and the whole suite stayed green, since nothing currently
+// writes a host into an element body. These fixtures fail if any of that reach
+// is lost, whether or not a live page uses it today.
+func TestExtractorReach(t *testing.T) {
+	cases := []struct {
+		name  string
+		html  string
+		found bool
+		host  string
+	}{
+		{"inline style @import", `<style>@import url(https://a.example.com/x.css);</style>`, true, "a.example.com"},
+		{"inline script url literal", `<script>var s="https://b.example.com/t.js";</script>`, true, "b.example.com"},
+		{"protocol-relative", `<script src="//c.example.com/t.js"></script>`, true, "c.example.com"},
+		{"source srcset", `<picture><source srcset="https://d.example.com/p.png"/></picture>`, true, "d.example.com"},
+		{"inside a link", `<a href="/x"><img src="https://e.example.com/px.gif"/></a>`, true, "e.example.com"},
+		{"link target itself", `<a href="https://f.example.com/page">text</a>`, false, "f.example.com"},
+		{"structured data", `<script type="application/ld+json">{"sameAs":["https://g.example.com/us"]}</script>`, false, "g.example.com"},
+		{"ld+json lookalike in a src", `<script src="https://h.example.com/application/ld+json/px.js"></script>`, true, "h.example.com"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.found, hostsWritten(t, tc.html)[tc.host])
+		})
+	}
+}
+
+// An unclosed structured-data block must not silently delete the markup after
+// it. Reported as malformed JSON rather than passing quietly.
+func TestUnclosedStructuredDataIsReported(t *testing.T) {
+	html := `<script type="application/ld+json">{"a":1}` +
+		`<script src="https://tracker.example.com/px.js"></script>`
+
+	_, err := scannable(html)
+	assert.Error(t, err,
+		"an unclosed ld+json block swallowed the script tag after it and nothing complained")
 }

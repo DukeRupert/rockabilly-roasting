@@ -181,13 +181,17 @@ assuming the integration is broken.
 immediately; invoices already in QuickBooks are untouched, and reconciliation
 of them carries on.
 
-One thing to watch after backing out: recording a payment against an order
-that *was* billed while live no longer posts that payment to QuickBooks —
-test mode writes nothing to the merchant's books, without exception. The
-payment is still recorded in Hiri, and the audit log carries a
-`qb.payment_sync_skipped` entry naming the invoice and amount, but the
-QuickBooks invoice keeps showing the full balance owed until someone applies
-the payment there by hand.
+Orders billed while you were live keep their QuickBooks invoice, and Hiri's
+manual invoice flow will not touch them in either mode — recording a payment
+against such an order is refused outright ("this order is managed by
+QuickBooks"). The way to settle one is **Mark as paid** on the order, or
+recording the payment in QuickBooks itself.
+
+Worth knowing, and not specific to test mode: **Mark as paid** settles the
+order in Hiri and sends nothing to QuickBooks. The QBO invoice goes on showing
+the full balance owed until someone applies the payment there. If you are
+reconciling a month that spans a go-live or a back-out, that is the gap to
+look for.
 
 **Disconnect** drops the OAuth connection entirely and stops all automated
 invoicing until someone reconnects. Nothing is deleted on Intuit's side.

@@ -19,20 +19,27 @@ import (
 
 // SyncQBPaymentWorker records a manual payment in QBO against the linked invoice.
 //
-// Gated on the billing mode like every other worker that writes to the
-// merchant's books. The gate reads as redundant — this worker only acts on an
-// order that already carries a QB invoice id, and only a live run ever sets
-// one — but "redundant" here rests on the whole history of a column rather
-// than on a check. Go live, bill some orders, switch back to test mode, and
-// recording a payment against one of those orders would post a Payment into
-// the real company while the admin says nothing is being written. Test mode
-// is worth stating outright rather than inferring.
+// The billing-mode gate below is belt to the service layer's braces, and the
+// braces are what actually hold: RecordPayment refuses outright on an order
+// carrying a qb_invoice_id (app/invoices.go, ensureOrderNotQBManaged →
+// ErrOrderQBManaged), and the only enqueue site for this job sits inside that
+// same transaction, after it. So every job this worker receives is for an
+// order with no QB invoice, and returns at the no-invoice check below without
+// reaching QuickBooks at all. A review verified this by probe rather than by
+// reading; do not trust the paragraph over the code if the fence ever moves.
 //
-// The earlier reasoning for leaving it ungated was that refusing would strand
-// money that had actually changed hands. It does not: RecordPayment has
-// already committed the payment in Hiri before this job runs, and the skip
-// writes an audit entry naming the invoice and amount, so what is owed in
-// QuickBooks can be settled by hand or after going live.
+// It is gated anyway because the guarantee test mode offers — nothing is
+// written to the merchant's books — should be legible at the place that does
+// the writing, not assembled from a fence three files away plus the history
+// of a column. The cost is one settings read on a job that then returns.
+//
+// Do not read this as "every writing worker is gated": SendQBInvoiceWorker has
+// QBO mail an invoice and never checks the mode, resting entirely on being
+// chained from the gated CreateQBInvoice.
+//
+// An earlier version of this comment claimed the gate closed a live hole —
+// go live, bill, switch back, record a payment. It does not; that sequence is
+// refused before this job is ever inserted. Kept as a guard, not as a fix.
 type SyncQBPaymentWorker struct {
 	river.WorkerDefaults[SyncQBPaymentArgs]
 	orders    *store.OrderStore

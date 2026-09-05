@@ -283,7 +283,7 @@ const (
 	// AuditQBItemsUpdated records a change to which QuickBooks items invoices
 	// bill against — in effect, which income account the shop's wholesale
 	// revenue lands in.
-	AuditQBItemsUpdated            = "qb.items_updated"
+	AuditQBItemsUpdated   = "qb.items_updated"
 	AuditQBInvoiceEmailed = "qb.invoice_emailed"
 	AuditQBPaymentSynced  = "qb.payment_synced"
 	// AuditQBPaymentSyncSkipped records a payment that was NOT mirrored into
@@ -291,7 +291,7 @@ const (
 	// recorded in Hiri either way; this is the trail that says QuickBooks
 	// still shows the invoice as owed, and someone has to apply the payment
 	// there by hand (or after going live).
-	AuditQBPaymentSyncSkipped = "qb.payment_sync_skipped"
+	AuditQBPaymentSyncSkipped      = "qb.payment_sync_skipped"
 	AuditQBConnected               = "qb.connected"
 	AuditQBDisconnected            = "qb.disconnected"
 	AuditQBInvoiceVoided           = "qb.invoice_voided"

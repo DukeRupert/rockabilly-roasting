@@ -183,6 +183,13 @@ func hostsFetchedByMarkup(t *testing.T, page string) map[string]bool {
 // loadedByThePrivacyPage is what this page's markup pulls in today. Its purpose
 // is to fail when the extractor goes blind: a host disappearing from this set
 // means tags stopped matching, not that a vendor left.
+//
+// It is compared for set equality with what the extractor actually finds, not
+// used as a floor. This is the fourth list in these two files that gated a loop
+// and could be quietly shrunk — vendorsOnThePage, operatorInDomain and
+// disclosedAs were the others, each found a round apart. Any list added here
+// that decides how much of something else gets checked needs binding to a
+// source outside itself, or it will be the fifth.
 var loadedByThePrivacyPage = []string{
 	"fonts.googleapis.com",
 	"fonts.gstatic.com",
@@ -209,11 +216,15 @@ func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 	policy := renderPrivacy(t)
 
 	fetched := hostsFetchedByMarkup(t, page)
-	require.NotEmpty(t, loadedByThePrivacyPage, "the floor is empty, so the loop below checks nothing")
-	for _, want := range loadedByThePrivacyPage {
-		assert.True(t, fetched[want],
-			"%s is loaded by this page's markup but the extractor did not find it — it has gone blind to some tags, which is how a new host would slip past", want)
+	found := make([]string, 0, len(fetched))
+	for host := range fetched {
+		found = append(found, host)
 	}
+	// Set equality, not a floor. A floor closed the empty case and left the
+	// shrunk one: cutting this list to a single entry checked one sixth of what
+	// its comment promises, with everything green.
+	assert.ElementsMatch(t, loadedByThePrivacyPage, found,
+		"what this page's markup loads no longer matches the recorded set — either the extractor has gone blind to some tags, or the page gained or lost a host and this list needs the same edit")
 
 	for host := range hostsWritten(t, page) {
 		vendor, known := vendorFor(host)

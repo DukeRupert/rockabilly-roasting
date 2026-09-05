@@ -36,7 +36,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16\"><!-- Page heading --><header class=\"mb-12\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">How we handle your data</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;\">Privacy <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">policy.</span></h1><p class=\"font-special text-chrome-deep text-sm mt-4\">Last updated: April 2026</p></header><!-- Legal body --><article class=\"space-y-10\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16\"><!-- Page heading --><header class=\"mb-12\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">How we handle your data</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;\">Privacy <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">policy.</span></h1><p class=\"font-special text-chrome-deep text-sm mt-4\">Last updated: September 2026</p></header><!-- Legal body --><article class=\"space-y-10\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -118,7 +118,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p>We share only what's necessary with the following services:</p><ul class=\"list-disc pl-5 space-y-2\"><li><strong class=\"font-oswald font-bold text-ink\">Stripe</strong> — payment processing</li><li><strong class=\"font-oswald font-bold text-ink\">EasyPost</strong> — shipping label generation and tracking</li><li><strong class=\"font-oswald font-bold text-ink\">Postmark</strong> — order, shipping, and account emails</li><li><strong class=\"font-oswald font-bold text-ink\">Google Analytics 4</strong> — anonymized site usage analytics</li><li><strong class=\"font-oswald font-bold text-ink\">Cloudflare</strong> — image and asset delivery</li></ul>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p>We share only what's necessary with the following services:</p><ul class=\"list-disc pl-5 space-y-2\"><li><strong class=\"font-oswald font-bold text-ink\">Stripe</strong> — payment processing</li><li><strong class=\"font-oswald font-bold text-ink\">Shippo</strong> — shipping label generation and tracking</li><li><strong class=\"font-oswald font-bold text-ink\">Postmark</strong> — order, shipping, and account emails</li><li><strong class=\"font-oswald font-bold text-ink\">Intuit QuickBooks</strong> — invoicing and bookkeeping for wholesale accounts</li><li><strong class=\"font-oswald font-bold text-ink\">Broadwave</strong> — newsletter list, if you sign up for it</li><li><strong class=\"font-oswald font-bold text-ink\">Google Analytics 4</strong> — anonymized site usage analytics</li><li><strong class=\"font-oswald font-bold text-ink\">Cloudflare</strong> — image and asset delivery</li></ul>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -140,13 +140,13 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, and the cookies set by Google Analytics described above. We don't use third-party advertising cookies.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>If you hold a wholesale account, we bill you on terms rather than charging a card at checkout, and we keep those books in <a href=\"https://quickbooks.intuit.com/\" class=\"text-rust hover:text-rust-deep underline underline-offset-2\">Intuit QuickBooks</a>. When we invoice an order, we send Intuit what an invoice needs: your business name, the billing email we have on file, your payment terms, and the lines and totals of the order itself. QuickBooks emails you the invoice from there, and we record your payments against it.</p><p>That's the whole of it — no card numbers, and nothing about retail shoppers. If your account is set to manual billing, we invoice you by hand and nothing goes to Intuit automatically.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = legalSection("Cookies").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = legalSection("Wholesale accounts and QuickBooks").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -162,17 +162,39 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we'll take care of it.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, and the cookies set by Google Analytics described above. We don't use third-party advertising cookies.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = legalSection("Data retention").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = legalSection("Cookies").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</article><!-- Contact card -->")
+		templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we'll take care of it.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("Data retention").Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</article><!-- Contact card -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -180,7 +202,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -204,12 +226,12 @@ func PrivacyPage(props PrivacyProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var8 == nil {
-			templ_7745c5c3_Var8 = templ.NopComponent
+		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var9 == nil {
+			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var9 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var10 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -232,7 +254,7 @@ func PrivacyPage(props PrivacyProps) templ.Component {
 			Description:  "How Rockabilly Roasting Co. handles your data.",
 			CartCount:    props.CartCount,
 			CanonicalURL: props.CanonicalURL,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

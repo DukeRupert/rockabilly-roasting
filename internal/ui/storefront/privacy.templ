@@ -22,7 +22,7 @@ templ PrivacyContent(props PrivacyProps) {
 					Privacy
 					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">policy.</span>
 				</h1>
-				<p class="font-special text-chrome-deep text-sm mt-4">Last updated: April 2026</p>
+				<p class="font-special text-chrome-deep text-sm mt-4">Last updated: September 2026</p>
 			</header>
 			<!-- Legal body -->
 			<article class="space-y-10">
@@ -47,11 +47,17 @@ templ PrivacyContent(props PrivacyProps) {
 					<p>We share only what's necessary with the following services:</p>
 					<ul class="list-disc pl-5 space-y-2">
 						<li><strong class="font-oswald font-bold text-ink">Stripe</strong> — payment processing</li>
-						<li><strong class="font-oswald font-bold text-ink">EasyPost</strong> — shipping label generation and tracking</li>
+						<li><strong class="font-oswald font-bold text-ink">Shippo</strong> — shipping label generation and tracking</li>
 						<li><strong class="font-oswald font-bold text-ink">Postmark</strong> — order, shipping, and account emails</li>
+						<li><strong class="font-oswald font-bold text-ink">Intuit QuickBooks</strong> — invoicing and bookkeeping for wholesale accounts</li>
+						<li><strong class="font-oswald font-bold text-ink">Broadwave</strong> — newsletter list, if you sign up for it</li>
 						<li><strong class="font-oswald font-bold text-ink">Google Analytics 4</strong> — anonymized site usage analytics</li>
 						<li><strong class="font-oswald font-bold text-ink">Cloudflare</strong> — image and asset delivery</li>
 					</ul>
+				}
+				@legalSection("Wholesale accounts and QuickBooks") {
+					<p>If you hold a wholesale account, we bill you on terms rather than charging a card at checkout, and we keep those books in <a href="https://quickbooks.intuit.com/" class="text-rust hover:text-rust-deep underline underline-offset-2">Intuit QuickBooks</a>. When we invoice an order, we send Intuit what an invoice needs: your business name, the billing email we have on file, your payment terms, and the lines and totals of the order itself. QuickBooks emails you the invoice from there, and we record your payments against it.</p>
+					<p>That's the whole of it — no card numbers, and nothing about retail shoppers. If your account is set to manual billing, we invoice you by hand and nothing goes to Intuit automatically.</p>
 				}
 				@legalSection("Cookies") {
 					<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, and the cookies set by Google Analytics described above. We don't use third-party advertising cookies.</p>

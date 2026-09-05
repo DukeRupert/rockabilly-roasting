@@ -90,12 +90,11 @@ const ourOrigin = "rockabillyroasting.com"
 // no test here can discover them. TestDisclosedHostsMatchTheCSPAudit binds the
 // keys to that file, so an origin added there fails here.
 //
-// The values are a different matter and nothing checks them: which company
-// operates a host is a fact about the world, not about this repository.
-// Mis-attributing cdn.jsdelivr.net to Cloudflare passes, because the policy
-// names Cloudflare for other reasons — and the page would then tell a reader
-// something false. Getting a value right is a human check, done when the entry
-// is added.
+// The values are weaker. Which company operates a host is a fact about the
+// world, so nothing here can prove an attribution right — but most hosts carry
+// their operator in the domain, and TestDisclosedVendorsMatchTheirDomains uses
+// that to catch the attributions that are plainly wrong. The two that do not
+// carry it are exempted by name there.
 var disclosedAs = map[string]string{
 	"fonts.googleapis.com":        "Google Fonts",
 	"fonts.gstatic.com":           "Google Fonts",
@@ -210,6 +209,7 @@ func TestEveryExternalHostTheLayoutLoadsIsDisclosed(t *testing.T) {
 	policy := renderPrivacy(t)
 
 	fetched := hostsFetchedByMarkup(t, page)
+	require.NotEmpty(t, loadedByThePrivacyPage, "the floor is empty, so the loop below checks nothing")
 	for _, want := range loadedByThePrivacyPage {
 		assert.True(t, fetched[want],
 			"%s is loaded by this page's markup but the extractor did not find it — it has gone blind to some tags, which is how a new host would slip past", want)
@@ -371,11 +371,17 @@ func TestDisclosedHostsMatchTheCSPAudit(t *testing.T) {
 	end := strings.Index(table[start:], "\n---")
 	require.NotEqual(t, -1, end, "cannot find the end of the origins section")
 
-	for _, m := range cspOrigin.FindAllStringSubmatch(table[start:start+end], -1) {
+	origins := cspOrigin.FindAllStringSubmatch(table[start:start+end], -1)
+	// The audit is a markdown document this branch does not own, and the only
+	// loop here whose length comes from outside. Reformatting it — an extra
+	// --- rule after the heading, backticks dropped from the table — used to
+	// leave this scanning nothing and passing.
+	require.GreaterOrEqual(t, len(origins), len(disclosedAs),
+		"found only %d origins in the CSP audit but disclosedAs has %d entries — the document has been reformatted and this check is reading nothing",
+		len(origins), len(disclosedAs))
+
+	for _, m := range origins {
 		host := strings.ToLower(m[1])
-		if strings.HasPrefix(host, "*") {
-			host = "o1" + strings.TrimPrefix(host, "*") // *.sentry.io -> a concrete ingest host
-		}
 		_, known := vendorFor(host)
 		assert.True(t, known,
 			"docs/security/csp-audit.md lists %s as an origin the browser fetches, but disclosedAs has no entry for it", host)
@@ -383,7 +389,7 @@ func TestDisclosedHostsMatchTheCSPAudit(t *testing.T) {
 }
 
 // vendorName pulls the bolded name out of each vendor list entry.
-var vendorName = regexp.MustCompile(`(?is)<li><strong[^>]*>(.*?)</strong>`)
+var vendorName = regexp.MustCompile(`(?is)<li[^>]*><strong[^>]*>(.*?)</strong>`)
 
 // The checklist is bound to the page in both directions. Its own test asserts
 // every listed vendor is named on the page; without this, dropping an entry
@@ -393,12 +399,49 @@ func TestEveryVendorOnThePageIsOnTheChecklist(t *testing.T) {
 	list := vendorList(t, renderPrivacy(t))
 
 	names := vendorName.FindAllStringSubmatch(list, -1)
-	require.NotEmpty(t, names, "no vendor names found in the list — its markup has changed shape")
+	// A count, not a non-emptiness check: an <li> carrying a class attribute
+	// used to be skipped, so a styling edit to some entries would quietly
+	// shrink what this verifies while the test went on passing.
+	require.Len(t, names, len(vendorsOnThePage),
+		"found %d vendor names in the list but the checklist has %d — either an entry is unreadable to this regex or the two have drifted apart",
+		len(names), len(vendorsOnThePage))
 
 	for _, m := range names {
 		name := strings.TrimSpace(m[1])
 		_, listed := vendorsOnThePage[name]
 		assert.True(t, listed,
 			"the policy names %s but the checklist in privacy_vendors_test.go does not, so nothing verifies it belongs there", name)
+	}
+}
+
+// operatorInDomain exempts the hosts whose registrable domain does not name the
+// company that runs them. Every other entry must carry its operator, which
+// catches an attribution that is plainly wrong — mis-filing cdn.jsdelivr.net
+// under Cloudflare passed every other check in this file, because the policy
+// names Cloudflare for its CDN anyway, and the page would have told a reader
+// something false.
+//
+// Not proof: two vendors are exempted, and a wrong value among those is still
+// only caught by a person. It forces the deliberate edit, which is the standard
+// the rest of this file works to.
+var operatorInDomain = map[string]string{
+	"fonts.gstatic.com":           "Google serves its font files from gstatic",
+	"cdn.rockabillyroasting.shop": "our domain in front of Cloudflare R2",
+}
+
+func TestDisclosedVendorsMatchTheirDomains(t *testing.T) {
+	require.NotEmpty(t, disclosedAs)
+	for host, vendor := range disclosedAs {
+		if why, exempt := operatorInDomain[host]; exempt {
+			t.Logf("%s exempt: %s", host, why)
+			continue
+		}
+		// The company's name as the policy writes it: "Google Analytics 4" ->
+		// "google", "jsDelivr" -> "jsdelivr". Compared against the host with
+		// hyphens dropped, so sentry-cdn matches Sentry and googletagmanager
+		// matches Google.
+		company := strings.ToLower(strings.Fields(vendor)[0])
+		assert.Contains(t, strings.ReplaceAll(host, "-", ""), company,
+			"%s is attributed to %q, but %q appears nowhere in the host — if the attribution is right, exempt it in operatorInDomain with the reason", host, vendor, company)
 	}
 }

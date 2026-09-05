@@ -25,6 +25,10 @@ import (
 // An earlier version deleted the whole element, which meant 16% of the page
 // went unscanned and a tracking pixel inside a link was invisible. The header
 // logo is an <img> inside an <a> today, so that was not a hypothetical shape.
+//
+// Double-quoted hrefs only, like fetchingAttr below. A single-quoted or
+// unquoted link target is reported as a named host — noisy rather than blind,
+// and templ always double-quotes.
 var anchorHref = regexp.MustCompile(`(?is)(<a\b[^>]*?)\shref\s*=\s*"[^"]*"`)
 
 // jsonLD matches a structured-data block, removed before scanning: it declares
@@ -38,7 +42,17 @@ var anchorHref = regexp.MustCompile(`(?is)(<a\b[^>]*?)\shref\s*=\s*"[^"]*"`)
 // tracker at .../application/ld+json/px.js used to delete its own tag — and
 // what it removes must parse as JSON, so an unclosed block cannot swallow the
 // script tag that follows it.
+//
+// A regex still cannot tell an attribute from an attribute's value, so a tag
+// carrying data-x=' type="application/ld+json"' would match. Structured data
+// never has a src, and a tag worth hiding always does, so tags with one are
+// refused below rather than removed. Not reachable through templ, which
+// escapes quotes and never single-quotes an attribute — closed because the
+// same shape one layer up was reachable.
 var jsonLD = regexp.MustCompile(`(?is)<script[^>]*\stype\s*=\s*"application/ld\+json"[^>]*>(.*?)</script>`)
+
+// srcAttr detects a src on a tag claiming to be structured data.
+var srcAttr = regexp.MustCompile(`(?is)\ssrc\s*=`)
 
 // urlHost pulls hosts out of written URLs, from any attribute and from element
 // bodies, accepting protocol-relative as well as https://.
@@ -95,8 +109,12 @@ func vendorFor(host string) (string, bool) {
 func scannable(page string) (string, error) {
 	out := anchorHref.ReplaceAllString(page, "$1")
 	for _, block := range jsonLD.FindAllStringSubmatch(out, -1) {
+		opening := block[0][:strings.Index(block[0], ">")+1]
+		if srcAttr.MatchString(opening) {
+			return "", errors.New("a script tagged application/ld+json also carries a src, which structured data never does — refusing to remove it, since doing so would hide whatever that src loads")
+		}
 		if !json.Valid([]byte(strings.TrimSpace(block[1]))) {
-			return "", errors.New("a script tagged application/ld+json does not contain valid JSON, so removing it before scanning would delete an unknown amount of real markup — most likely the block is unclosed and has swallowed the tags after it")
+			return "", errors.New("a script tagged application/ld+json does not contain valid JSON, so removing it before scanning would delete an unknown amount of real markup. Either the block is unclosed and has swallowed the tags after it, or its JSON is wrapped in a CDATA or comment guard that this check does not unwrap")
 		}
 		out = strings.Replace(out, block[0], "", 1)
 	}
@@ -221,31 +239,46 @@ func TestGoogleCountMatchesTheProse(t *testing.T) {
 		"the policy says %q but the vendor list names Google %d times", claimed, got)
 }
 
-// The extractor's reach is pinned here rather than only through the real page,
-// because the real page happens not to exercise most of it: a reviewer reverted
-// hostsWritten to attributes-only — the exact regression the body scan was
-// added to prevent — and the whole suite stayed green, since nothing currently
-// writes a host into an element body. These fixtures fail if any of that reach
-// is lost, whether or not a live page uses it today.
+// The reach of BOTH extractors is pinned here, against fixtures rather than
+// against the live page, because the live page exercises almost none of it: a
+// reviewer reverted hostsWritten to attributes-only — the regression the body
+// scan exists to prevent — and the suite stayed green, then did it again to
+// fetchingAttr's srcset and poster, which no rendered page contains.
+//
+// So every case states what each extractor should see. hostsWritten is the
+// disclosure check and reads the whole page; hostsFetchedByMarkup is the floor
+// and reads only attributes that fetch, which is why the two columns differ for
+// anything written in an element body.
 func TestExtractorReach(t *testing.T) {
 	cases := []struct {
-		name  string
-		html  string
-		found bool
-		host  string
+		name             string
+		html             string
+		host             string
+		written, fetched bool
 	}{
-		{"inline style @import", `<style>@import url(https://a.example.com/x.css);</style>`, true, "a.example.com"},
-		{"inline script url literal", `<script>var s="https://b.example.com/t.js";</script>`, true, "b.example.com"},
-		{"protocol-relative", `<script src="//c.example.com/t.js"></script>`, true, "c.example.com"},
-		{"source srcset", `<picture><source srcset="https://d.example.com/p.png"/></picture>`, true, "d.example.com"},
-		{"inside a link", `<a href="/x"><img src="https://e.example.com/px.gif"/></a>`, true, "e.example.com"},
-		{"link target itself", `<a href="https://f.example.com/page">text</a>`, false, "f.example.com"},
-		{"structured data", `<script type="application/ld+json">{"sameAs":["https://g.example.com/us"]}</script>`, false, "g.example.com"},
-		{"ld+json lookalike in a src", `<script src="https://h.example.com/application/ld+json/px.js"></script>`, true, "h.example.com"},
+		{"script src", `<script src="https://a.example.com/t.js"></script>`, "a.example.com", true, true},
+		{"link href", `<link rel="stylesheet" href="https://b.example.com/s.css"/>`, "b.example.com", true, true},
+		{"source srcset", `<picture><source srcset="https://c.example.com/p.png"/></picture>`, "c.example.com", true, true},
+		{"video poster", `<video poster="https://d.example.com/f.jpg"></video>`, "d.example.com", true, true},
+		{"protocol-relative", `<script src="//e.example.com/t.js"></script>`, "e.example.com", true, true},
+		{"subresource inside a link", `<a href="/x"><img src="https://f.example.com/px.gif"/></a>`, "f.example.com", true, true},
+		{"ld+json lookalike in a src", `<script src="https://g.example.com/application/ld+json/px.js"></script>`, "g.example.com", true, true},
+
+		// Written into an element body: the disclosure check sees these, the
+		// floor does not, because neither is a resource load the markup makes.
+		{"inline style @import", `<style>@import url(https://h.example.com/x.css);</style>`, "h.example.com", true, false},
+		{"inline script url literal", `<script>var s="https://i.example.com/t.js";</script>`, "i.example.com", true, false},
+		{"prose mention in a meta", `<meta name="n" content="see //j.example.com"/>`, "j.example.com", true, false},
+
+		// Neither: a link target is not a fetch, and structured data declares
+		// rather than requests.
+		{"link target itself", `<a href="https://k.example.com/page">text</a>`, "k.example.com", false, false},
+		{"structured data", `<script type="application/ld+json">{"sameAs":["https://l.example.com/us"]}</script>`, "l.example.com", false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.found, hostsWritten(t, tc.html)[tc.host])
+			assert.Equal(t, tc.written, hostsWritten(t, tc.html)[tc.host], "hostsWritten")
+			assert.Equal(t, tc.fetched, hostsFetchedByMarkup(t, tc.html)[tc.host], "hostsFetchedByMarkup")
 		})
 	}
 }

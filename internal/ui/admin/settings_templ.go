@@ -2457,7 +2457,7 @@ func qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) templ.Component
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, " <!-- Posts to the tab's own URL, not a verb path. A rejected save\n\t\t\t\t     re-renders here instead of redirecting, and hx-boost pushes the\n\t\t\t\t     action into history — so a refresh afterwards has to GET\n\t\t\t\t     something, and a POST-only path would answer 405 on the very\n\t\t\t\t     page the staffer was just told to go fix. Same reasoning as the\n\t\t\t\t     shipping form; see renderShippingSettings. --> <form method=\"post\" action=\"/admin/settings/integrations\" class=\"mt-3 grid gap-3 sm:grid-cols-2\"><div class=\"sm:col-span-2\"><label for=\"qb_client_id\" class=\"label-font text-rr-muted\">Client ID</label> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, " <!-- Posts to the tab's own URL, not a verb path. A rejected save\n\t\t\t\t     re-renders here instead of redirecting, and hx-boost pushes the\n\t\t\t\t     action into history — so a refresh afterwards has to GET\n\t\t\t\t     something, and a POST-only path would answer 405 on the very\n\t\t\t\t     page the staffer was just told to go fix. Same reasoning as the\n\t\t\t\t     shipping form; see renderShippingSettings. --> <form id=\"qb-app-save\" method=\"post\" action=\"/admin/settings/integrations\" class=\"mt-3 grid gap-3 sm:grid-cols-2\"><div class=\"sm:col-span-2\"><label for=\"qb_client_id\" class=\"label-font text-rr-muted\">Client ID</label> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -2650,12 +2650,12 @@ func qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) templ.Component
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 206, "</div><div class=\"sm:col-span-2 flex items-center gap-2\"><button type=\"submit\" class=\"btn-confirm\">Save credentials</button> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 206, "</div></form><!-- The buttons sit outside both forms, and each reaches its own.\n\t\t\t\t     Save uses the form= attribute; Remove stays INSIDE its form\n\t\t\t\t     deliberately, because admin-confirm.js restores focus on\n\t\t\t\t     cancel with returnTo.querySelector('[type=\"submit\"]') against\n\t\t\t\t     the button's form — a Remove button that pointed at an empty\n\t\t\t\t     form elsewhere on the page would drop focus instead. Nesting\n\t\t\t\t     the two forms is not an option: that is invalid HTML. --> <div class=\"mt-3 flex items-center gap-2\"><button type=\"submit\" form=\"qb-app-save\" class=\"btn-confirm\">Save credentials</button> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if !panel.FromEnvironment && panel.Configured {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 207, "<button type=\"submit\" form=\"qb-app-clear\" class=\"btn-danger\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 207, "<form method=\"post\" action=\"/admin/settings/integrations/quickbooks/app/clear\"><button type=\"submit\" class=\"btn-danger\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -2673,24 +2673,18 @@ func qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) templ.Component
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 208, ">Remove</button>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 208, ">Remove</button></form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 209, "</div></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 209, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if !panel.FromEnvironment && panel.Configured {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 210, "<!-- Outside the form above: a nested form is invalid HTML, and the\n\t\t\t\t\t     Remove button has to submit somewhere other than the save. --> <form id=\"qb-app-clear\" method=\"post\" action=\"/admin/settings/integrations/quickbooks/app/clear\" class=\"hidden\"></form>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 211, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 210, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -122,9 +122,10 @@ because mis-clicks happen and the alternative is the customer emailing staff.
 Copy is explicit that this stops *only* the weekly reminder — order
 confirmations, shipping notices and invoices are unaffected.
 
-Set `UNSUBSCRIBE_SECRET` to enable any of this. Unset degrades safely: no link,
-no headers, footer falls back to "reply and we'll take you off the list", and
-the server warns at boot. Rotating the secret invalidates every outstanding link
+Set `UNSUBSCRIBE_SECRET` — or `APP_SECRET`, which derives a key for this
+purpose when the specific variable is unset — to enable any of this. With
+neither, it degrades safely: no link, no headers, footer falls back to "reply
+and we'll take you off the list", and the server warns at boot. Rotating the secret invalidates every outstanding link
 in already-delivered mail.
 
 **Per-customer opt-out — customer detail page**
@@ -145,7 +146,8 @@ All optional; the defaults reproduce the old service's schedule.
 | `ORDER_REMINDER_HOUR` | `10` | 0–23 |
 | `ORDER_REMINDER_TIMEZONE` | `MERCHANT_TIMEZONE` | IANA name |
 | `DISABLE_ORDER_REMINDERS` | unset | Any value stops the weekly job. Use in dev/staging |
-| `UNSUBSCRIBE_SECRET` | unset | Signs opt-out links. Unset = no link, no `List-Unsubscribe` headers, reply-to fallback |
+| `UNSUBSCRIBE_SECRET` | unset | Signs opt-out links. Falls back to a key derived from `APP_SECRET`; with neither = no link, no `List-Unsubscribe` headers, reply-to fallback |
+| `APP_SECRET` | unset | One high-entropy value the per-feature keys are derived from when their own variable is unset. See `.env.example` |
 
 > **Timezone discrepancy — decide before the first prod send.** The old `rr`
 > service hardcoded `America/Denver`, while `MERCHANT_TIMEZONE` here defaults to

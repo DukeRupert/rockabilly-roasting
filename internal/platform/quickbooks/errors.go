@@ -29,6 +29,12 @@ var (
 	// would not recover the connection either way.
 	ErrAppConfigUnreadable = errors.New("quickbooks: stored app configuration could not be decrypted")
 
+	// ErrNoEncryptionKey is returned when a QuickBooks secret has to be
+	// encrypted or decrypted and no key is configured. Named rather than left
+	// to surface as "crypto/aes: invalid key size 0", because the fix is a
+	// variable on the box and the message has to say which one.
+	ErrNoEncryptionKey = errors.New("quickbooks: no encryption key configured")
+
 	// ErrInvalidAppConfig is returned when a submitted app configuration is
 	// incomplete or names an environment that does not exist.
 	ErrInvalidAppConfig = errors.New("quickbooks: invalid app configuration")
@@ -54,6 +60,9 @@ func (e *APIError) Error() string {
 func IsRetryable(err error) bool {
 	if errors.Is(err, ErrNotConfigured) {
 		return false // needs a human in the admin, not another attempt
+	}
+	if errors.Is(err, ErrAppConfigUnreadable) {
+		return false // needs a key restored on the box; retrying cannot find one
 	}
 	if errors.Is(err, ErrNotFound) {
 		return false // a missing/deleted resource won't reappear on retry

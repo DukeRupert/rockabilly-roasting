@@ -88,7 +88,7 @@ Active subscriptions get a **Skip shipments** row in the Actions panel, for when
 
 Skipping never charges the customer and never creates an order for the skipped window; it only moves the next order date. The subscription stays active, keeps its plan, variant and quantity, and every skip is recorded in the audit log. For an open-ended break, pause instead.
 
-**The customer is emailed either way.** Every skip -- yours or theirs -- sends a notice confirming what was skipped, when the next shipment bills, and a one-click link to undo it. The link is signed with `ORDER_ACTION_SECRET`; without that secret the email still sends and asks the customer to reply instead.
+**The customer is emailed either way.** Every skip -- yours or theirs -- sends a notice confirming what was skipped, when the next shipment bills, and a one-click link to undo it. The link is signed with `ORDER_ACTION_SECRET` (or, unset, a key derived from `UNSUBSCRIBE_SECRET` or `APP_SECRET`); with none of them the email still sends and asks the customer to reply instead.
 
 **Undoing notifies the customer.** An undo moves the charge date *earlier* than the last message told them, so a staff-initiated undo emails them the old and new dates. A customer who undoes it themselves gets nothing extra -- they saw it confirmed on screen.
 

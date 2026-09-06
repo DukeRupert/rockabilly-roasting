@@ -42,11 +42,6 @@ type settingsSection struct {
 	Postponements []domain.DeliveryPostponement
 	QB            admin.QBConnectionStatus
 	QBEnabled     bool
-	// QBAppUnreadable marks a saved Intuit app configuration that would not
-	// decrypt. Carried separately from QBEnabled because it is a different
-	// answer to a different question: not "no app is configured" but "one is,
-	// and this server cannot read it".
-	QBAppUnreadable bool
 	// BoxPresets is the full list, not a count: the attention list needs to
 	// know whether any exist and the box-presets page needs to draw them, and
 	// reading it twice would let the "No box presets" warning render above a
@@ -88,18 +83,14 @@ func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error)
 	// every read after it fails too and the page 500s regardless.
 	qbErr := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		configured, err := d.QB.ConfiguredTx(ctx, tx)
-		switch {
-		case errors.Is(err, quickbooks.ErrAppConfigUnreadable):
-			// Not a section-level failure. Everything else on this page is
-			// readable, and the integrations card has a panel that explains
-			// this precise case — surfacing it as "couldn't read the status"
-			// would send staff to reconnect a connection that is fine.
-			out.QBAppUnreadable = true
-		case err != nil:
+		if err != nil {
 			return err
-		default:
-			out.QBEnabled = configured
 		}
+		// True for a configuration this server cannot currently decrypt, too:
+		// the shop still means to bill through QuickBooks. Whether the secrets
+		// are readable is a different question, asked only by the tab that
+		// renders the credentials panel.
+		out.QBEnabled = configured
 
 		// Read even when no app is configured. The connection and the app it
 		// was made through are stored separately, and a shop whose
@@ -420,23 +411,28 @@ func (d *Deps) integrationsProps(r *http.Request) (admin.SettingsIntegrationsPro
 	appPanel := admin.QBAppPanel{
 		RedirectURI: d.QB.RedirectURI(),
 		Connected:   section.QB.Connected,
-		Unreadable:  section.QBAppUnreadable,
 	}
-	if !appPanel.Unreadable {
-		cfg, configured, cfgErr := d.QB.AppConfig(ctx)
-		if cfgErr != nil {
-			// loadSettingsSection asked the same question a moment ago and got
-			// an answer, so this is a database that has just gone away. The
-			// card renders as unconfigured; the shipping form below is still
-			// the reason most staff opened the page.
-			slog.Error("admin settings: qb app config", "error", cfgErr)
-		} else {
-			appPanel.Configured = configured
-			appPanel.FromEnvironment = configured && !cfg.FromDatabase
-			appPanel.HasStoredSecrets = cfg.FromDatabase
-			appPanel.ClientID = cfg.ClientID
-			appPanel.Environment = cfg.Environment
-		}
+	cfg, configured, cfgErr := d.QB.AppConfig(ctx)
+	switch {
+	case errors.Is(cfgErr, quickbooks.ErrAppConfigUnreadable):
+		// A saved configuration this server cannot decrypt. Asked here rather
+		// than in loadSettingsSection because this is the only tab that can
+		// say anything useful about it, and because every other page in the
+		// section is perfectly readable — reporting it section-wide would send
+		// staff to reconnect a connection that is fine.
+		appPanel.Unreadable = true
+	case cfgErr != nil:
+		// loadSettingsSection asked a neighbouring question a moment ago and
+		// got an answer, so this is a database that has just gone away. The
+		// card renders as unconfigured; the shipping form is still the reason
+		// most staff opened the page.
+		slog.Error("admin settings: qb app config", "error", cfgErr)
+	default:
+		appPanel.Configured = configured
+		appPanel.FromEnvironment = configured && !cfg.FromDatabase
+		appPanel.HasStoredSecrets = cfg.FromDatabase
+		appPanel.ClientID = cfg.ClientID
+		appPanel.Environment = cfg.Environment
 	}
 
 	name, role := staffNameRole(r)
@@ -779,10 +775,7 @@ func (d *Deps) handleAdminQBAppConfigUpdate(w http.ResponseWriter, r *http.Reque
 			// The client ID and the environment only. Neither secret may ever
 			// reach the audit log — it is readable by every staffer who can
 			// open the audit page, and by anyone who reads a database backup.
-			After: map[string]any{
-				"client_id":   strings.TrimSpace(in.ClientID),
-				"environment": strings.TrimSpace(in.Environment),
-			},
+			After: qbAppConfigAuditPayload(in),
 		})
 	})
 	var invalid *quickbooks.AppConfigError
@@ -795,11 +788,32 @@ func (d *Deps) handleAdminQBAppConfigUpdate(w http.ResponseWriter, r *http.Reque
 		d.renderRejectedQBAppConfig(w, r, in, invalid.Fields)
 	case errors.Is(err, quickbooks.ErrConnected):
 		redirectFlashError(w, r, "/admin/settings/integrations", "Disconnect QuickBooks before changing the app credentials")
+	case errors.Is(err, quickbooks.ErrNoEncryptionKey):
+		// Nothing on the form can fix this, so it is not a field error. The
+		// message names the variables because the fix is on the server.
+		slog.Error("qb: save app config", "error", err)
+		redirectFlashError(w, r, "/admin/settings/integrations",
+			"This server has no key to encrypt the credentials with — set QB_TOKEN_ENCRYPTION_KEY or APP_SECRET, then try again")
 	case err != nil:
 		slog.Error("qb: save app config", "error", err)
 		redirectFlashError(w, r, "/admin/settings/integrations", "Couldn't save the QuickBooks app credentials")
 	default:
 		redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks app credentials saved")
+	}
+}
+
+// qbAppConfigAuditPayload is what a credentials change records.
+//
+// A function rather than a literal at the call site so it can be pinned by a
+// test: the audit log is readable by every staffer who can open the audit page
+// and by anyone who reads a database backup, and neither secret may ever reach
+// it. The client ID and the environment are the whole payload — between them
+// they answer "whose books is this shop about to write into", which is the
+// question the entry exists to answer.
+func qbAppConfigAuditPayload(in quickbooks.AppConfigInput) map[string]any {
+	return map[string]any{
+		"client_id":   strings.TrimSpace(in.ClientID),
+		"environment": strings.TrimSpace(in.Environment),
 	}
 }
 

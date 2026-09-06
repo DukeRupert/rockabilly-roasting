@@ -681,3 +681,45 @@ func TestQBAppPanel_FormPostsToATabURLThatAnswersGET(t *testing.T) {
 	assert.Contains(t, html, `action="/admin/settings/integrations"`)
 	assert.NotContains(t, html, `action="/admin/settings/integrations/quickbooks/app"`)
 }
+
+// admin-confirm.js restores focus on cancel with
+// returnTo.querySelector('[type="submit"]') against the button's own form. A
+// Remove button that pointed at an empty form elsewhere on the page — which is
+// what the form= attribute bought before — would leave focus nowhere when the
+// dialog was dismissed. So Remove stays inside the form it submits, and Save
+// is the one that reaches out.
+func TestQBAppPanel_RemoveButtonLivesInsideTheFormItSubmits(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBEnabled: true,
+		QBApp: QBAppPanel{
+			Configured:       true,
+			HasStoredSecrets: true,
+			ClientID:         "ABxxClientId",
+		},
+	})
+
+	clearForm := formWithAction(t, html, "/admin/settings/integrations/quickbooks/app/clear")
+	assert.Contains(t, clearForm, "Remove", "the Remove button must be inside the clear form")
+	assert.Contains(t, clearForm, `type="submit"`)
+	// The empty stand-in form is gone, and with it the focus trap.
+	assert.NotContains(t, html, `id="qb-app-clear"`)
+
+	// Save reaches its form by id instead — it opens no dialog, so nothing
+	// needs to restore focus to it.
+	assert.Contains(t, html, `form="qb-app-save"`)
+	assert.Contains(t, html, `id="qb-app-save"`)
+}
+
+// formWithAction returns the markup of the single <form> carrying the given
+// action, from its opening tag to its closing one.
+func formWithAction(t *testing.T, html, action string) string {
+	t.Helper()
+	needle := `action="` + action + `"`
+	at := strings.Index(html, needle)
+	require.NotEqual(t, -1, at, "no form posting to %s", action)
+	start := strings.LastIndex(html[:at], "<form")
+	require.NotEqual(t, -1, start, "malformed form for %s", action)
+	end := strings.Index(html[start:], "</form>")
+	require.NotEqual(t, -1, end, "unterminated form for %s", action)
+	return html[start : start+end]
+}

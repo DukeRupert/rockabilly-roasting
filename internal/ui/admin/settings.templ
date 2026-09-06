@@ -1401,7 +1401,7 @@ templ qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) {
 				     something, and a POST-only path would answer 405 on the very
 				     page the staffer was just told to go fix. Same reasoning as the
 				     shipping form; see renderShippingSettings. -->
-				<form method="post" action="/admin/settings/integrations" class="mt-3 grid gap-3 sm:grid-cols-2">
+				<form id="qb-app-save" method="post" action="/admin/settings/integrations" class="mt-3 grid gap-3 sm:grid-cols-2">
 					<div class="sm:col-span-2">
 						<label for="qb_client_id" class="label-font text-rr-muted">Client ID</label>
 						<input
@@ -1453,12 +1453,20 @@ templ qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) {
 						</select>
 						@fieldNote(fieldErrors, "qb_environment", "Production writes into the real company's books. The client ID and secret are different for each — an app's sandbox keys will not authorise a production company.")
 					</div>
-					<div class="sm:col-span-2 flex items-center gap-2">
-						<button type="submit" class="btn-confirm">Save credentials</button>
-						if !panel.FromEnvironment && panel.Configured {
+				</form>
+				<!-- The buttons sit outside both forms, and each reaches its own.
+				     Save uses the form= attribute; Remove stays INSIDE its form
+				     deliberately, because admin-confirm.js restores focus on
+				     cancel with returnTo.querySelector('[type="submit"]') against
+				     the button's form — a Remove button that pointed at an empty
+				     form elsewhere on the page would drop focus instead. Nesting
+				     the two forms is not an option: that is invalid HTML. -->
+				<div class="mt-3 flex items-center gap-2">
+					<button type="submit" form="qb-app-save" class="btn-confirm">Save credentials</button>
+					if !panel.FromEnvironment && panel.Configured {
+						<form method="post" action="/admin/settings/integrations/quickbooks/app/clear">
 							<button
 								type="submit"
-								form="qb-app-clear"
 								class="btn-danger"
 								{ ConfirmAttrs(ActionConfirm{
 									Title: "Remove the saved credentials?",
@@ -1474,14 +1482,9 @@ templ qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) {
 							>
 								Remove
 							</button>
-						}
-					</div>
-				</form>
-				if !panel.FromEnvironment && panel.Configured {
-					<!-- Outside the form above: a nested form is invalid HTML, and the
-					     Remove button has to submit somewhere other than the save. -->
-					<form id="qb-app-clear" method="post" action="/admin/settings/integrations/quickbooks/app/clear" class="hidden"></form>
-				}
+						</form>
+					}
+				</div>
 			}
 		}
 	</div>

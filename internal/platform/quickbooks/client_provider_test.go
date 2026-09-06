@@ -2,6 +2,8 @@ package quickbooks
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -281,7 +283,8 @@ func TestAStoredRowWithNoEncryptionKeyNamesTheVariable(t *testing.T) {
 
 	_, _, err := p.appConfigTx(context.Background(), nil)
 	assert.ErrorIs(t, err, ErrAppConfigUnreadable)
-	assert.Contains(t, err.Error(), "APP_SECRET")
+	// Both, so a caller can tell "the key is wrong" from "there is no key".
+	assert.ErrorIs(t, err, ErrNoEncryptionKey)
 }
 
 func TestConfigurationChangeChangesTheFingerprint(t *testing.T) {
@@ -301,4 +304,82 @@ func TestNotConfiguredIsPermanent(t *testing.T) {
 	// A job that hits it must fail once with a message naming the setting, not
 	// retry for hours against a configuration only a human can supply.
 	assert.False(t, IsRetryable(ErrNotConfigured))
+}
+
+// Deciding whether to enqueue a QuickBooks job must never depend on the
+// secrets. The callers are inside a transaction placing a wholesale order, and
+// an encryption key rotated on the box would otherwise abort it — turning a
+// bookkeeping misconfiguration into a 500 for a buyer at checkout.
+func TestConfiguredTxDoesNotDecrypt(t *testing.T) {
+	apps := &fakeAppConfigStore{row: &domain.QBAppConfig{
+		ClientID:        "saved-client",
+		ClientSecret:    "not-ciphertext",
+		WebhookVerifier: "not-ciphertext",
+		Environment:     domain.QBEnvironmentSandbox,
+	}}
+	p := newTestProvider(apps, &fakeCredStore{}, AppConfig{})
+	ctx := context.Background()
+
+	// The same row that AppConfig refuses to read...
+	_, _, err := p.appConfigTx(ctx, nil)
+	require.ErrorIs(t, err, ErrAppConfigUnreadable)
+
+	// ...still answers the enqueue question, without an error.
+	configured, err := p.ConfiguredTx(ctx, nil)
+	require.NoError(t, err)
+	assert.True(t, configured, "a stored row is an intent to bill, readable or not")
+}
+
+func TestConfiguredTxFallsBackToTheEnvironment(t *testing.T) {
+	ctx := context.Background()
+
+	on, err := newTestProvider(&fakeAppConfigStore{}, &fakeCredStore{}, envConfig()).ConfiguredTx(ctx, nil)
+	require.NoError(t, err)
+	assert.True(t, on)
+
+	// Half an environment is not a configuration.
+	off, err := newTestProvider(&fakeAppConfigStore{}, &fakeCredStore{}, AppConfig{ClientID: "env-client"}).ConfiguredTx(ctx, nil)
+	require.NoError(t, err)
+	assert.False(t, off)
+}
+
+// The environment fallback is not covered by the migration's CHECK
+// constraint, so a typo in QB_ENVIRONMENT reaches this function unfiltered.
+// It must read as production: silently aiming a shop at a sandbox company
+// that does not hold its books is the worse failure.
+func TestUnrecognisedEnvironmentMeansProduction(t *testing.T) {
+	for _, env := range []string{"prod", "Production", "PRODUCTION", "", " sandbox", "live"} {
+		assert.False(t, AppConfig{Environment: env}.Sandbox(),
+			"%q must not be treated as sandbox", env)
+	}
+	assert.True(t, AppConfig{Environment: domain.QBEnvironmentSandbox}.Sandbox())
+}
+
+// Saving with no encryption key configured is a server problem, not a form
+// problem: nothing the staffer types can fix it, and marking a field would
+// send them looking in the wrong place.
+func TestSaveWithoutAnEncryptionKeyNamesTheVariable(t *testing.T) {
+	p := NewProvider(ProviderConfig{
+		AppConfigs:  &fakeAppConfigStore{},
+		Credentials: &fakeCredStore{},
+		TenantID:    uuid.New(),
+	})
+
+	err := p.SaveAppConfig(context.Background(), nil, AppConfigInput{
+		ClientID:        "client",
+		ClientSecret:    "secret",
+		WebhookVerifier: "verifier",
+		Environment:     domain.QBEnvironmentSandbox,
+	})
+	assert.ErrorIs(t, err, ErrNoEncryptionKey)
+
+	var invalid *AppConfigError
+	assert.False(t, errors.As(err, &invalid), "not a field error — no field can fix it")
+}
+
+// An unreadable configuration needs a key restored on the box. Retrying
+// cannot find one, so a job must fail once rather than burn its ladder.
+func TestUnreadableConfigIsPermanent(t *testing.T) {
+	assert.False(t, IsRetryable(ErrAppConfigUnreadable))
+	assert.False(t, IsRetryable(fmt.Errorf("create invoice: %w", ErrAppConfigUnreadable)))
 }

@@ -238,9 +238,7 @@ func (p *Provider) appConfigTx(ctx context.Context, tx pgx.Tx) (AppConfig, bool,
 
 func (p *Provider) decryptStored(stored *domain.QBAppConfig) (AppConfig, error) {
 	if len(p.cfg.EncryptionKey) == 0 {
-		// Named rather than left to fail inside AES as "invalid key size 0".
-		// The fix is a variable on the box, and the message has to say which.
-		return AppConfig{}, fmt.Errorf("%w: set QB_TOKEN_ENCRYPTION_KEY or APP_SECRET", ErrAppConfigUnreadable)
+		return AppConfig{}, fmt.Errorf("%w: %w", ErrAppConfigUnreadable, ErrNoEncryptionKey)
 	}
 	secret, err := decryptWithKey(p.cfg.EncryptionKey, stored.ClientSecret)
 	if err != nil {
@@ -259,22 +257,33 @@ func (p *Provider) decryptStored(stored *domain.QBAppConfig) (AppConfig, error) 
 	}, nil
 }
 
-// Configured reports whether a complete configuration is in force. A read
-// failure is reported as an error rather than as "not configured": those are
-// different facts, and answering "not configured" to "could not tell" is what
-// sends a staffer to re-enter credentials that were fine.
-func (p *Provider) Configured(ctx context.Context) (bool, error) {
-	_, ok, err := p.AppConfig(ctx)
-	return ok, err
-}
-
-// ConfiguredTx is Configured inside a caller's transaction. Handlers that are
-// already in one use it rather than Configured, so deciding whether to enqueue
-// a QuickBooks job does not take a second connection out of the pool while the
-// first is still held.
+// ConfiguredTx reports whether this deployment intends to use QuickBooks,
+// inside a caller's transaction.
+//
+// It deliberately does NOT decrypt. The callers are handlers already inside a
+// transaction that is placing an order or approving an account, and the only
+// question they ask is "should I enqueue a QuickBooks job?" — which the
+// existence of a configuration answers on its own. Decrypting here would let
+// an unreadable row (an encryption key rotated on the box) abort the enclosing
+// transaction and turn a bookkeeping misconfiguration into a 500 for a
+// wholesale buyer placing an order. The job that runs later needs the secrets
+// and fails there instead, where the failure is visible in the admin and the
+// order has already been placed.
+//
+// It also takes the caller's transaction rather than opening one, so deciding
+// whether to enqueue does not pull a second connection out of the pool while
+// the first is still held.
 func (p *Provider) ConfiguredTx(ctx context.Context, tx pgx.Tx) (bool, error) {
-	_, ok, err := p.appConfigTx(ctx, tx)
-	return ok, err
+	stored, err := p.cfg.AppConfigs.GetByTenantID(ctx, tx, p.cfg.TenantID)
+	if err != nil {
+		return false, err
+	}
+	if stored != nil {
+		// A row is an intent to bill through QuickBooks whether or not this
+		// process can currently read it.
+		return stored.ClientID != "", nil
+	}
+	return p.cfg.EnvFallback.Complete(), nil
 }
 
 // WebhookVerifier returns the token Intuit's webhook signatures are checked
@@ -314,13 +323,6 @@ func (p *Provider) OAuth(ctx context.Context) (*OAuthManager, error) {
 // settings page to still render.
 func (p *Provider) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus, error) {
 	return connectionStatus(ctx, tx, p.cfg.Credentials, p.cfg.TenantID)
-}
-
-// Client returns the API client for the configuration in force, or
-// ErrNotConfigured when there is none. Most callers do not need this: Provider
-// implements Client itself.
-func (p *Provider) Client(ctx context.Context) (Client, error) {
-	return p.resolve(ctx)
 }
 
 // resolve returns the client for the configuration in force, rebuilding it
@@ -381,6 +383,15 @@ func (p *Provider) SaveAppConfig(ctx context.Context, tx pgx.Tx, in AppConfigInp
 	}
 	if connected {
 		return ErrConnected
+	}
+
+	// Checked before validating the form rather than left to surface from
+	// inside AES as "invalid key size 0". Nothing the staffer types can fix
+	// it — QB_CLIENT_ID no longer gates anything, so a deployment can now
+	// reach this form with neither key variable set — and marking a field
+	// would send them looking in the wrong place.
+	if len(p.cfg.EncryptionKey) == 0 {
+		return ErrNoEncryptionKey
 	}
 
 	var storedSecret, storedVerifier string

@@ -160,4 +160,4 @@ Every local-delivery confirmation email tells the customer their delivery date a
 
 Local delivery and pickup are both free, so the switch never changes what was charged.
 
-**Requires a signing secret.** The link is signed with `ORDER_ACTION_SECRET`, falling back to `UNSUBSCRIBE_SECRET` if that isn't set. With neither set, the server warns at boot and confirmation emails ask the customer to reply instead of printing a link that couldn't be verified.
+**Requires a signing secret.** The link is signed with `ORDER_ACTION_SECRET`, falling back to `UNSUBSCRIBE_SECRET`, and then to a key derived from `APP_SECRET`. With none of the three set, the server warns at boot and confirmation emails ask the customer to reply instead of printing a link that couldn't be verified.

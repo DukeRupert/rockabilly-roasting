@@ -31,11 +31,17 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 
-# Install templ and goose. Pin templ to the same version as the library in
-# go.mod — using @latest broke v1.37.0 deploy when the CLI started emitting
-# calls into APIs newer than the pinned library version.
+# Install templ and goose, both pinned. templ is pinned to the same version as
+# the library in go.mod — using @latest broke the v1.37.0 deploy when the CLI
+# started emitting calls into APIs newer than the pinned library version.
+#
+# goose is pinned for the same reason, learned the same way: it was left on
+# @latest when templ was pinned, and it broke the v1.117.0 deploy the day
+# goose v3.28.0 raised its own requirement to go 1.26 while this image is on
+# 1.25 with GOTOOLCHAIN=local. v3.27.0 is the last release that builds here.
+# Raise this deliberately when the base image moves, not by leaving it floating.
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 && \
-    go install github.com/pressly/goose/v3/cmd/goose@latest
+    go install github.com/pressly/goose/v3/cmd/goose@v3.27.0
 
 # Cache Go modules
 COPY go.mod go.sum ./

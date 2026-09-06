@@ -20,6 +20,35 @@ type QBCredentials struct {
 	UpdatedAt        time.Time
 }
 
+// QBAppConfig identifies the Intuit app a QuickBooks connection is made
+// through: the OAuth client pair, the webhook verifier token, and which of
+// Intuit's two API environments they belong to.
+//
+// It is the other half of QBCredentials — that struct holds the tokens, this
+// one holds the app that issued them. Both secret fields are encrypted at
+// rest; decryption happens in the platform/quickbooks package.
+type QBAppConfig struct {
+	TenantID uuid.UUID
+	ClientID string
+	// ClientSecret and WebhookVerifier are ciphertext as they travel through
+	// the store. Nothing outside platform/quickbooks should need the
+	// plaintext, and nothing anywhere should render either back to a screen.
+	ClientSecret    string
+	WebhookVerifier string
+	// Environment is "sandbox" or "production", constrained by the database.
+	Environment string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// QBEnvironmentSandbox and QBEnvironmentProduction are the two Intuit API
+// environments. They are named here rather than left as bare strings because
+// the difference between them is whether a real company's books get written.
+const (
+	QBEnvironmentSandbox    = "sandbox"
+	QBEnvironmentProduction = "production"
+)
+
 // QBBillingMode controls whether the QuickBooks chain is allowed to move
 // money. It is stored on store_settings and flipped from the admin, so a proof
 // period can be started and ended without a deploy.

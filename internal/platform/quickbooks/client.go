@@ -27,6 +27,9 @@ const (
 	productionBaseURL = "https://quickbooks.api.intuit.com"
 
 	tokenRefreshBuffer = 5 * time.Minute
+
+	// defaultHTTPTimeout bounds every call to Intuit.
+	defaultHTTPTimeout = 30 * time.Second
 )
 
 // CredentialStore is the interface for persisting QB OAuth tokens.
@@ -76,7 +79,7 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 		credStore: credStore,
 		pool:      pool,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 		baseURL: baseURL,
 		terms:   newTermCache(),
@@ -371,9 +374,19 @@ func classifyError(statusCode int, body []byte) error {
 	}
 }
 
-// Encrypt encrypts plaintext using AES-256-GCM.
+// Encrypt encrypts plaintext using AES-256-GCM under the client's key.
 func (c *QBClient) Encrypt(plaintext string) (string, error) {
-	block, err := aes.NewCipher(c.config.EncryptionKey)
+	return encryptWithKey(c.config.EncryptionKey, plaintext)
+}
+
+// encryptWithKey encrypts plaintext using AES-256-GCM and returns base64.
+//
+// A package-level function rather than only a QBClient method because the app
+// config's client secret and webhook verifier are encrypted with the same key,
+// and they have to be readable before there is a configured client to read
+// them with.
+func encryptWithKey(key []byte, plaintext string) (string, error) {
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
@@ -396,11 +409,16 @@ func (c *QBClient) Decrypt(encoded string) (string, error) { return c.decrypt(en
 
 // decrypt decrypts a base64-encoded AES-256-GCM ciphertext.
 func (c *QBClient) decrypt(encoded string) (string, error) {
+	return decryptWithKey(c.config.EncryptionKey, encoded)
+}
+
+// decryptWithKey is decrypt's key-explicit form — see encryptWithKey.
+func decryptWithKey(key []byte, encoded string) (string, error) {
 	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", err
 	}
-	block, err := aes.NewCipher(c.config.EncryptionKey)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}

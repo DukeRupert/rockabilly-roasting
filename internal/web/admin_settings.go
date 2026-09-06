@@ -42,6 +42,11 @@ type settingsSection struct {
 	Postponements []domain.DeliveryPostponement
 	QB            admin.QBConnectionStatus
 	QBEnabled     bool
+	// QBAppUnreadable marks a saved Intuit app configuration that would not
+	// decrypt. Carried separately from QBEnabled because it is a different
+	// answer to a different question: not "no app is configured" but "one is,
+	// and this server cannot read it".
+	QBAppUnreadable bool
 	// BoxPresets is the full list, not a count: the attention list needs to
 	// know whether any exist and the box-presets page needs to draw them, and
 	// reading it twice would let the "No box presets" warning render above a
@@ -71,7 +76,6 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 // read.
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
 	out := settingsSection{
-		QBEnabled:      d.QBOAuthManager != nil,
 		ServiceEnabled: d.ModuleService.Enabled(domain.ModuleEquipmentService),
 	}
 
@@ -82,21 +86,37 @@ func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error)
 	// that was fine. Sharing the transaction below would make that graceful
 	// path unreachable: a real database error aborts the pgx transaction, so
 	// every read after it fails too and the page 500s regardless.
-	if out.QBEnabled {
-		qbErr := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			status, err := d.QBOAuthManager.Status(ctx, tx)
-			if err != nil {
-				return err
-			}
-			out.QB.Connected = status.Connected
-			out.QB.RealmID = status.RealmID
-			out.QB.RefreshExpiresAt = status.RefreshExpiresAt
-			return nil
-		})
-		if qbErr != nil {
-			slog.Error("admin settings: quickbooks status", "error", qbErr)
-			out.QB = admin.QBConnectionStatus{Unavailable: true}
+	qbErr := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		configured, err := d.QB.ConfiguredTx(ctx, tx)
+		switch {
+		case errors.Is(err, quickbooks.ErrAppConfigUnreadable):
+			// Not a section-level failure. Everything else on this page is
+			// readable, and the integrations card has a panel that explains
+			// this precise case — surfacing it as "couldn't read the status"
+			// would send staff to reconnect a connection that is fine.
+			out.QBAppUnreadable = true
+		case err != nil:
+			return err
+		default:
+			out.QBEnabled = configured
 		}
+
+		// Read even when no app is configured. The connection and the app it
+		// was made through are stored separately, and a shop whose
+		// configuration was cleared out from under a live connection needs the
+		// page to say so rather than to render as a fresh install.
+		status, err := d.QB.Status(ctx, tx)
+		if err != nil {
+			return err
+		}
+		out.QB.Connected = status.Connected
+		out.QB.RealmID = status.RealmID
+		out.QB.RefreshExpiresAt = status.RefreshExpiresAt
+		return nil
+	})
+	if qbErr != nil {
+		slog.Error("admin settings: quickbooks status", "error", qbErr)
+		out.QB = admin.QBConnectionStatus{Unavailable: true}
 	}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -291,13 +311,44 @@ func (d *Deps) handleAdminSettingsWholesale(w http.ResponseWriter, r *http.Reque
 
 // handleAdminSettingsIntegrations renders the Integrations tab.
 func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	section, err := d.loadSettingsSection(ctx)
+	props, err := d.integrationsProps(r)
 	if err != nil {
 		slog.Error("admin settings: load", "error", err)
 		Error(w, r, err)
 		return
+	}
+	props.Flash = settingsFlash(r)
+	d.renderIntegrations(w, r, props)
+}
+
+// renderIntegrations renders the Integrations tab, htmx partial or whole.
+//
+// A rejected save renders 200, not 422, for the same reason the shipping form
+// does: hx-boost is on across the admin and htmx does not swap 4xx responses,
+// so a correct status code would mean the staffer clicks Save and the page
+// silently does nothing. See renderShippingSettings for the rest of that
+// argument, including why the form posts to this tab's own URL.
+func (d *Deps) renderIntegrations(w http.ResponseWriter, r *http.Request, props admin.SettingsIntegrationsProps) {
+	ctx := r.Context()
+	if IsHTMX(r) {
+		admin.SettingsIntegrationsContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.SettingsIntegrations(props).Render(ctx, w) //nolint:errcheck
+}
+
+// integrationsProps assembles everything the Integrations tab renders from
+// what is currently stored.
+//
+// Separate from the handler so a rejected save can re-render the page as it
+// actually is and then overlay its draft, rather than assembling a second,
+// almost-identical set of props that would drift out of step with this one.
+func (d *Deps) integrationsProps(r *http.Request) (admin.SettingsIntegrationsProps, error) {
+	ctx := r.Context()
+
+	section, err := d.loadSettingsSection(ctx)
+	if err != nil {
+		return admin.SettingsIntegrationsProps{}, err
 	}
 
 	// Billing mode and the review count are read here rather than in
@@ -346,42 +397,61 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		itemPanel.ShippingItemID = cfg.ShippingItemID
 		itemPanel.ShippingItemName = cfg.ShippingItemName
 
-		if d.QBClient == nil {
+		items, listErr := d.QB.ListItems(ctx)
+		if listErr != nil {
 			// Cannot offer a choice, which is not the same as the company
 			// having nothing to choose from.
 			itemPanel.Unavailable = true
-		} else {
-			items, listErr := d.QBClient.ListItems(ctx)
-			if listErr != nil {
+			// Not configured is the ordinary state of a shop that has not
+			// connected yet, and logging it as an error every time the
+			// settings page loads would bury the failures that matter.
+			if !errors.Is(listErr, quickbooks.ErrNotConfigured) {
 				slog.Error("admin settings: qb list items", "error", listErr)
-				itemPanel.Unavailable = true
 			}
-			for _, item := range items {
-				itemPanel.Choices = append(itemPanel.Choices, admin.QBItemChoice{
-					ID: item.ID, Name: item.Name, IncomeAccount: item.IncomeAccount,
-				})
-			}
+		}
+		for _, item := range items {
+			itemPanel.Choices = append(itemPanel.Choices, admin.QBItemChoice{
+				ID: item.ID, Name: item.Name, IncomeAccount: item.IncomeAccount,
+			})
+		}
+	}
+
+	// Which Intuit app is in force, and the form for changing it.
+	appPanel := admin.QBAppPanel{
+		RedirectURI: d.QB.RedirectURI(),
+		Connected:   section.QB.Connected,
+		Unreadable:  section.QBAppUnreadable,
+	}
+	if !appPanel.Unreadable {
+		cfg, configured, cfgErr := d.QB.AppConfig(ctx)
+		if cfgErr != nil {
+			// loadSettingsSection asked the same question a moment ago and got
+			// an answer, so this is a database that has just gone away. The
+			// card renders as unconfigured; the shipping form below is still
+			// the reason most staff opened the page.
+			slog.Error("admin settings: qb app config", "error", cfgErr)
+		} else {
+			appPanel.Configured = configured
+			appPanel.FromEnvironment = configured && !cfg.FromDatabase
+			appPanel.HasStoredSecrets = cfg.FromDatabase
+			appPanel.ClientID = cfg.ClientID
+			appPanel.Environment = cfg.Environment
 		}
 	}
 
 	name, role := staffNameRole(r)
-	props := admin.SettingsIntegrationsProps{
+	return admin.SettingsIntegrationsProps{
 		Nav:            section.nav(role),
 		QB:             section.QB,
+		QBApp:          appPanel,
 		QBEnabled:      section.QBEnabled,
 		QBBillingMode:  mode,
 		QBPreviewCount: previewCount,
 		QBItems:        itemPanel,
-		Flash:          settingsFlash(r),
 		MerchantTZ:     d.MerchantTZ,
 		StaffName:      name,
 		StaffRole:      role,
-	}
-	if IsHTMX(r) {
-		admin.SettingsIntegrationsContent(props).Render(ctx, w) //nolint:errcheck
-		return
-	}
-	admin.SettingsIntegrations(props).Render(ctx, w) //nolint:errcheck
+	}, nil
 }
 
 // handleAdminShippingSettingsUpdate persists the edited shipping config and
@@ -678,14 +748,141 @@ func parseZipList(raw string) []string {
 	return out
 }
 
+// handleAdminQBAppConfigUpdate saves which Intuit app the shop connects
+// QuickBooks through.
+//
+// The two secrets arrive here and are never sent back: a blank field means
+// "keep what is stored", which is what lets a staffer correct a client ID
+// without retyping credentials they may not have in front of them.
+func (d *Deps) handleAdminQBAppConfigUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	actor := staffActor(r)
+
+	in := quickbooks.AppConfigInput{
+		ClientID:        r.FormValue("qb_client_id"),
+		ClientSecret:    r.FormValue("qb_client_secret"),
+		WebhookVerifier: r.FormValue("qb_webhook_verifier"),
+		Environment:     r.FormValue("qb_environment"),
+	}
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if err := d.QB.SaveAppConfig(ctx, tx, in); err != nil {
+			return err
+		}
+		return d.AuditWriter.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    actor.Type,
+			ActorID:      actor.ID,
+			ActorName:    actor.Name,
+			Action:       audit.AuditQBAppConfigUpdated,
+			ResourceType: "qb_app_config",
+			ResourceID:   d.QB.TenantID(),
+			// The client ID and the environment only. Neither secret may ever
+			// reach the audit log — it is readable by every staffer who can
+			// open the audit page, and by anyone who reads a database backup.
+			After: map[string]any{
+				"client_id":   strings.TrimSpace(in.ClientID),
+				"environment": strings.TrimSpace(in.Environment),
+			},
+		})
+	})
+	var invalid *quickbooks.AppConfigError
+	switch {
+	case errors.As(err, &invalid):
+		// Re-rendered in place, not redirected with a flash. The secrets
+		// cannot be echoed back, so a rejected save that also dropped the
+		// client ID would cost the staffer every field on the form for one
+		// mistake — the same trap the shipping form was fixed for.
+		d.renderRejectedQBAppConfig(w, r, in, invalid.Fields)
+	case errors.Is(err, quickbooks.ErrConnected):
+		redirectFlashError(w, r, "/admin/settings/integrations", "Disconnect QuickBooks before changing the app credentials")
+	case err != nil:
+		slog.Error("qb: save app config", "error", err)
+		redirectFlashError(w, r, "/admin/settings/integrations", "Couldn't save the QuickBooks app credentials")
+	default:
+		redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks app credentials saved")
+	}
+}
+
+// renderRejectedQBAppConfig re-renders the Integrations tab with the submitted
+// values still in the form and each bad field marked.
+//
+// The page is assembled from what is stored and only then overlaid with the
+// draft, so everything else on the tab — the connection status, the invoice
+// items, the billing mode, and the summary above the form — keeps describing
+// what is actually saved. Nothing reached the database.
+func (d *Deps) renderRejectedQBAppConfig(w http.ResponseWriter, r *http.Request, in quickbooks.AppConfigInput, fieldErrors map[string]string) {
+	props, err := d.integrationsProps(r)
+	if err != nil {
+		slog.Error("admin settings: load", "error", err)
+		Error(w, r, err)
+		return
+	}
+	props.QBApp.Draft = &admin.QBAppDraft{
+		ClientID:    strings.TrimSpace(in.ClientID),
+		Environment: strings.TrimSpace(in.Environment),
+	}
+	props.FieldErrors = fieldErrors
+	props.Flash = admin.Flash{Message: "Nothing was saved — check the fields marked below.", Error: true}
+	d.renderIntegrations(w, r, props)
+}
+
+// handleAdminQBAppConfigClear forgets the saved app configuration, returning
+// the deployment to whatever the environment supplies — usually nothing.
+func (d *Deps) handleAdminQBAppConfigClear(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	actor := staffActor(r)
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if err := d.QB.ClearAppConfig(ctx, tx); err != nil {
+			return err
+		}
+		return d.AuditWriter.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    actor.Type,
+			ActorID:      actor.ID,
+			ActorName:    actor.Name,
+			Action:       audit.AuditQBAppConfigCleared,
+			ResourceType: "qb_app_config",
+			ResourceID:   d.QB.TenantID(),
+		})
+	})
+	switch {
+	case errors.Is(err, quickbooks.ErrConnected):
+		redirectFlashError(w, r, "/admin/settings/integrations", "Disconnect QuickBooks before removing the app credentials")
+	case err != nil:
+		slog.Error("qb: clear app config", "error", err)
+		redirectFlashError(w, r, "/admin/settings/integrations", "Couldn't remove the QuickBooks app credentials")
+	default:
+		redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks app credentials removed")
+	}
+}
+
+// qbOAuth resolves the OAuth manager for the app currently configured,
+// writing the response itself when there is none to resolve. Every OAuth
+// handler starts here: the configuration is a database row now, so "is
+// QuickBooks configured" is a question each request asks rather than one main
+// answered at boot with a nil.
+func (d *Deps) qbOAuth(w http.ResponseWriter, r *http.Request) (*quickbooks.OAuthManager, bool) {
+	oauth, err := d.QB.OAuth(r.Context())
+	switch {
+	case errors.Is(err, quickbooks.ErrNotConfigured), errors.Is(err, quickbooks.ErrInvalidAppConfig):
+		http.Error(w, "QuickBooks not configured", http.StatusBadRequest)
+		return nil, false
+	case err != nil:
+		slog.Error("qb oauth: resolve manager", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return nil, false
+	}
+	return oauth, true
+}
+
 // handleAdminQBConnect initiates the OAuth2 flow to connect QuickBooks.
 func (d *Deps) handleAdminQBConnect(w http.ResponseWriter, r *http.Request) {
-	if d.QBOAuthManager == nil {
-		http.Error(w, "QuickBooks not configured", http.StatusBadRequest)
+	oauth, ok := d.qbOAuth(w, r)
+	if !ok {
 		return
 	}
 
-	authURL, err := d.QBOAuthManager.StartAuth(w)
+	authURL, err := oauth.StartAuth(w)
 	if err != nil {
 		slog.Error("qb oauth: start auth", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -701,12 +898,12 @@ func (d *Deps) handleAdminQBConnect(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if d.QBOAuthManager == nil {
-		http.Error(w, "QuickBooks not configured", http.StatusBadRequest)
+	oauth, ok := d.qbOAuth(w, r)
+	if !ok {
 		return
 	}
 
-	creds, err := d.QBOAuthManager.ExchangeCallback(ctx, r)
+	creds, err := oauth.ExchangeCallback(ctx, r)
 	if err != nil {
 		switch {
 		case errors.Is(err, quickbooks.ErrInvalidState):
@@ -725,7 +922,7 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 
 	actor := staffActor(r)
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		if err := d.QBOAuthManager.SaveCredentials(ctx, tx, creds); err != nil {
+		if err := oauth.SaveCredentials(ctx, tx, creds); err != nil {
 			return err
 		}
 		return d.AuditWriter.Record(ctx, tx, audit.AuditEntry{
@@ -734,7 +931,7 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 			ActorName:    actor.Name,
 			Action:       audit.AuditQBConnected,
 			ResourceType: "qb_credentials",
-			ResourceID:   d.QBOAuthManager.TenantID(),
+			ResourceID:   d.QB.TenantID(),
 			After:        map[string]any{"realm_id": creds.RealmID},
 		})
 	})
@@ -752,8 +949,8 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if d.QBOAuthManager == nil {
-		http.Error(w, "QuickBooks not configured", http.StatusBadRequest)
+	oauth, ok := d.qbOAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -763,7 +960,7 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 	// with Intuit before forgetting it locally.
 	var refreshToken string
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		rt, err := d.QBOAuthManager.RefreshTokenForRevoke(ctx, tx)
+		rt, err := oauth.RefreshTokenForRevoke(ctx, tx)
 		refreshToken = rt
 		return err
 	}); err != nil {
@@ -776,14 +973,14 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 	// revoke failure (Intuit down, token already revoked) must not block the
 	// local disconnect below.
 	if refreshToken != "" {
-		if err := d.QBOAuthManager.Revoke(ctx, refreshToken); err != nil {
+		if err := oauth.Revoke(ctx, refreshToken); err != nil {
 			slog.Warn("qb: token revoke failed, disconnecting locally anyway", "error", err)
 		}
 	}
 
 	// Phase 3 (write tx): delete the local credential and audit, atomically.
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		if err := d.QBOAuthManager.Disconnect(ctx, tx); err != nil {
+		if err := oauth.Disconnect(ctx, tx); err != nil {
 			return err
 		}
 		return d.AuditWriter.Record(ctx, tx, audit.AuditEntry{
@@ -792,7 +989,7 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 			ActorName:    actor.Name,
 			Action:       audit.AuditQBDisconnected,
 			ResourceType: "qb_credentials",
-			ResourceID:   d.QBOAuthManager.TenantID(),
+			ResourceID:   d.QB.TenantID(),
 		})
 	})
 	if err != nil {
@@ -871,13 +1068,12 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 	if salesID == "" {
 		return store.QBItemConfig{}, app.ErrQBSalesItemRequired
 	}
-	if d.QBClient == nil {
+	items, err := d.QB.ListItems(ctx)
+	if errors.Is(err, quickbooks.ErrNotConfigured) {
 		// A different fact from "that item is gone", and worth saying so: the
-		// form should not be reachable at all without a client.
+		// form should not be reachable at all without a configured app.
 		return store.QBItemConfig{}, app.ErrQBNotConnected
 	}
-
-	items, err := d.QBClient.ListItems(ctx)
 	if err != nil {
 		return store.QBItemConfig{}, fmt.Errorf("qb list items: %w", err)
 	}

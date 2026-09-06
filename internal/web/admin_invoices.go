@@ -175,7 +175,11 @@ func (d *Deps) handleAdminInvoiceRecordPayment(w http.ResponseWriter, r *http.Re
 		}
 
 		// Enqueue QB payment sync if QB is connected (atomically in the same tx)
-		if d.QBClient != nil {
+		qbConfigured, txErr := d.QB.ConfiguredTx(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		if qbConfigured {
 			ref := ""
 			if reference != nil {
 				ref = *reference

@@ -283,9 +283,20 @@ const (
 	// AuditQBItemsUpdated records a change to which QuickBooks items invoices
 	// bill against — in effect, which income account the shop's wholesale
 	// revenue lands in.
-	AuditQBItemsUpdated   = "qb.items_updated"
-	AuditQBInvoiceEmailed = "qb.invoice_emailed"
-	AuditQBPaymentSynced  = "qb.payment_synced"
+	AuditQBItemsUpdated = "qb.items_updated"
+	// AuditQBAppConfigUpdated records a change to which Intuit app the shop
+	// connects through — the OAuth client pair, the webhook verifier and the
+	// API environment. Recorded because it is the one setting that decides
+	// whose books get written, and because the credentials themselves can
+	// never appear in the log: the entry names the client ID and the
+	// environment, and nothing else.
+	AuditQBAppConfigUpdated = "qb.app_config_updated"
+	// AuditQBAppConfigCleared records the app configuration being removed,
+	// which switches QuickBooks off for the deployment unless the environment
+	// still supplies one.
+	AuditQBAppConfigCleared = "qb.app_config_cleared"
+	AuditQBInvoiceEmailed   = "qb.invoice_emailed"
+	AuditQBPaymentSynced    = "qb.payment_synced"
 	// AuditQBPaymentSyncSkipped records a payment that was NOT mirrored into
 	// QuickBooks because the shop is in test mode.
 	//

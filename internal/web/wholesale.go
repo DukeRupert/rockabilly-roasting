@@ -958,7 +958,11 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		}
 
 		// Enqueue QB customer + invoice chain if QB is connected.
-		if d.QBClient != nil {
+		qbConfigured, txErr := d.QB.ConfiguredTx(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		if qbConfigured {
 			_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
 				CustomerID: customer.ID,
 				OrderID:    order.ID,

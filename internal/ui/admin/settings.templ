@@ -221,7 +221,13 @@ type SettingsIntegrationsProps struct {
 	// QBItems is which QuickBooks items invoices bill against, and what they
 	// could be changed to.
 	QBItems QBItemPanel
-	QBEnabled  bool // true if QB_CLIENT_ID is configured
+	// QBApp is which Intuit app the shop connects through, and the form for
+	// changing it.
+	QBApp     QBAppPanel
+	QBEnabled bool // true when an Intuit app is configured, from the form or the environment
+	// FieldErrors maps a form field name to what is wrong with it, for a
+	// rejected save that re-renders in place rather than redirecting.
+	FieldErrors map[string]string
 	Flash      Flash
 	MerchantTZ *time.Location
 	StaffName  string
@@ -863,12 +869,8 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 					</div>
 				</div>
 			} else if !props.QBEnabled {
-				<!-- QB not configured in env -->
-				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
-					<p class="text-sm text-rr-muted">
-						QuickBooks integration is not configured. Set <code class="rounded bg-rr-raised px-1 py-0.5 text-xs font-mono">QB_CLIENT_ID</code> and related environment variables to enable.
-					</p>
-				</div>
+				<!-- No Intuit app configured: the form is the whole card. -->
+				@qbAppPanel(props.QBApp, props.FieldErrors)
 			} else if props.QB.Connected {
 				<!-- Connected state -->
 				<div class="border-t border-rr-border">
@@ -897,6 +899,7 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 						}
 					</dl>
 				</div>
+				@qbAppPanel(props.QBApp, props.FieldErrors)
 				@qbItemPanel(props.QBItems)
 				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
 					<div class="sm:flex sm:items-start sm:justify-between sm:gap-4">
@@ -960,7 +963,9 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 					</div>
 				</div>
 			} else {
-				<!-- Disconnected state -->
+				<!-- Disconnected state. The app configuration is editable here and
+				     nowhere else: once a connection exists the tokens belong to
+				     this app, so changing it is a disconnect first. -->
 				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
 					<a
 						href="/admin/settings/integrations/quickbooks/connect"
@@ -970,6 +975,7 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 						Connect to QuickBooks
 					</a>
 				</div>
+				@qbAppPanel(props.QBApp, props.FieldErrors)
 			}
 		</div>
 	</div>
@@ -1260,4 +1266,223 @@ func qbItemLabel(choice QBItemChoice) string {
 		return choice.Name
 	}
 	return choice.Name + " → " + choice.IncomeAccount
+}
+
+// QBAppPanel backs the Intuit app credentials panel: which app the shop
+// connects QuickBooks through, and the form for changing it.
+//
+// The two secrets are deliberately absent from this struct. A page that prints
+// a client secret into HTML has put it in browser caches, proxy logs and over
+// whoever is standing behind the staffer — so the panel reports only whether
+// secrets are stored, and the form takes blank to mean "leave them alone".
+type QBAppPanel struct {
+	// Configured is whether a complete configuration is in force, from either
+	// source.
+	Configured bool
+	// FromEnvironment marks a configuration supplied by the server's
+	// environment variables rather than saved here. Saving the form stores one
+	// in the database, which then wins.
+	FromEnvironment bool
+	// HasStoredSecrets is whether a saved row already holds both secrets, and
+	// therefore whether the secret fields may be left blank.
+	HasStoredSecrets bool
+	ClientID         string
+	// Environment is "sandbox" or "production".
+	Environment string
+	// Connected locks the form: the stored OAuth tokens were issued by this
+	// app and stop meaning anything the moment it changes.
+	Connected bool
+	// Unreadable marks a saved row that would not decrypt, which means the
+	// encryption key changed. Says so rather than offering a form, because
+	// saving over it would not recover the connection either.
+	Unreadable bool
+	// RedirectURI is the callback this deployment will send Intuit to. Shown
+	// because it has to be registered on Intuit's side character for character
+	// and it is derived from BASE_URL rather than typed anywhere.
+	RedirectURI string
+	// Draft is what was just submitted and rejected. Non-nil means the inputs
+	// render it instead of what is stored, so a mistyped field does not cost
+	// the staffer the client ID they pasted alongside it. The summary above
+	// the form keeps showing the stored values either way — nothing has
+	// changed on disk yet.
+	//
+	// The secrets are deliberately not part of it. They cannot be re-rendered,
+	// which is exactly why keeping the fields that CAN be is worth the trouble.
+	Draft *QBAppDraft
+}
+
+// QBAppDraft is the non-secret part of a rejected submission.
+type QBAppDraft struct {
+	ClientID    string
+	Environment string
+}
+
+// FormClientID is what the client ID input renders: the rejected draft when
+// there is one, otherwise what is stored.
+func (p QBAppPanel) FormClientID() string {
+	if p.Draft != nil {
+		return p.Draft.ClientID
+	}
+	return p.ClientID
+}
+
+// FormEnvironment is what the environment select renders. Same rule.
+func (p QBAppPanel) FormEnvironment() string {
+	if p.Draft != nil {
+		return p.Draft.Environment
+	}
+	return p.Environment
+}
+
+// EnvironmentLabel names the API environment the way a bookkeeper reads it.
+func (p QBAppPanel) EnvironmentLabel() string {
+	if p.Environment == domain.QBEnvironmentSandbox {
+		return "Sandbox (test company)"
+	}
+	return "Production (real company)"
+}
+
+// qbAppPanel renders the app credentials: a summary when there is nothing to
+// be done, the form when there is.
+templ qbAppPanel(panel QBAppPanel, fieldErrors map[string]string) {
+	<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+		<h3 class="text-sm font-medium text-rr-heading">Intuit app</h3>
+		if panel.Unreadable {
+			<p class="mt-1 text-sm text-rr-muted">
+				The saved app credentials could not be read. That means the server's
+				encryption key changed — the credentials are intact but unreadable with
+				the current key. Restore the previous key, or clear the connection and
+				enter the credentials again.
+			</p>
+		} else {
+			<p class="mt-1 text-xs text-rr-muted">
+				The QuickBooks app these invoices are billed through. Created at
+				developer.intuit.com — the shop's own app, not a published one.
+			</p>
+			if panel.Configured {
+				<dl class="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+					<dt class="text-rr-muted">Client ID</dt>
+					<dd class="font-mono text-rr-heading sm:col-span-2">{ panel.ClientID }</dd>
+					<dt class="text-rr-muted">Environment</dt>
+					<dd class="text-rr-heading sm:col-span-2">{ panel.EnvironmentLabel() }</dd>
+					<dt class="text-rr-muted">Set in</dt>
+					<dd class="text-rr-heading sm:col-span-2">
+						if panel.FromEnvironment {
+							the server environment
+						} else {
+							this page
+						}
+					</dd>
+				</dl>
+			}
+			if panel.RedirectURI != "" {
+				<p class="mt-3 text-xs text-rr-muted">
+					Redirect URI to register with Intuit:
+					<code class="rounded bg-rr-raised px-1 py-0.5 font-mono">{ panel.RedirectURI }</code>
+				</p>
+			}
+			if panel.Connected {
+				<p class="mt-3 text-sm text-rr-muted">
+					Disconnect QuickBooks before changing these. The authorisation stored
+					here was issued by this app and stops working the moment it changes.
+				</p>
+			} else {
+				if panel.FromEnvironment {
+					<p class="mt-3 text-sm text-rr-muted">
+						These are coming from the server's environment variables. Saving here
+						stores them in the database instead, which then takes precedence — and
+						means the next change needs no deploy. Both secrets have to be entered:
+						environment variables cannot be read back out.
+					</p>
+				}
+				<!-- Posts to the tab's own URL, not a verb path. A rejected save
+				     re-renders here instead of redirecting, and hx-boost pushes the
+				     action into history — so a refresh afterwards has to GET
+				     something, and a POST-only path would answer 405 on the very
+				     page the staffer was just told to go fix. Same reasoning as the
+				     shipping form; see renderShippingSettings. -->
+				<form method="post" action="/admin/settings/integrations" class="mt-3 grid gap-3 sm:grid-cols-2">
+					<div class="sm:col-span-2">
+						<label for="qb_client_id" class="label-font text-rr-muted">Client ID</label>
+						<input
+							type="text"
+							id="qb_client_id"
+							name="qb_client_id"
+							value={ panel.FormClientID() }
+							autocomplete="off"
+							spellcheck="false"
+							class={ fieldInput(fieldErrors, "qb_client_id", "mt-1 font-mono text-rr-heading") }
+						/>
+						@fieldNote(fieldErrors, "qb_client_id", "")
+					</div>
+					<div>
+						<label for="qb_client_secret" class="label-font text-rr-muted">Client secret</label>
+						<input
+							type="password"
+							id="qb_client_secret"
+							name="qb_client_secret"
+							autocomplete="new-password"
+							class={ fieldInput(fieldErrors, "qb_client_secret", "mt-1 font-mono text-rr-heading") }
+						/>
+						if _, bad := fieldErrors["qb_client_secret"]; bad {
+							@fieldNote(fieldErrors, "qb_client_secret", "")
+						} else if panel.HasStoredSecrets {
+							<p class="mt-1 text-xs text-rr-muted">Stored. Leave blank to keep it.</p>
+						}
+					</div>
+					<div>
+						<label for="qb_webhook_verifier" class="label-font text-rr-muted">Webhook verifier token</label>
+						<input
+							type="password"
+							id="qb_webhook_verifier"
+							name="qb_webhook_verifier"
+							autocomplete="new-password"
+							class={ fieldInput(fieldErrors, "qb_webhook_verifier", "mt-1 font-mono text-rr-heading") }
+						/>
+						if _, bad := fieldErrors["qb_webhook_verifier"]; bad {
+							@fieldNote(fieldErrors, "qb_webhook_verifier", "")
+						} else if panel.HasStoredSecrets {
+							<p class="mt-1 text-xs text-rr-muted">Stored. Leave blank to keep it.</p>
+						}
+					</div>
+					<div class="sm:col-span-2">
+						<label for="qb_environment" class="label-font block text-rr-muted">Environment</label>
+						<select id="qb_environment" name="qb_environment" class={ fieldInput(fieldErrors, "qb_environment", "mt-1 text-rr-heading sm:max-w-xs") }>
+							<option value={ domain.QBEnvironmentSandbox } selected?={ panel.FormEnvironment() != domain.QBEnvironmentProduction }>Sandbox (test company)</option>
+							<option value={ domain.QBEnvironmentProduction } selected?={ panel.FormEnvironment() == domain.QBEnvironmentProduction }>Production (real company)</option>
+						</select>
+						@fieldNote(fieldErrors, "qb_environment", "Production writes into the real company's books. The client ID and secret are different for each — an app's sandbox keys will not authorise a production company.")
+					</div>
+					<div class="sm:col-span-2 flex items-center gap-2">
+						<button type="submit" class="btn-confirm">Save credentials</button>
+						if !panel.FromEnvironment && panel.Configured {
+							<button
+								type="submit"
+								form="qb-app-clear"
+								class="btn-danger"
+								{ ConfirmAttrs(ActionConfirm{
+									Title: "Remove the saved credentials?",
+									Lead:  "Forgets which Intuit app this shop connects QuickBooks through.",
+									Points: []string{
+										"Wholesale invoicing stops until an app is configured again.",
+										"Nothing in QuickBooks is changed or deleted.",
+										"If the server still sets the QB_ environment variables, it falls back to those.",
+									},
+									Confirm: "Remove",
+									Danger:  true,
+								})... }
+							>
+								Remove
+							</button>
+						}
+					</div>
+				</form>
+				if !panel.FromEnvironment && panel.Configured {
+					<!-- Outside the form above: a nested form is invalid HTML, and the
+					     Remove button has to submit somewhere other than the save. -->
+					<form id="qb-app-clear" method="post" action="/admin/settings/integrations/quickbooks/app/clear" class="hidden"></form>
+				}
+			}
+		}
+	</div>
 }

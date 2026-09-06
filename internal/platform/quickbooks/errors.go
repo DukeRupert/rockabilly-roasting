@@ -14,6 +14,29 @@ var (
 	ErrServerError      = errors.New("quickbooks: server error")
 	ErrInvalidSignature = errors.New("quickbooks: invalid webhook signature")
 	ErrNotFound         = errors.New("quickbooks: resource not found")
+
+	// ErrNotConfigured is returned by every Client method when no Intuit app
+	// is configured — neither a saved row nor the environment fallback. It is
+	// the state a fresh deployment boots in, so it is an ordinary answer
+	// rather than a fault: the settings page turns it into a form to fill in,
+	// and a job that hits it fails with a message naming the setting.
+	ErrNotConfigured = errors.New("quickbooks: no Intuit app configured")
+
+	// ErrAppConfigUnreadable is returned when a saved app configuration will
+	// not decrypt, which means the encryption key changed. Distinguished from
+	// "not configured" because the two need opposite responses: one is a form
+	// to fill in, the other is a key to restore, and re-entering credentials
+	// would not recover the connection either way.
+	ErrAppConfigUnreadable = errors.New("quickbooks: stored app configuration could not be decrypted")
+
+	// ErrInvalidAppConfig is returned when a submitted app configuration is
+	// incomplete or names an environment that does not exist.
+	ErrInvalidAppConfig = errors.New("quickbooks: invalid app configuration")
+
+	// ErrConnected is returned when a change would strand the live connection
+	// — the stored tokens were issued by the app being replaced, so they stop
+	// meaning anything the moment it changes. Disconnect first.
+	ErrConnected = errors.New("quickbooks: disconnect before changing the app configuration")
 )
 
 // APIError represents an error response from the QBO API.
@@ -29,6 +52,9 @@ func (e *APIError) Error() string {
 
 // IsRetryable returns true if the error is transient and the operation should be retried.
 func IsRetryable(err error) bool {
+	if errors.Is(err, ErrNotConfigured) {
+		return false // needs a human in the admin, not another attempt
+	}
 	if errors.Is(err, ErrNotFound) {
 		return false // a missing/deleted resource won't reappear on retry
 	}

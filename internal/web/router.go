@@ -38,51 +38,52 @@ import (
 // to data that isn't covered by an existing service, extend the service rather
 // than reaching into the store.
 type Deps struct {
-	Pool                   *pgxpool.Pool
-	Logger                 *slog.Logger
-	Metrics                *metrics.Registry
-	Sessions               *sessions.Manager
-	OrderService           *app.OrderService
-	CustomerService        *app.CustomerService
-	CatalogService         *app.CatalogService
-	CheckoutService        *app.CheckoutService
-	FulfillmentService     *app.FulfillmentService
-	RouteService           *app.RouteService
-	SubscriptionService    *app.SubscriptionService
-	DiscountService        *app.DiscountService
-	AuthService            *app.AuthService
-	CustomerUserService    *app.CustomerUserService
-	StaffService           *app.StaffService
-	PricingService         *app.PricingService
-	CartService            *app.CartService
-	WholesaleService       *app.WholesaleService
-	AnnouncementService    *app.AnnouncementService
-	WhiteLabelService      *app.WhiteLabelService
-	AttributeService       *app.AttributeService
-	InvoiceService         *app.InvoiceService
-	PriceListService       *app.PriceListService
-	AuditQueryService      *app.AuditQueryService
-	WebhookService         *app.WebhookService
-	JobHealthService       *app.JobHealthService
-	ModuleService          *app.ModuleService
-	EquipmentService       *app.EquipmentService
-	ServiceTicketService   *app.ServiceTicketService
-	ServicePlanService     *app.ServicePlanService
-	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
-	PaymentProvider        payments.Provider
-	RiverClient            *river.Client[pgx.Tx]
-	Enqueuer               app.JobEnqueuer // shared job enqueuer; applies notification quiet hours (see jobs.Enqueuer)
-	R2Client               *media.R2Client
-	MediaConfig            *media.Config
-	QBClient               quickbooks.Client
-	QBOAuthManager         *quickbooks.OAuthManager // nil when QuickBooks is not configured
-	QBWebhookVerifierToken string
-	ShippoWebhookSecret    string // URL-path secret for inbound Shippo tracking webhooks; empty disables the endpoint
-	QBHTTPClient           *http.Client
-	HelpRegistry           *help.Registry
-	RateLimiter            *ratelimit.Limiter
-	TurnstileVerifier      *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
-	TurnstileSiteKey       string              // public site key embedded in widget; empty disables widget
+	Pool                 *pgxpool.Pool
+	Logger               *slog.Logger
+	Metrics              *metrics.Registry
+	Sessions             *sessions.Manager
+	OrderService         *app.OrderService
+	CustomerService      *app.CustomerService
+	CatalogService       *app.CatalogService
+	CheckoutService      *app.CheckoutService
+	FulfillmentService   *app.FulfillmentService
+	RouteService         *app.RouteService
+	SubscriptionService  *app.SubscriptionService
+	DiscountService      *app.DiscountService
+	AuthService          *app.AuthService
+	CustomerUserService  *app.CustomerUserService
+	StaffService         *app.StaffService
+	PricingService       *app.PricingService
+	CartService          *app.CartService
+	WholesaleService     *app.WholesaleService
+	AnnouncementService  *app.AnnouncementService
+	WhiteLabelService    *app.WhiteLabelService
+	AttributeService     *app.AttributeService
+	InvoiceService       *app.InvoiceService
+	PriceListService     *app.PriceListService
+	AuditQueryService    *app.AuditQueryService
+	WebhookService       *app.WebhookService
+	JobHealthService     *app.JobHealthService
+	ModuleService        *app.ModuleService
+	EquipmentService     *app.EquipmentService
+	ServiceTicketService *app.ServiceTicketService
+	ServicePlanService   *app.ServicePlanService
+	AuditWriter          *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
+	PaymentProvider      payments.Provider
+	RiverClient          *river.Client[pgx.Tx]
+	Enqueuer             app.JobEnqueuer // shared job enqueuer; applies notification quiet hours (see jobs.Enqueuer)
+	R2Client             *media.R2Client
+	MediaConfig          *media.Config
+	// QB resolves which Intuit app is configured — a database row now, so it
+	// can change while the server runs — and is itself the quickbooks.Client
+	// handlers call. It is never nil: an unconfigured deployment gets
+	// quickbooks.ErrNotConfigured from each call rather than a nil check.
+	QB                  *quickbooks.Provider
+	ShippoWebhookSecret string // URL-path secret for inbound Shippo tracking webhooks; empty disables the endpoint
+	HelpRegistry        *help.Registry
+	RateLimiter         *ratelimit.Limiter
+	TurnstileVerifier   *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
+	TurnstileSiteKey    string              // public site key embedded in widget; empty disables widget
 	// Newsletter posts footer signups to Broadwave server-side, keeping the API
 	// key out of page source. No-op when BROADWAVE_API_KEY/LIST are unset.
 	Newsletter    *newsletter.Client
@@ -714,6 +715,14 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+	// Which Intuit app the shop connects through. A separate form from the
+	// items one below and from the connect flow above: it is the only one that
+	// carries credentials, and the only one refused while connected.
+	// Posts to the tab's own URL, not a verb path, because a rejected save
+	// re-renders in place — see renderIntegrations and the note on the
+	// shipping form above, which makes the same trade for the same reason.
+	settingsRoute("POST /admin/settings/integrations", deps.handleAdminQBAppConfigUpdate)
+	settingsRoute("POST /admin/settings/integrations/quickbooks/app/clear", deps.handleAdminQBAppConfigClear)
 	// Shadow billing: the review list, and the switch that decides whether
 	// wholesale customers are actually invoiced. Same admin-only gate as the
 	// rest of settings — going live is the highest-blast-radius button in the

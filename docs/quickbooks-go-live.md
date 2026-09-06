@@ -29,7 +29,11 @@ separate list from development:
 https://<prod-host>/admin/settings/integrations/quickbooks/callback
 ```
 
-It must match `QB_REDIRECT_URI` character for character.
+This is `BASE_URL` plus the callback route, which is exactly what the server
+derives — the settings page in step 2 prints the exact string, so register that
+rather than typing it out. If you override it with `QB_REDIRECT_URI` (because
+the hostname Intuit was given differs from `BASE_URL`), it must match this
+character for character.
 
 Register the webhook endpoint and note its verifier token:
 
@@ -37,22 +41,61 @@ Register the webhook endpoint and note its verifier token:
 https://<prod-host>/webhooks/quickbooks
 ```
 
-## 2. Set the environment
+## 2. Enter the app credentials
 
-In the `rr-app` container's configuration (not `~/.env` on the host):
+Admin → Settings → Integrations → **Intuit app**.
+
+| Field | Value |
+|---|---|
+| Client ID / Client secret | the **production** pair from step 1 |
+| Webhook verifier token | from the webhook registration in step 1 |
+| Environment | `Production (real company)` |
+
+The panel also prints the redirect URI this deployment will send Intuit to. It
+is derived from `BASE_URL`, so check it matches what you registered rather than
+typing it anywhere.
+
+Neither secret is ever rendered back. Once saved, leaving a secret field blank
+means "keep the stored one", so correcting a client ID does not mean retyping
+credentials.
+
+The form is refused while QuickBooks is connected: the stored authorisation was
+issued by the app being replaced and stops working the moment it changes.
+Disconnect first (step 3 in reverse), then change the credentials, then
+reconnect.
+
+> **Environment is the field to check twice.** `Production` writes into the
+> real company's books. An app's sandbox keys will not authorise a production
+> company, so a mismatch fails at the consent screen rather than quietly — but
+> a production pair pointed at the wrong company will not.
+
+### The environment variables
+
+Everything above used to live in the `rr-app` container's configuration, and
+still works from there: `QB_CLIENT_ID`, `QB_CLIENT_SECRET`,
+`QB_WEBHOOK_VERIFIER_TOKEN` and `QB_ENVIRONMENT` are read as a **fallback**
+when nothing has been saved in the admin. A deployment already configured that
+way keeps working untouched; saving the form once moves it into the database,
+which then wins.
+
+Two things stay in the environment, because neither can live in the database it
+protects or describes:
 
 | Variable | Notes |
 |---|---|
-| `QB_CLIENT_ID` / `QB_CLIENT_SECRET` | the **production** pair |
-| `QB_ENVIRONMENT` | `production` |
-| `QB_REDIRECT_URI` | exactly as registered above |
-| `QB_WEBHOOK_VERIFIER_TOKEN` | required, or the binary refuses to boot |
-| `QB_TOKEN_ENCRYPTION_KEY` | fresh 32 bytes, base64: `openssl rand -base64 32`. Never reuse another environment's key |
-| `INSECURE_COOKIES` | **must not be set** |
+| `QB_TOKEN_ENCRYPTION_KEY` | optional — derived from `APP_SECRET` when unset. To pin it, use fresh 32 bytes, base64: `openssl rand -base64 32`, and never reuse another environment's key |
+| `APP_SECRET` | required unless `QB_TOKEN_ENCRYPTION_KEY` is set. Also backs the email link signers — see `.env.example` |
 
-> `QB_ENVIRONMENT` fails *toward* production. The code selects the live API
-> unless the value is exactly `sandbox`, so a typo, a stray space, or an unset
-> variable points the integration at a real company. Check it, don't assume it.
+`QB_REDIRECT_URI` is optional and defaults to `BASE_URL` + the callback path;
+set it only when the hostname registered with Intuit differs from `BASE_URL`.
+`INSECURE_COOKIES` **must not be set**.
+
+> Whichever of `QB_TOKEN_ENCRYPTION_KEY` / `APP_SECRET` supplies the encryption
+> key, changing it later makes both the stored refresh token *and* the saved app
+> credentials unreadable. The settings page says so explicitly rather than
+> offering a form — the fix is to restore the previous key, because re-entering
+> the credentials would not recover the connection. Rotating `APP_SECRET` also
+> rotates the outstanding email-link signatures.
 
 `QB_SALES_ITEM_ID` and `QB_SHIPPING_ITEM_ID` are **not** needed. They are set
 in the admin now (step 4) and only remain as a fallback for older

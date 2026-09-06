@@ -31,7 +31,17 @@ The QuickBooks card shows the current connection state:
 - **Connected** (green badge) -- Your store is linked to a QuickBooks company.
 - **Not connected** (grey badge) -- No active connection.
 
-If QuickBooks environment variables (`QB_CLIENT_ID` and related keys) are not configured on the server, the card will display a notice explaining that the integration is not available.
+#### Intuit app
+
+Before you can connect, the card needs to know which QuickBooks app to connect through. Enter the client ID, client secret and webhook verifier token from your Intuit developer account, and choose whether it is a sandbox (test) or production (real company) app.
+
+The card also prints the redirect URI to register with Intuit -- it has to match character for character, so copy it from here rather than typing it.
+
+Neither secret is ever shown back to you. Once they are saved, leaving a secret box empty means "keep the one already stored", so you can correct a client ID without retyping the rest.
+
+These can only be changed while QuickBooks is disconnected. The authorisation your store holds was issued by this app and stops working the moment the app changes, so disconnect first, change the credentials, then reconnect.
+
+If your server sets the QuickBooks credentials as environment variables instead, the card says so and uses those. Saving the form once moves the credentials into the database, and from then on the form is what counts.
 
 #### When Connected
 

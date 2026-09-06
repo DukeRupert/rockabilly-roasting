@@ -533,3 +533,151 @@ func TestPostponementsPanel_ExplainsWhyRestoreIsMissing(t *testing.T) {
 	assert.NotContains(t, html, "/admin/settings/delivery-postponements/delete")
 	assert.NotContains(t, html, "Already run", "it has not run yet")
 }
+
+// The app-credentials panel is the one place in the admin where a client
+// secret is typed, so what it does NOT render matters as much as what it does.
+func TestQBAppPanel_NeverRendersASecretBack(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBEnabled: true,
+		QBApp: QBAppPanel{
+			Configured:       true,
+			HasStoredSecrets: true,
+			ClientID:         "ABxxClientId",
+			Environment:      domain.QBEnvironmentProduction,
+			RedirectURI:      "https://shop.example.com/admin/settings/integrations/quickbooks/callback",
+		},
+	})
+
+	assert.Contains(t, html, "ABxxClientId", "the client ID is not a secret and identifies the app")
+	assert.Contains(t, html, `name="qb_client_secret"`)
+	assert.Contains(t, html, `name="qb_webhook_verifier"`)
+	// Neither secret input may carry a value attribute — a stored secret is
+	// reported as stored, never echoed.
+	for _, field := range []string{"qb_client_secret", "qb_webhook_verifier"} {
+		input := inputNamed(t, html, field)
+		assert.Contains(t, input, `type="password"`, "%s must be a password field", field)
+		assert.NotContains(t, input, "value=", "%s must not echo a stored secret", field)
+	}
+	assert.Contains(t, html, "Stored. Leave blank to keep it.")
+}
+
+// A live connection was issued by the configured app, so the form is withheld
+// rather than rendered and refused on submit.
+func TestQBAppPanel_LockedWhileConnected(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QB:        QBConnectionStatus{Connected: true},
+		QBEnabled: true,
+		QBApp: QBAppPanel{
+			Configured: true,
+			Connected:  true,
+			ClientID:   "ABxxClientId",
+		},
+	})
+
+	assert.NotContains(t, html, `name="qb_client_secret"`)
+	assert.Contains(t, html, "Disconnect QuickBooks before changing these")
+}
+
+// An unreadable configuration is not an empty one. Offering the form here
+// would invite a staffer to re-enter credentials that would not fix it — the
+// encryption key is what changed.
+func TestQBAppPanel_UnreadableSaysSoInsteadOfOfferingAForm(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBApp: QBAppPanel{Unreadable: true},
+	})
+
+	assert.NotContains(t, html, `name="qb_client_secret"`)
+	assert.Contains(t, html, "encryption key changed")
+}
+
+// The redirect URI is derived from BASE_URL and has to be registered with
+// Intuit character for character, so the page has to print it.
+func TestQBAppPanel_ShowsTheRedirectURIToRegister(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBApp: QBAppPanel{RedirectURI: "https://shop.example.com/admin/settings/integrations/quickbooks/callback"},
+	})
+
+	assert.Contains(t, html, "https://shop.example.com/admin/settings/integrations/quickbooks/callback")
+}
+
+// inputNamed returns the single <input> tag carrying name="<field>".
+func inputNamed(t *testing.T, html, field string) string {
+	t.Helper()
+	needle := `name="` + field + `"`
+	at := strings.Index(html, needle)
+	require.NotEqual(t, -1, at, "no input named %s", field)
+	start := strings.LastIndex(html[:at], "<input")
+	require.NotEqual(t, -1, start, "malformed input for %s", field)
+	end := strings.Index(html[start:], ">")
+	require.NotEqual(t, -1, end, "unterminated input for %s", field)
+	return html[start : start+end+1]
+}
+
+// A rejected save must hand the form back with what was typed. The secrets
+// cannot be re-rendered, so losing the client ID alongside them would cost the
+// staffer every field on the form for one mistake.
+func TestQBAppPanel_RejectedSaveKeepsInputAndMarksFields(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBApp: QBAppPanel{
+			Draft: &QBAppDraft{
+				ClientID:    "ABpastedClientId",
+				Environment: domain.QBEnvironmentProduction,
+			},
+		},
+		FieldErrors: map[string]string{
+			"qb_client_secret":    "Enter the client secret.",
+			"qb_webhook_verifier": "Enter the webhook verifier token.",
+		},
+	})
+
+	assert.Contains(t, inputNamed(t, html, "qb_client_id"), `value="ABpastedClientId"`)
+	assert.Contains(t, html, "Enter the client secret.")
+	assert.Contains(t, html, "Enter the webhook verifier token.")
+	// Marked, not merely described: the border changes so the eye lands on the
+	// field before the sentence does.
+	assert.Contains(t, inputNamed(t, html, "qb_client_secret"), "border-rr-red")
+	assert.Contains(t, inputNamed(t, html, "qb_webhook_verifier"), "border-rr-red")
+	assert.NotContains(t, inputNamed(t, html, "qb_client_id"), "border-rr-red", "a field that was fine must not be marked")
+
+	// Still no secret echoed, draft or not.
+	for _, field := range []string{"qb_client_secret", "qb_webhook_verifier"} {
+		assert.NotContains(t, inputNamed(t, html, field), "value=")
+	}
+}
+
+// The draft drives the inputs; the summary above them keeps describing what is
+// stored. Nothing reached the database, and a page that claimed otherwise
+// would be telling the staffer their rejected edit had taken.
+func TestQBAppPanel_RejectedSaveLeavesTheSummaryOnStoredValues(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{
+		QBEnabled: true,
+		QBApp: QBAppPanel{
+			Configured:       true,
+			HasStoredSecrets: true,
+			ClientID:         "ABstoredClientId",
+			Environment:      domain.QBEnvironmentSandbox,
+			Draft: &QBAppDraft{
+				ClientID:    "",
+				Environment: domain.QBEnvironmentProduction,
+			},
+		},
+		FieldErrors: map[string]string{"qb_client_id": "Enter the client ID from your Intuit app."},
+	})
+
+	// The summary names what is billing today.
+	assert.Contains(t, html, "ABstoredClientId")
+	// The input renders the draft as submitted — cleared stays cleared, rather
+	// than being helpfully refilled with a value the staffer just deleted.
+	assert.NotContains(t, inputNamed(t, html, "qb_client_id"), `value="ABstoredClientId"`)
+	assert.Contains(t, inputNamed(t, html, "qb_client_id"), "border-rr-red")
+}
+
+// hx-boost pushes the form's action into history, so a refresh after a
+// rejected save GETs whatever it posted to. That has to be a URL with a GET
+// route, or the staffer meets a 405 on the page they were told to go fix.
+func TestQBAppPanel_FormPostsToATabURLThatAnswersGET(t *testing.T) {
+	html := renderIntegrations(t, SettingsIntegrationsProps{QBApp: QBAppPanel{}})
+
+	assert.Contains(t, html, `action="/admin/settings/integrations"`)
+	assert.NotContains(t, html, `action="/admin/settings/integrations/quickbooks/app"`)
+}

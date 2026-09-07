@@ -723,3 +723,26 @@ func formWithAction(t *testing.T, html, action string) string {
 	require.NotEqual(t, -1, end, "unterminated form for %s", action)
 	return html[start : start+end]
 }
+
+// An unreadable configuration reaches the disconnected branch — a
+// configuration exists, so QBEnabled is true — but the authorisation flow
+// needs the client secret and cannot start. Offering Connect there sends the
+// staffer to a handler that can only refuse, past a panel that already names
+// the real fix.
+func TestQBAppPanel_UnreadableWithholdsTheConnectButton(t *testing.T) {
+	unreadable := renderIntegrations(t, SettingsIntegrationsProps{
+		QBEnabled: true,
+		QBApp:     QBAppPanel{Unreadable: true},
+	})
+	assert.Empty(t, anchorsTo(unreadable, "/admin/settings/integrations/quickbooks/connect"),
+		"an unreadable configuration must not offer a connect link")
+	assert.Contains(t, unreadable, "encryption key changed")
+
+	// A readable configuration that simply is not connected still offers it —
+	// this must not have withheld the button from the ordinary case.
+	readable := renderIntegrations(t, SettingsIntegrationsProps{
+		QBEnabled: true,
+		QBApp:     QBAppPanel{Configured: true, ClientID: "ABxxClientId"},
+	})
+	assert.NotEmpty(t, anchorsTo(readable, "/admin/settings/integrations/quickbooks/connect"))
+}

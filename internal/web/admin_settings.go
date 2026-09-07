@@ -878,6 +878,13 @@ func (d *Deps) handleAdminQBAppConfigClear(w http.ResponseWriter, r *http.Reques
 func (d *Deps) qbOAuth(w http.ResponseWriter, r *http.Request) (*quickbooks.OAuthManager, bool) {
 	oauth, err := d.QB.OAuth(r.Context())
 	switch {
+	case errors.Is(err, quickbooks.ErrAppConfigUnreadable):
+		// Distinct from "not configured", and not a 500. An app IS configured;
+		// this server cannot decrypt it. The settings card says so and names
+		// the fix, so this only needs to refuse without pretending the
+		// configuration is absent.
+		http.Error(w, "QuickBooks credentials cannot be read — see Settings > Integrations", http.StatusBadRequest)
+		return nil, false
 	case errors.Is(err, quickbooks.ErrNotConfigured), errors.Is(err, quickbooks.ErrInvalidAppConfig):
 		http.Error(w, "QuickBooks not configured", http.StatusBadRequest)
 		return nil, false

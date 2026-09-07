@@ -966,15 +966,22 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 				<!-- Disconnected state. The app configuration is editable here and
 				     nowhere else: once a connection exists the tokens belong to
 				     this app, so changing it is a disconnect first. -->
-				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
-					<a
-						href="/admin/settings/integrations/quickbooks/connect"
-						hx-boost="false"
-						class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
-					>
-						Connect to QuickBooks
-					</a>
-				</div>
+				if !props.QBApp.Unreadable {
+					<!-- Withheld when the stored credentials cannot be decrypted.
+					     A configuration exists, so this branch is reached, but the
+					     authorisation flow needs the client secret and cannot start
+					     — the button would refuse. The panel below states the real
+					     problem and the real fix. -->
+					<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+						<a
+							href="/admin/settings/integrations/quickbooks/connect"
+							hx-boost="false"
+							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+						>
+							Connect to QuickBooks
+						</a>
+					</div>
+				}
 				@qbAppPanel(props.QBApp, props.FieldErrors)
 			}
 		</div>

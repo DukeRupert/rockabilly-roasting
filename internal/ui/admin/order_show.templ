@@ -73,6 +73,16 @@ type OrderShowProps struct {
 	// normal load, incremented by each self-refresh while a BuyLabel attempt is
 	// queued. Caps the loop at maxLabelPolls. See shouldPollLabel.
 	PollCount int
+	// LocalDeliveryEnabled and LocalPickupEnabled mirror the shop's shipping
+	// config. They gate the convert-to-local buttons so staff are never offered
+	// a channel the shop does not run — the service refuses the same two cases.
+	LocalDeliveryEnabled bool
+	LocalPickupEnabled   bool
+	// ShipToIsLocal reports whether the ship-to zip sits inside the configured
+	// local zone. Converting an out-of-zone order to local delivery is allowed
+	// on purpose — staff know the route better than the zip table — so this
+	// drives a warning on the button, not a lock.
+	ShipToIsLocal bool
 }
 
 // maxLabelPolls bounds the auto-refresh that runs after a label is queued: the
@@ -400,13 +410,111 @@ templ convertToShippedForm(orderID uuid.UUID) {
 					Points: []string{
 						"Shipping stays comped — the customer is not charged extra.",
 						"The customer is not notified of the change.",
-						"Switch it back from the shipping method controls if you change your mind.",
+						"You can convert it back to local from this same card, as long as no label has been bought yet.",
 					},
 					Confirm: "Convert to mail-out",
 				})... }
 			>Convert to mail-out</button>
 		}
 	</form>
+}
+
+// canConvertToLocal gates the return leg — carrier channel back onto the van or
+// the pickup shelf. Mirrors app.ConvertShippedOrderToLocal exactly, minus the
+// config toggles, which the caller checks per target.
+//
+// A nil method counts as shipped: that is the legacy spelling carried by
+// imported orders, and they are the ones most likely to have been filed on the
+// wrong channel.
+//
+// A live label hides the buttons rather than failing on submit — postage is
+// bought and staff need the refund flow on the shipment card first.
+func canConvertToLocal(order *domain.Order, shipments []domain.Shipment) bool {
+	if order.ShippingMethod != nil && *order.ShippingMethod != domain.ShippingMethodShipped {
+		return false
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	if order.FulfillmentStatus != domain.FulfillmentStatusUnfulfilled &&
+		order.FulfillmentStatus != domain.FulfillmentStatusFulfilled {
+		return false
+	}
+	// BlocksRebuy is the shared "this label is live" rule; see domain.Shipment.
+	for _, sh := range shipments {
+		if sh.BlocksRebuy() {
+			return false
+		}
+	}
+	return true
+}
+
+// convertToLocalForm flips a mail-out order onto one of the local channels.
+// Reversible in both directions — unlike its counterpart, which spent a year
+// being a one-way door — so the dialog leads with the two things that do not
+// reverse themselves: the shipping the customer already paid, and the silence.
+templ convertToLocalForm(orderID uuid.UUID, target domain.ShippingMethod, label string, outOfZone bool) {
+	{{ hintID := fmt.Sprintf("hint-convert-local-%s", target) }}
+	<form
+		method="post"
+		action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/convert-to-local", orderID.String())) }
+		class="inline"
+	>
+		<input type="hidden" name="method" value={ string(target) }/>
+		@ActionWrap(hintID, convertToLocalHint(target, outOfZone)) {
+			<button
+				type="submit"
+				class="btn-secondary text-xs"
+				aria-describedby={ hintID }
+				{ ConfirmAttrs(ActionConfirm{
+					Title:   convertToLocalConfirmTitle(target),
+					Lead:    "Moves the order off the carrier channel. It stops being a mail-out and no shipping label can be bought for it until you convert it back.",
+					Points:  convertToLocalConfirmPoints(target, outOfZone),
+					Confirm: label,
+				})... }
+			>{ label }</button>
+		}
+	</form>
+}
+
+// convertToLocalHint is the hover/described-by text for each target.
+func convertToLocalHint(target domain.ShippingMethod, outOfZone bool) string {
+	base := "Moves this order onto the delivery queue so it rides the next run."
+	if target == domain.ShippingMethodPickup {
+		base = "Moves this order onto the pickup shelf. Mark it ready when the bag is packed."
+	}
+	if outOfZone {
+		base += " This address is outside the local zone."
+	}
+	return base
+}
+
+func convertToLocalConfirmTitle(target domain.ShippingMethod) string {
+	if target == domain.ShippingMethodPickup {
+		return "Convert this order to local pickup?"
+	}
+	return "Convert this order to local delivery?"
+}
+
+// convertToLocalConfirmPoints spells out what the conversion does not do. The
+// shipping refund is the one that costs real money: a mail-out from a local zip
+// is charged the flat rate (ShippingConfig.CalculateForMethod), and converting
+// does not hand it back.
+func convertToLocalConfirmPoints(target domain.ShippingMethod, outOfZone bool) []string {
+	points := []string{}
+	if target == domain.ShippingMethodPickup {
+		points = append(points, "The order moves to the pickup queue — it will not appear on a delivery run.")
+	} else {
+		points = append(points, "The order joins the delivery queue and the load list for the next run.")
+	}
+	points = append(points,
+		"Any shipping already charged is not refunded — issue that from the refund flow if it is owed.",
+		"The customer is not notified of the change.",
+	)
+	if outOfZone {
+		points = append(points, "This address is outside the configured local zone — check the driver can actually reach it.")
+	}
+	return points
 }
 
 templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
@@ -1331,6 +1439,18 @@ templ orderShippingCard(props OrderShowProps) {
 				<div class="mt-1 flex flex-col gap-2 border-t border-rr-border pt-3">
 					@shippingMethodSwap(props.Order.ID, *props.Order.ShippingMethod)
 					@convertToShippedForm(props.Order.ID)
+				</div>
+			} else if canConvertToLocal(props.Order, props.Shipments) && (props.LocalDeliveryEnabled || props.LocalPickupEnabled) {
+				<!-- The way back off the carrier channel. Only one of these
+					branches ever renders: an order is either local (swap +
+					mail-out, above) or shipped (convert to local, here). -->
+				<div class="mt-1 flex flex-col gap-2 border-t border-rr-border pt-3">
+					if props.LocalDeliveryEnabled {
+						@convertToLocalForm(props.Order.ID, domain.ShippingMethodLocalDelivery, "Convert to local delivery", !props.ShipToIsLocal)
+					}
+					if props.LocalPickupEnabled {
+						@convertToLocalForm(props.Order.ID, domain.ShippingMethodPickup, "Convert to local pickup", !props.ShipToIsLocal)
+					}
 				</div>
 			}
 		</div>

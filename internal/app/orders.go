@@ -1535,6 +1535,125 @@ func (s *OrderService) ConvertLocalOrderToShipped(ctx context.Context, tx pgx.Tx
 	return order, nil
 }
 
+// ConvertShippedOrderToLocal is the return leg of ConvertLocalOrderToShipped:
+// it moves an order off the carrier channel and onto local delivery or pickup,
+// for the order that was placed as a mail-out but should have been a local run.
+//
+// Until this existed the mail-out conversion was a trap — the order page hid
+// the local swap controls once the method was "shipped", so the only way back
+// was a hand-written UPDATE against production.
+//
+// A live label is the one hard blocker (ErrOrderHasActiveLabel): postage has
+// been bought and, unrefunded, is still spendable, so staff request the refund
+// from the shipment card first and convert afterwards. domain.Shipment.
+// BlocksRebuy is the shared source of truth for "live", the same rule the
+// buy-label guard reads.
+//
+// Deliberately *not* blocked on the ship-to zip being inside the delivery zone.
+// The zip table is the checkout's rule for what to offer a stranger; staff
+// converting an order have already spoken to the customer and may well be
+// dropping off somewhere the table doesn't list. The caller surfaces an
+// out-of-zone address as a warning instead — see ShipToIsLocal on the order
+// page.
+//
+// Money is left alone, mirroring the comped mail-out conversion. A local zip
+// pays no shipping, but a mail-out from one does (ShippingConfig.
+// CalculateForMethod), so a converted order may hold a shipping charge the
+// customer no longer owes. Refunding it means a Stripe call, which cannot
+// happen inside this transaction; staff issue it from the refund flow and the
+// confirm dialog says so. No customer email is sent.
+func (s *OrderService) ConvertShippedOrderToLocal(ctx context.Context, tx pgx.Tx, id uuid.UUID, target domain.ShippingMethod, actor Actor) (*domain.Order, error) {
+	if target != domain.ShippingMethodPickup && target != domain.ShippingMethodLocalDelivery {
+		return nil, fmt.Errorf("target must be pickup or local_delivery: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for local conversion: %w", err)
+	}
+
+	// A nil method is the legacy spelling of "shipped" — imported orders and
+	// everything placed before the local channel existed carry it, and
+	// CalculateForMethod already reads nil that way. Those are exactly the
+	// orders most likely to need this, so they convert too.
+	if order.ShippingMethod != nil && *order.ShippingMethod != domain.ShippingMethodShipped {
+		return nil, fmt.Errorf("order is not on the shipped channel: %w", ErrInvalidOrderStatus)
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return nil, fmt.Errorf("cannot convert cancelled/refunded order to local: %w", ErrInvalidOrderStatus)
+	}
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order has already left the shop: %w", ErrInvalidOrderStatus)
+	}
+
+	// Fail closed when the shipments store is absent: without it there is no
+	// way to tell whether postage is live, and silently skipping the check is
+	// how an order gets delivered by van on a label the shop already paid for.
+	if s.shipments == nil {
+		return nil, fmt.Errorf("shipments store not configured: %w", ErrInvalidOrderStatus)
+	}
+	shipments, err := s.shipments.ListShipmentsByOrder(ctx, tx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list shipments for local conversion: %w", err)
+	}
+	for _, sh := range shipments {
+		if sh.BlocksRebuy() {
+			return nil, ErrOrderHasActiveLabel
+		}
+	}
+
+	// The shop has to actually run the channel being converted to. Offering
+	// pickup on an order when pickup is switched off would strand the bag on a
+	// shelf nobody is told to check.
+	cfg, err := s.shipments.GetConfig(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("get shipping config for local conversion: %w", err)
+	}
+	switch target {
+	case domain.ShippingMethodLocalDelivery:
+		if !cfg.LocalDeliveryEnabled {
+			return nil, fmt.Errorf("local delivery is not enabled: %w", ErrInvalidOrderStatus)
+		}
+	case domain.ShippingMethodPickup:
+		if !cfg.LocalPickupEnabled {
+			return nil, fmt.Errorf("local pickup is not enabled: %w", ErrInvalidOrderStatus)
+		}
+	}
+
+	previous := "shipped"
+	if order.ShippingMethod != nil {
+		previous = string(*order.ShippingMethod)
+	}
+	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, target)
+	if err != nil {
+		return nil, fmt.Errorf("set shipping method: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderShippingMethodChanged,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"from": previous,
+			"to":   string(target),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit local conversion: %w", err)
+	}
+
+	return order, nil
+}
+
 // UpdateFulfillmentStatus updates an order's fulfillment status.
 func (s *OrderService) UpdateFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, status)

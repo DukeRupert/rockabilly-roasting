@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -115,4 +118,115 @@ func TestConvertToLocalConfirmPoints_OutOfZoneWarning(t *testing.T) {
 		}
 		assert.True(t, found, "the shipping-refund caveat must always be shown")
 	}
+}
+
+// shouldOfferConvertToLocal gates the Shipping card itself, not just the
+// buttons in it. A plain retail mail-out is written with shipping_method NULL
+// and carries no dates, no PO and no subscription, so hasShippingDetails alone
+// renders no card — which hid this feature from most of the orders it exists
+// for until the call site started ORing the two.
+func TestShouldOfferConvertToLocal_NilMethodOrderWithNothingElseToShow(t *testing.T) {
+	props := OrderShowProps{
+		Order:                convertibleOrder(nil),
+		LocalDeliveryEnabled: true,
+	}
+	assert.False(t, hasShippingDetails(props.Order),
+		"precondition: such an order has nothing to display")
+	assert.True(t, shouldOfferConvertToLocal(props),
+		"but it still has something to do, so the card must render")
+}
+
+func TestShouldOfferConvertToLocal_NeedsAChannelToSendItTo(t *testing.T) {
+	props := OrderShowProps{Order: convertibleOrder(methodPtr(domain.ShippingMethodShipped))}
+	assert.False(t, shouldOfferConvertToLocal(props),
+		"no local channel enabled: offering the conversion would strand the order")
+
+	props.LocalPickupEnabled = true
+	assert.True(t, shouldOfferConvertToLocal(props))
+}
+
+func TestShouldOfferConvertToLocal_TracksTheEligibilityGate(t *testing.T) {
+	props := OrderShowProps{
+		Order:                convertibleOrder(methodPtr(domain.ShippingMethodShipped)),
+		LocalDeliveryEnabled: true,
+		Shipments:            []domain.Shipment{{RefundStatus: domain.RefundStatusNone}},
+	}
+	assert.False(t, shouldOfferConvertToLocal(props), "a live label still blocks")
+}
+
+// The pickup variants of the copy helpers had no test, so their branches could
+// be deleted without the suite noticing.
+func TestConvertToLocalCopy_PickupVariants(t *testing.T) {
+	assert.Equal(t, "Convert this order to local pickup?",
+		convertToLocalConfirmTitle(domain.ShippingMethodPickup))
+	assert.Equal(t, "Convert this order to local delivery?",
+		convertToLocalConfirmTitle(domain.ShippingMethodLocalDelivery))
+
+	pickupHint := convertToLocalHint(domain.ShippingMethodPickup, false)
+	assert.Contains(t, pickupHint, "pickup shelf")
+	assert.NotContains(t, pickupHint, "next run")
+
+	deliveryHint := convertToLocalHint(domain.ShippingMethodLocalDelivery, false)
+	assert.Contains(t, deliveryHint, "next run")
+
+	// The out-of-zone suffix must reach the hint on both targets.
+	assert.Contains(t, convertToLocalHint(domain.ShippingMethodPickup, true),
+		"outside the local zone")
+	assert.Contains(t, convertToLocalHint(domain.ShippingMethodLocalDelivery, true),
+		"outside the local zone")
+}
+
+func TestConvertToLocalConfirmPoints_PickupSaysItIsNotOnARun(t *testing.T) {
+	points := convertToLocalConfirmPoints(domain.ShippingMethodPickup, false)
+	assert.Contains(t, points[0], "will not appear on a delivery run")
+
+	delivery := convertToLocalConfirmPoints(domain.ShippingMethodLocalDelivery, false)
+	assert.Contains(t, delivery[0], "joins the delivery queue")
+
+	// "Not notified" is the point that stops staff assuming the customer knows.
+	for _, ps := range [][]string{points, delivery} {
+		assert.Contains(t, ps, "The customer is not notified of the change.")
+	}
+}
+
+// The gate functions agreeing is not the same as the control reaching the page:
+// the card is rendered behind hasShippingDetails, and this feature was invisible
+// on most of its target orders because that guard alone said no. Render the whole
+// page for the exact shape — a plain retail mail-out with shipping_method NULL
+// and nothing else the card displays — rather than trusting the helpers.
+func TestOrderShowContent_NilMethodOrderGetsTheConvertControl(t *testing.T) {
+	order := &domain.Order{
+		ID:                uuid.New(),
+		Status:            domain.OrderStatusConfirmed,
+		FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
+		CurrencyCode:      "usd",
+	}
+	props := OrderShowProps{
+		Order:                order,
+		MerchantTZ:           denver,
+		LocalDeliveryEnabled: true,
+	}
+
+	var sb strings.Builder
+	require := assert.New(t)
+	require.NoError(OrderShowContent(props).Render(context.Background(), &sb))
+	require.Contains(sb.String(), "convert-to-local",
+		"a NULL-method mail-out must be offered the way back")
+	require.Contains(sb.String(), "Convert to local delivery")
+}
+
+// The counterpart: with no local channel enabled there is nothing to offer, and
+// an order with nothing to display must not gain an empty Shipping card.
+func TestOrderShowContent_NoLocalChannelLeavesTheCardAlone(t *testing.T) {
+	order := &domain.Order{
+		ID:                uuid.New(),
+		Status:            domain.OrderStatusConfirmed,
+		FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
+		CurrencyCode:      "usd",
+	}
+	props := OrderShowProps{Order: order, MerchantTZ: denver}
+
+	var sb strings.Builder
+	assert.NoError(t, OrderShowContent(props).Render(context.Background(), &sb))
+	assert.NotContains(t, sb.String(), "convert-to-local")
 }

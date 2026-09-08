@@ -426,9 +426,17 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 		// Shipping config, for the convert-to-local controls: which local
 		// channels the shop runs, and whether this address is inside the zone.
-		// A config read failure is not fatal to the page — the controls simply
-		// stay hidden, which is the same thing staff saw before they existed.
-		if cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx); cfgErr == nil {
+		//
+		// A missing singleton row costs the controls, not the page — the same
+		// trade the orders list makes for its pickup filter. Any other failure
+		// propagates: hiding the controls on a real DB error would look exactly
+		// like a shop with both local channels switched off, and staff would
+		// have no way to tell those apart.
+		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if cfgErr != nil && !errors.Is(cfgErr, pgx.ErrNoRows) {
+			return cfgErr
+		}
+		if cfgErr == nil && cfg != nil {
 			localDeliveryEnabled = cfg.LocalDeliveryEnabled
 			localPickupEnabled = cfg.LocalPickupEnabled
 			if shippingAddress != nil {
@@ -960,9 +968,9 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		// "shipped" is a one-way conversion off the local channel (comped
-		// shipping, unlocks the label flow); everything else is a
-		// pickup↔local_delivery swap.
+		// "shipped" converts off the local channel (comped shipping, unlocks
+		// the label flow); everything else is a pickup↔local_delivery swap.
+		// The return trip has its own route — see handleAdminOrderConvertToLocal.
 		if target == domain.ShippingMethodShipped {
 			_, txErr = d.OrderService.ConvertLocalOrderToShipped(ctx, tx, id, staffActor(r))
 		} else {
@@ -1019,12 +1027,11 @@ func (d *Deps) handleAdminOrderConvertToLocal(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	flash := "Shipping+method+updated"
-	switch target {
-	case domain.ShippingMethodLocalDelivery:
+	// Only the two local targets reach here — the service rejects anything
+	// else — so there is no third case to write a message for.
+	flash := "Converted+to+local+pickup.+Mark+it+ready+when+the+bag+is+on+the+shelf."
+	if target == domain.ShippingMethodLocalDelivery {
 		flash = "Converted+to+local+delivery.+It+is+on+the+delivery+queue+now."
-	case domain.ShippingMethodPickup:
-		flash = "Converted+to+local+pickup.+Mark+it+ready+when+the+bag+is+on+the+shelf."
 	}
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }

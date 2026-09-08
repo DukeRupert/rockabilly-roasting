@@ -1480,8 +1480,10 @@ func (s *OrderService) SetOrderInternalNote(ctx context.Context, tx pgx.Tx, id u
 // a label and mail it out — used when a customer who checked out as local turns
 // out to need it posted instead.
 //
-// Unlike SwapLocalShippingMethod this is a deliberate, explicit one-way action:
+// Unlike SwapLocalShippingMethod this is a deliberate, explicit conversion:
 // once the order is "shipped" the order page surfaces the rate/label flow.
+// ConvertShippedOrderToLocal below is the way back, available until a label is
+// bought — this was a genuine one-way door until that existed.
 // Shipping is comped — local orders carry no shipping line and staff make this
 // change as a courtesy after talking to the customer, so we leave the order
 // total untouched and do not re-charge or recompute tax. No customer email is
@@ -1626,7 +1628,11 @@ func (s *OrderService) ConvertShippedOrderToLocal(ctx context.Context, tx pgx.Tx
 		}
 	}
 
-	previous := "shipped"
+	// JSON null when the column held NULL, rather than reporting the "shipped"
+	// this method treats it as. NULL is the common spelling on ordinary retail
+	// mail-outs, so flattening the two would erase the distinction on exactly
+	// the population this conversion targets.
+	var previous any
 	if order.ShippingMethod != nil {
 		previous = string(*order.ShippingMethod)
 	}

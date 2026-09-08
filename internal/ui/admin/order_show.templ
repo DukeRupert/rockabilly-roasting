@@ -449,6 +449,23 @@ func canConvertToLocal(order *domain.Order, shipments []domain.Shipment) bool {
 	return true
 }
 
+// shouldOfferConvertToLocal reports whether the order page offers the way back
+// off the carrier channel: the order is eligible and the shop runs at least one
+// local channel to send it to.
+//
+// It gates the card itself, not just the buttons inside it. A plain retail
+// mail-out is written with shipping_method NULL — resolveLocalMethod returns nil
+// for any zip outside the local zone, and nothing backfills the column — so it
+// carries no method, no dates, no PO and no subscription, and hasShippingDetails
+// alone would render no Shipping card at all. That silently hid this feature
+// from the majority of the orders it exists for.
+func shouldOfferConvertToLocal(props OrderShowProps) bool {
+	if !props.LocalDeliveryEnabled && !props.LocalPickupEnabled {
+		return false
+	}
+	return canConvertToLocal(props.Order, props.Shipments)
+}
+
 // convertToLocalForm flips a mail-out order onto one of the local channels.
 // Reversible in both directions — unlike its counterpart, which spent a year
 // being a one-way door — so the dialog leads with the two things that do not
@@ -1222,7 +1239,7 @@ templ OrderShowContent(props OrderShowProps) {
 				@orderCustomerCard(props)
 			}
 			@orderAddressCard(props)
-			if hasShippingDetails(props.Order) {
+			if hasShippingDetails(props.Order) || shouldOfferConvertToLocal(props) {
 				@orderShippingCard(props)
 			}
 			@orderNotesCard(props)
@@ -1388,8 +1405,12 @@ templ orderAddressCard(props OrderShowProps) {
 }
 
 // hasShippingDetails reports whether the Shipping rail card has anything to
-// say. A card-paid retail order can carry no method, no dates, no PO and no
-// subscription — without this guard the rail rendered an empty titled box.
+// *display*. A card-paid retail order can carry no method, no dates, no PO and
+// no subscription — without this guard the rail rendered an empty titled box.
+//
+// Not sufficient on its own to decide whether to render the card: an order with
+// nothing to display may still have something to *do*. See
+// shouldOfferConvertToLocal, which the call site ORs with this.
 func hasShippingDetails(order *domain.Order) bool {
 	return order.ShippingMethod != nil ||
 		order.ScheduledDeliveryDate != nil ||
@@ -1440,7 +1461,7 @@ templ orderShippingCard(props OrderShowProps) {
 					@shippingMethodSwap(props.Order.ID, *props.Order.ShippingMethod)
 					@convertToShippedForm(props.Order.ID)
 				</div>
-			} else if canConvertToLocal(props.Order, props.Shipments) && (props.LocalDeliveryEnabled || props.LocalPickupEnabled) {
+			} else if shouldOfferConvertToLocal(props) {
 				<!-- The way back off the carrier channel. Only one of these
 					branches ever renders: an order is either local (swap +
 					mail-out, above) or shipped (convert to local, here). -->

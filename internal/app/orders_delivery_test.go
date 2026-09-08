@@ -300,3 +300,264 @@ func TestOrderService_ListOrderIDsToAutoDeliver(t *testing.T) {
 		assert.False(t, contains(ids, delivered.ID))
 	})
 }
+
+// setLocalPickupEnabled flips the shop's pickup toggle inside the test tx. The
+// seeded config row ships with delivery on and pickup off (migration 041), so a
+// pickup conversion is refused until this runs.
+func setLocalPickupEnabled(t *testing.T, tx pgx.Tx, enabled bool) {
+	t.Helper()
+	_, err := tx.Exec(context.Background(),
+		`UPDATE shipping_config SET local_pickup_enabled = $1`, enabled)
+	require.NoError(t, err)
+}
+
+// setLocalDeliveryEnabled flips the delivery toggle. The seeded row ships with
+// delivery *on*, so without this the only covered case would be the default —
+// and the guard that matters is the one staff hit when the van is off the road.
+func setLocalDeliveryEnabled(t *testing.T, tx pgx.Tx, enabled bool) {
+	t.Helper()
+	_, err := tx.Exec(context.Background(),
+		`UPDATE shipping_config SET local_delivery_enabled = $1`, enabled)
+	require.NoError(t, err)
+}
+
+// lastShippingMethodAudit returns the action and metadata of the most recent
+// shipping-method audit entry for an order.
+func lastShippingMethodAudit(t *testing.T, tx pgx.Tx, orderID uuid.UUID) (string, map[string]any) {
+	t.Helper()
+	var action string
+	var metadata map[string]any
+	err := tx.QueryRow(context.Background(),
+		`SELECT action, metadata FROM audit_log
+		  WHERE resource_id = $1 AND action = $2
+		  ORDER BY created_at DESC LIMIT 1`,
+		orderID, audit.AuditOrderShippingMethodChanged).Scan(&action, &metadata)
+	require.NoError(t, err, "expected a shipping-method audit entry")
+	return action, metadata
+}
+
+// TestOrderService_ConvertShippedOrderToLocal covers the return leg off the
+// carrier channel. The blocker that matters is a live label: postage is bought
+// and unrefunded, so the order must not quietly become a van stop.
+func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
+	ctx := context.Background()
+	svc := newDeliveryOrderService()
+	actor := testutil.TestActor()
+
+	t.Run("shipped order converts to local delivery, total untouched", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+		// Shipping the customer already paid is left alone — refunding it is a
+		// Stripe call and cannot happen in this transaction.
+		assert.Equal(t, order.Total, got.Total)
+		assert.Equal(t, order.ShippingTotal, got.ShippingTotal)
+	})
+
+	t.Run("a nil method is the legacy spelling of shipped and converts", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		// No WithShippingMethod: imported and pre-local-channel orders carry nil.
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+		require.Nil(t, order.ShippingMethod)
+
+		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+	})
+
+	t.Run("a fulfilled order still in the shop converts", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusFulfilled))
+
+		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+	})
+
+	t.Run("a live label blocks the conversion", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		staffID := testutil.CreateStaff(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+		createOrderShipment(t, tx, order.ID, staffID, domain.ShipmentStatusLabelCreated, nil)
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrOrderHasActiveLabel)
+	})
+
+	t.Run("a refund-requested label no longer blocks", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		staffID := testutil.CreateStaff(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+		createOrderShipment(t, tx, order.ID, staffID, domain.ShipmentStatusLabelCreated, nil)
+
+		// Requesting the refund is what frees the order — the same rule the
+		// buy-label guard reads (domain.Shipment.BlocksRebuy).
+		shipments, err := store.NewShippingStore().ListShipmentsByOrder(ctx, tx, order.ID)
+		require.NoError(t, err)
+		require.Len(t, shipments, 1)
+		_, err = store.NewShippingStore().UpdateShipmentRefundRequested(
+			ctx, tx, shipments[0].ID, "refund_1", &staffID)
+		require.NoError(t, err)
+
+		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+	})
+
+	t.Run("pickup is refused while the shop has pickup switched off", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodPickup, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("pickup converts once the shop enables it", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		setLocalPickupEnabled(t, tx, true)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodPickup, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodPickup, *got.ShippingMethod)
+	})
+
+	t.Run("an already-local order is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("shipped target is not a local method", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodShipped, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("order that already left the shop is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusShipped))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("cancelled order is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithOrderStatus(domain.OrderStatusCancelled),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("local delivery is refused while the shop has delivery switched off", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		setLocalDeliveryEnabled(t, tx, false)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("the conversion is audited with both ends of the move", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+
+		action, metadata := lastShippingMethodAudit(t, tx, order.ID)
+		assert.Equal(t, audit.AuditOrderShippingMethodChanged, action)
+		assert.Equal(t, "shipped", metadata["from"])
+		assert.Equal(t, "local_delivery", metadata["to"])
+	})
+
+	// A NULL column must not be reported as the "shipped" the conversion treats
+	// it as — NULL is the common spelling on retail mail-outs, and flattening
+	// the two would erase the distinction on the orders this targets.
+	t.Run("a nil method is audited as null, not as shipped", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+		require.Nil(t, order.ShippingMethod)
+
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		require.NoError(t, err)
+
+		_, metadata := lastShippingMethodAudit(t, tx, order.ID)
+		assert.Nil(t, metadata["from"], "a NULL method must audit as null")
+		assert.Equal(t, "local_delivery", metadata["to"])
+	})
+
+	t.Run("missing order returns ErrOrderNotFound", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, uuid.New(), domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrOrderNotFound)
+	})
+
+	t.Run("a service without the shipments store fails closed", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		// Without the shipments store there is no way to see a live label, so
+		// the conversion must refuse rather than skip the check.
+		_, err := newOrderService().ConvertShippedOrderToLocal(
+			ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+}

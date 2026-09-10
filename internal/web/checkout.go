@@ -988,9 +988,15 @@ func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZ
 
 // resolveLocalMethod picks the shipping method to stamp on a retail order.
 // Priority: explicit client choice, then the customer's saved preference, then
-// the first eligible local option. Returns nil for non-local addresses
-// (eligible empty), which leaves the order's shipping_method NULL — i.e.
-// standard "shipped" downstream.
+// the first eligible local option. A non-local address (eligible empty) resolves
+// to "shipped".
+//
+// It used to return nil there, which left shipping_method NULL — a second
+// spelling of "shipped" that every read site had to remember, and that some
+// forgot. Migration 086 backfilled those rows and made the column NOT NULL;
+// this is the write side of the same change, so no new NULL-equivalents are
+// created. Still returns a pointer because the caller distinguishes "resolved"
+// from "not applicable" (wholesale takes a different path).
 //
 // A local customer (eligible set non-empty) may still choose to have the order
 // mailed: "shipped" is always an honored choice even though it never appears in
@@ -998,8 +1004,9 @@ func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZ
 // preferences are validated against the eligible set; an ineligible one falls
 // through to the default.
 func resolveLocalMethod(eligible []domain.ShippingMethod, requested string, preference *domain.ShippingMethod) *domain.ShippingMethod {
+	shippedOnly := domain.ShippingMethodShipped
 	if len(eligible) == 0 {
-		return nil
+		return &shippedOnly
 	}
 	contains := func(s domain.ShippingMethod) bool {
 		for _, m := range eligible {

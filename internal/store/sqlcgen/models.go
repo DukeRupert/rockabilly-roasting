@@ -287,6 +287,36 @@ type EmailVerification struct {
 	CreatedAt  time.Time          `json:"created_at"`
 }
 
+type Equipment struct {
+	ID                uuid.UUID   `json:"id"`
+	CustomerID        uuid.UUID   `json:"customer_id"`
+	AddressID         *uuid.UUID  `json:"address_id"`
+	Category          string      `json:"category"`
+	Make              string      `json:"make"`
+	Model             string      `json:"model"`
+	SerialNumber      string      `json:"serial_number"`
+	Ownership         string      `json:"ownership"`
+	Status            string      `json:"status"`
+	InstalledOn       pgtype.Date `json:"installed_on"`
+	WarrantyExpiresOn pgtype.Date `json:"warranty_expires_on"`
+	Notes             string      `json:"notes"`
+	CreatedAt         time.Time   `json:"created_at"`
+	UpdatedAt         time.Time   `json:"updated_at"`
+}
+
+type EquipmentServicePlan struct {
+	ID             uuid.UUID          `json:"id"`
+	EquipmentID    uuid.UUID          `json:"equipment_id"`
+	PlanID         uuid.UUID          `json:"plan_id"`
+	StartsOn       pgtype.Date        `json:"starts_on"`
+	UnderContract  bool               `json:"under_contract"`
+	ContractEndsOn pgtype.Date        `json:"contract_ends_on"`
+	EndedAt        pgtype.Timestamptz `json:"ended_at"`
+	Notes          string             `json:"notes"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
+
 type Fulfillment struct {
 	ID             uuid.UUID          `json:"id"`
 	OrderID        uuid.UUID          `json:"order_id"`
@@ -391,6 +421,14 @@ type MagicLinkToken struct {
 	Purpose    string             `json:"purpose"`
 }
 
+type Module struct {
+	Key       string             `json:"key"`
+	Enabled   bool               `json:"enabled"`
+	EnabledAt pgtype.Timestamptz `json:"enabled_at"`
+	EnabledBy *uuid.UUID         `json:"enabled_by"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+
 type Order struct {
 	ID                    uuid.UUID          `json:"id"`
 	Number                string             `json:"number"`
@@ -422,7 +460,7 @@ type Order struct {
 	QbInvoiceID           *string            `json:"qb_invoice_id"`
 	QbInvoiceNo           *string            `json:"qb_invoice_no"`
 	QbSyncedAt            pgtype.Timestamptz `json:"qb_synced_at"`
-	ShippingMethod        *string            `json:"shipping_method"`
+	ShippingMethod        string             `json:"shipping_method"`
 	RequestedDeliveryDate pgtype.Timestamptz `json:"requested_delivery_date"`
 	OverdueReminderStage  int16              `json:"overdue_reminder_stage"`
 	Channel               string             `json:"channel"`
@@ -529,6 +567,29 @@ type QbCredential struct {
 	TenantID         uuid.UUID `json:"tenant_id"`
 }
 
+type QbInvoicePreview struct {
+	ID                  uuid.UUID       `json:"id"`
+	OrderID             uuid.UUID       `json:"order_id"`
+	CustomerID          *uuid.UUID      `json:"customer_id"`
+	QbCustomerID        *string         `json:"qb_customer_id"`
+	WouldCreateCustomer bool            `json:"would_create_customer"`
+	DocNumber           string          `json:"doc_number"`
+	BillEmail           string          `json:"bill_email"`
+	TermsDays           int32           `json:"terms_days"`
+	DueDate             pgtype.Date     `json:"due_date"`
+	SubtotalCents       int32           `json:"subtotal_cents"`
+	ShippingCents       int32           `json:"shipping_cents"`
+	TotalCents          int32           `json:"total_cents"`
+	TermID              *string         `json:"term_id"`
+	Lines               json.RawMessage `json:"lines"`
+	ExistingQbInvoiceID *string         `json:"existing_qb_invoice_id"`
+	LookupError         *string         `json:"lookup_error"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	AutoBilled          bool            `json:"auto_billed"`
+	BillingMethod       string          `json:"billing_method"`
+}
+
 type ResetToken struct {
 	ID        uuid.UUID          `json:"id"`
 	ActorType string             `json:"actor_type"`
@@ -553,6 +614,111 @@ type RouteStop struct {
 	SkipReason   string             `json:"skip_reason"`
 	Notes        string             `json:"notes"`
 	DeliveredAt  pgtype.Timestamptz `json:"delivered_at"`
+}
+
+type ServiceMaintenanceDue struct {
+	ID                 uuid.UUID   `json:"id"`
+	AssignmentID       uuid.UUID   `json:"assignment_id"`
+	TaskID             uuid.UUID   `json:"task_id"`
+	EquipmentID        uuid.UUID   `json:"equipment_id"`
+	DueOn              pgtype.Date `json:"due_on"`
+	Status             string      `json:"status"`
+	CompletedOn        pgtype.Date `json:"completed_on"`
+	CompletedByStaffID *uuid.UUID  `json:"completed_by_staff_id"`
+	TicketID           *uuid.UUID  `json:"ticket_id"`
+	Notes              string      `json:"notes"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
+}
+
+type ServicePart struct {
+	ID            uuid.UUID   `json:"id"`
+	TicketID      uuid.UUID   `json:"ticket_id"`
+	VariantID     *uuid.UUID  `json:"variant_id"`
+	Name          string      `json:"name"`
+	PartNumber    string      `json:"part_number"`
+	Supplier      string      `json:"supplier"`
+	Quantity      int32       `json:"quantity"`
+	UnitCostCents int32       `json:"unit_cost_cents"`
+	Status        string      `json:"status"`
+	OrderedOn     pgtype.Date `json:"ordered_on"`
+	ReceivedOn    pgtype.Date `json:"received_on"`
+	InstalledOn   pgtype.Date `json:"installed_on"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+}
+
+type ServicePlan struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Category    *string   `json:"category"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ServicePlanTask struct {
+	ID               uuid.UUID `json:"id"`
+	PlanID           uuid.UUID `json:"plan_id"`
+	Name             string    `json:"name"`
+	Instructions     string    `json:"instructions"`
+	IntervalDays     int32     `json:"interval_days"`
+	LeadDays         int32     `json:"lead_days"`
+	WarrantyRequired bool      `json:"warranty_required"`
+	SortOrder        int32     `json:"sort_order"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	// When this task stopped generating work, or NULL while it is live. Set deliberately by a staff action, never by a date somebody types — a nullable timestamp that silently stops something is how subscriptions stopped billing (migration 075).
+	RetiredAt pgtype.Timestamptz `json:"retired_at"`
+}
+
+type ServiceTicket struct {
+	ID                     uuid.UUID          `json:"id"`
+	Number                 string             `json:"number"`
+	CustomerID             uuid.UUID          `json:"customer_id"`
+	EquipmentID            *uuid.UUID         `json:"equipment_id"`
+	AddressID              *uuid.UUID         `json:"address_id"`
+	Title                  string             `json:"title"`
+	Description            string             `json:"description"`
+	Severity               string             `json:"severity"`
+	Status                 string             `json:"status"`
+	OpenedByStaffID        *uuid.UUID         `json:"opened_by_staff_id"`
+	OpenedByCustomerUserID *uuid.UUID         `json:"opened_by_customer_user_id"`
+	AssignedStaffID        *uuid.UUID         `json:"assigned_staff_id"`
+	ScheduledFor           pgtype.Timestamptz `json:"scheduled_for"`
+	ResolvedAt             pgtype.Timestamptz `json:"resolved_at"`
+	Resolution             string             `json:"resolution"`
+	Billable               bool               `json:"billable"`
+	LastContactAt          time.Time          `json:"last_contact_at"`
+	CreatedAt              time.Time          `json:"created_at"`
+	UpdatedAt              time.Time          `json:"updated_at"`
+}
+
+type ServiceTicketNote struct {
+	ID              uuid.UUID  `json:"id"`
+	TicketID        uuid.UUID  `json:"ticket_id"`
+	Kind            string     `json:"kind"`
+	Body            string     `json:"body"`
+	OccurredAt      time.Time  `json:"occurred_at"`
+	StaffID         *uuid.UUID `json:"staff_id"`
+	CustomerUserID  *uuid.UUID `json:"customer_user_id"`
+	CustomerVisible bool       `json:"customer_visible"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type ServiceTimeEntry struct {
+	ID          uuid.UUID   `json:"id"`
+	TicketID    uuid.UUID   `json:"ticket_id"`
+	StaffID     uuid.UUID   `json:"staff_id"`
+	Kind        string      `json:"kind"`
+	Minutes     int32       `json:"minutes"`
+	PerformedOn pgtype.Date `json:"performed_on"`
+	Billable    bool        `json:"billable"`
+	Note        string      `json:"note"`
+	CreatedAt   time.Time   `json:"created_at"`
+	// Hourly cost this entry was booked at, in cents, captured when it was written. NULL = uncosted (logged before any rate existed); the reports count its minutes and none of its money.
+	RateCents *int32 `json:"rate_cents"`
 }
 
 type Session struct {
@@ -664,6 +830,16 @@ type StoreSetting struct {
 	CreatedAt                   time.Time      `json:"created_at"`
 	UpdatedAt                   time.Time      `json:"updated_at"`
 	DefaultWholesalePriceListID *uuid.UUID     `json:"default_wholesale_price_list_id"`
+	QbBillingMode               string         `json:"qb_billing_mode"`
+	QbSalesItemID               string         `json:"qb_sales_item_id"`
+	// Display name of the sales item, cached from QuickBooks so the settings page can name the current choice without a live API call. Advisory only — the ID is what bills.
+	QbSalesItemName    string `json:"qb_sales_item_name"`
+	QbShippingItemID   string `json:"qb_shipping_item_id"`
+	QbShippingItemName string `json:"qb_shipping_item_name"`
+	// Loaded cost of one hour of technician time, in cents. NULL = not set; cost reports omit the money column entirely.
+	ServiceLaborRateCents *int32 `json:"service_labor_rate_cents"`
+	// Cost of one hour of travel, in cents. NULL falls back to the labour rate.
+	ServiceTravelRateCents *int32 `json:"service_travel_rate_cents"`
 }
 
 type Subscription struct {

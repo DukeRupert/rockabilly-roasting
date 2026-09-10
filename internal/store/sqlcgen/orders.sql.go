@@ -190,7 +190,7 @@ type CreateOrderParams struct {
 	Notes                 *string            `json:"notes"`
 	Metadata              json.RawMessage    `json:"metadata"`
 	PlacedAt              time.Time          `json:"placed_at"`
-	ShippingMethod        *string            `json:"shipping_method"`
+	ShippingMethod        string             `json:"shipping_method"`
 	RequestedDeliveryDate pgtype.Timestamptz `json:"requested_delivery_date"`
 	Channel               string             `json:"channel"`
 	ScheduledDeliveryDate pgtype.Date        `json:"scheduled_delivery_date"`
@@ -1120,7 +1120,7 @@ RETURNING id, number, customer_id, status, payment_status, fulfillment_status, c
 
 type UpdateOrderShippingMethodParams struct {
 	ID             uuid.UUID `json:"id"`
-	ShippingMethod *string   `json:"shipping_method"`
+	ShippingMethod string    `json:"shipping_method"`
 }
 
 func (q *Queries) UpdateOrderShippingMethod(ctx context.Context, arg UpdateOrderShippingMethodParams) (Order, error) {

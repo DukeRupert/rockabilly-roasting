@@ -399,12 +399,12 @@ templ orderInvoiceSheet(props OrderInvoiceProps) {
 				</div>
 			}
 		</div>
-		if props.Order.ShippingMethod != nil || props.Order.RequestedDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
+		if props.Order.ShippingMethod != "" || props.Order.RequestedDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
 			<div class="detail-row">
-				if props.Order.ShippingMethod != nil {
+				if props.Order.ShippingMethod != "" {
 					<div class="item">
 						<div class="lbl">Method</div>
-						<div class="val">{ string(*props.Order.ShippingMethod) }</div>
+						<div class="val">{ string(props.Order.ShippingMethod) }</div>
 					</div>
 				}
 				if props.Order.RequestedDeliveryDate != nil {

@@ -1237,8 +1237,8 @@ func OrderListContent(props OrderListProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if row.Order.ShippingMethod != nil {
-					templ_7745c5c3_Err = ShippingMethodBadge(*row.Order.ShippingMethod).Render(ctx, templ_7745c5c3_Buffer)
+				if row.Order.ShippingMethod != "" {
+					templ_7745c5c3_Err = ShippingMethodBadge(row.Order.ShippingMethod).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

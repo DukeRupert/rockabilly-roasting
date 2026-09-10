@@ -375,6 +375,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var customerOrderCount int
 	var couponCode string
 	var activity []domain.AuditEntry
+	var localDeliveryEnabled, localPickupEnabled, shipToIsLocal bool
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -421,6 +422,26 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
 		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
 			return txErr
+		}
+
+		// Shipping config, for the convert-to-local controls: which local
+		// channels the shop runs, and whether this address is inside the zone.
+		//
+		// A missing singleton row costs the controls, not the page — the same
+		// trade the orders list makes for its pickup filter. Any other failure
+		// propagates: hiding the controls on a real DB error would look exactly
+		// like a shop with both local channels switched off, and staff would
+		// have no way to tell those apart.
+		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if cfgErr != nil && !errors.Is(cfgErr, pgx.ErrNoRows) {
+			return cfgErr
+		}
+		if cfgErr == nil && cfg != nil {
+			localDeliveryEnabled = cfg.LocalDeliveryEnabled
+			localPickupEnabled = cfg.LocalPickupEnabled
+			if shippingAddress != nil {
+				shipToIsLocal = cfg.IsLocal(shippingAddress.PostalCode)
+			}
 		}
 
 		// Billing address. Usually the same row as shipping; the rail renders it
@@ -604,8 +625,13 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		BillingAddress:     billingAddress,
 		CustomerOrderCount: customerOrderCount,
 		CouponCode:         couponCode,
-		PaymentDueAt:       orderPaymentDueAt(order, customer, d.MerchantTZ),
-		Activity:           activity,
+
+		LocalDeliveryEnabled: localDeliveryEnabled,
+		LocalPickupEnabled:   localPickupEnabled,
+		ShipToIsLocal:        shipToIsLocal,
+
+		PaymentDueAt: orderPaymentDueAt(order, customer, d.MerchantTZ),
+		Activity:     activity,
 	}
 
 	if IsHTMX(r) {
@@ -942,9 +968,9 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		// "shipped" is a one-way conversion off the local channel (comped
-		// shipping, unlocks the label flow); everything else is a
-		// pickup↔local_delivery swap.
+		// "shipped" converts off the local channel (comped shipping, unlocks
+		// the label flow); everything else is a pickup↔local_delivery swap.
+		// The return trip has its own route — see handleAdminOrderConvertToLocal.
 		if target == domain.ShippingMethodShipped {
 			_, txErr = d.OrderService.ConvertLocalOrderToShipped(ctx, tx, id, staffActor(r))
 		} else {
@@ -967,6 +993,45 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 		flash = "Converted+to+mail-out.+Get+shipping+rates+to+print+a+label."
 	default:
 		flash = "Shipping+method+updated"
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
+// handleAdminOrderConvertToLocal moves an order off the carrier channel and
+// onto local delivery or pickup — the return leg of the mail-out conversion,
+// for an order that was placed as a mail-out but belongs on the van.
+//
+// Its own route rather than another branch of handleAdminOrderShippingMethod:
+// that handler picks its service call from the target method alone, and both
+// directions share the same two local targets. Splitting on intent keeps the
+// dispatch readable instead of making it read the order back to guess.
+func (d *Deps) handleAdminOrderConvertToLocal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	target := domain.ShippingMethod(r.FormValue("method"))
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.ConvertShippedOrderToLocal(ctx, tx, id, target, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Only the two local targets reach here — the service rejects anything
+	// else — so there is no third case to write a message for.
+	flash := "Converted+to+local+pickup.+Mark+it+ready+when+the+bag+is+on+the+shelf."
+	if target == domain.ShippingMethodLocalDelivery {
+		flash = "Converted+to+local+delivery.+It+is+on+the+delivery+queue+now."
 	}
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }

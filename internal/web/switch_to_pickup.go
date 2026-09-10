@@ -56,15 +56,14 @@ func (d *Deps) handleSwitchToPickupPage(w http.ResponseWriter, r *http.Request) 
 
 	// Already on pickup — show the "you're all set" page rather than inviting a
 	// switch that would do nothing.
-	if order.ShippingMethod != nil && *order.ShippingMethod == domain.ShippingMethodPickup {
+	if order.ShippingMethod == domain.ShippingMethodPickup {
 		storefront.SwitchToPickupDonePage(storefront.SwitchToPickupProps{
 			OrderNumber:        order.Number,
 			PickupInstructions: pickupInstructions,
 		}).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
-	if order.ShippingMethod == nil ||
-		*order.ShippingMethod != domain.ShippingMethodLocalDelivery ||
+	if order.ShippingMethod != domain.ShippingMethodLocalDelivery ||
 		order.FulfillmentStatus != domain.FulfillmentStatusUnfulfilled {
 		d.renderSwitchToPickupProblem(w, r, app.ErrOrderNotSwitchable)
 		return

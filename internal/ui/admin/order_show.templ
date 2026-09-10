@@ -191,9 +191,8 @@ func canBuyLabel(order *domain.Order, shipments []domain.Shipment, attempt *doma
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
 		return false
 	}
-	if order.ShippingMethod != nil &&
-		(*order.ShippingMethod == domain.ShippingMethodPickup ||
-			*order.ShippingMethod == domain.ShippingMethodLocalDelivery) {
+	if order.ShippingMethod == domain.ShippingMethodPickup ||
+		order.ShippingMethod == domain.ShippingMethodLocalDelivery {
 		return false
 	}
 	// Blocked only by a live label. A refunded (or refund-requested) shipment no
@@ -260,16 +259,15 @@ func canShipOrder(order *domain.Order) bool {
 	}
 	// Hide the generic Mark Shipped button for orders routed through a local
 	// fulfillment channel — those have their own action buttons.
-	if order.ShippingMethod != nil &&
-		(*order.ShippingMethod == domain.ShippingMethodPickup ||
-			*order.ShippingMethod == domain.ShippingMethodLocalDelivery) {
+	if order.ShippingMethod == domain.ShippingMethodPickup ||
+		order.ShippingMethod == domain.ShippingMethodLocalDelivery {
 		return false
 	}
 	return true
 }
 
 func canMarkReadyForPickup(order *domain.Order) bool {
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodPickup {
+	if order.ShippingMethod != domain.ShippingMethodPickup {
 		return false
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -345,7 +343,7 @@ func canRevertShipment(order *domain.Order) bool {
 }
 
 func canMarkOutForDelivery(order *domain.Order) bool {
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+	if order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return false
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -359,11 +357,8 @@ func canMarkOutForDelivery(order *domain.Order) bool {
 // while the bag is still in the shop (unfulfilled or fulfilled) and the
 // order isn't terminated.
 func canSwapShippingMethod(order *domain.Order) bool {
-	if order.ShippingMethod == nil {
-		return false
-	}
-	if *order.ShippingMethod != domain.ShippingMethodPickup &&
-		*order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+	if order.ShippingMethod != domain.ShippingMethodPickup &&
+		order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return false
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -424,14 +419,10 @@ templ convertToShippedForm(orderID uuid.UUID) {
 // the pickup shelf. Mirrors app.ConvertShippedOrderToLocal exactly, minus the
 // config toggles, which the caller checks per target.
 //
-// A nil method counts as shipped: that is the legacy spelling carried by
-// imported orders, and they are the ones most likely to have been filed on the
-// wrong channel.
-//
 // A live label hides the buttons rather than failing on submit — postage is
 // bought and staff need the refund flow on the shipment card first.
 func canConvertToLocal(order *domain.Order, shipments []domain.Shipment) bool {
-	if order.ShippingMethod != nil && *order.ShippingMethod != domain.ShippingMethodShipped {
+	if order.ShippingMethod != domain.ShippingMethodShipped {
 		return false
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -454,12 +445,10 @@ func canConvertToLocal(order *domain.Order, shipments []domain.Shipment) bool {
 // off the carrier channel: the order is eligible and the shop runs at least one
 // local channel to send it to.
 //
-// It gates the card itself, not just the buttons inside it. A plain retail
-// mail-out is written with shipping_method NULL — resolveLocalMethod returns nil
-// for any zip outside the local zone, and nothing backfills the column — so it
-// carries no method, no dates, no PO and no subscription, and hasShippingDetails
-// alone would render no Shipping card at all. That silently hid this feature
-// from the majority of the orders it exists for.
+// Gates only the buttons now. It used to gate the card as well, because a plain
+// retail mail-out carried a NULL method and the card was hidden from exactly the
+// orders this feature exists for. Migration 086 removed NULL and the card is
+// unconditional, so this is back to answering one question: offer the buttons?
 func shouldOfferConvertToLocal(props OrderShowProps) bool {
 	if !props.LocalDeliveryEnabled && !props.LocalPickupEnabled {
 		return false
@@ -1240,9 +1229,13 @@ templ OrderShowContent(props OrderShowProps) {
 				@orderCustomerCard(props)
 			}
 			@orderAddressCard(props)
-			if hasShippingDetails(props.Order) || shouldOfferConvertToLocal(props) {
-				@orderShippingCard(props)
-			}
+			<!-- Always rendered. This used to be gated on hasShippingDetails,
+				which asked whether the card had anything to say — a card-paid
+				retail order could carry no method, no dates, no PO and no
+				subscription, and the rail showed an empty titled box. Migration
+				086 gave every order a method, so the card always has at least a
+				badge and the guard became trivially true. -->
+			@orderShippingCard(props)
 			@orderNotesCard(props)
 			if canCancelOrder(props.Order.Status) || canRefundOrder(props.Order.Status, props.Order.PaymentStatus) {
 				@orderDangerZone(props)
@@ -1405,32 +1398,15 @@ templ orderAddressCard(props OrderShowProps) {
 	}
 }
 
-// hasShippingDetails reports whether the Shipping rail card has anything to
-// *display*. A card-paid retail order can carry no method, no dates, no PO and
-// no subscription — without this guard the rail rendered an empty titled box.
-//
-// Not sufficient on its own to decide whether to render the card: an order with
-// nothing to display may still have something to *do*. See
-// shouldOfferConvertToLocal, which the call site ORs with this.
-func hasShippingDetails(order *domain.Order) bool {
-	return order.ShippingMethod != nil ||
-		order.ScheduledDeliveryDate != nil ||
-		order.RequestedDeliveryDate != nil ||
-		(order.CustomerPONumber != nil && *order.CustomerPONumber != "") ||
-		order.SubscriptionID != nil
-}
-
 // orderShippingCard is where the method lives together with the controls that
 // change it. Those two buttons used to sit inside a read-only-looking metadata
 // strip halfway down the page, which is a poor home for a state change.
 templ orderShippingCard(props OrderShowProps) {
 	@railCard("Shipping") {
 		<div class="flex flex-col gap-2">
-			if props.Order.ShippingMethod != nil {
-				<div class="flex flex-wrap items-center gap-2">
-					@ShippingMethodBadge(*props.Order.ShippingMethod)
-				</div>
-			}
+			<div class="flex flex-wrap items-center gap-2">
+				@ShippingMethodBadge(props.Order.ShippingMethod)
+			</div>
 			if props.Order.ScheduledDeliveryDate != nil {
 				<!-- The run this order was promised at checkout, distinct from the
 					imported "requested" date. Shown so staff can honour the date the
@@ -1459,7 +1435,7 @@ templ orderShippingCard(props OrderShowProps) {
 			}
 			if canSwapShippingMethod(props.Order) {
 				<div class="mt-1 flex flex-col gap-2 border-t border-rr-border pt-3">
-					@shippingMethodSwap(props.Order.ID, *props.Order.ShippingMethod)
+					@shippingMethodSwap(props.Order.ID, props.Order.ShippingMethod)
 					@convertToShippedForm(props.Order.ID)
 				</div>
 			} else if shouldOfferConvertToLocal(props) {

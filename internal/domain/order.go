@@ -126,7 +126,15 @@ type Order struct {
 	QBInvoiceID           *string
 	QBInvoiceNo           *string
 	QBSyncedAt            *time.Time
-	ShippingMethod        *ShippingMethod
+	// ShippingMethod is how this order leaves the shop. Never empty: the column
+	// is NOT NULL DEFAULT 'shipped' (migration 086), and it is a value rather
+	// than a pointer so that "no method" is unrepresentable.
+	//
+	// It used to be a nullable pointer, where nil was a second spelling of
+	// "shipped" — resolveLocalMethod returned nil for any out-of-zone address.
+	// Read sites then disagreed about what nil meant, and the one that forgot it
+	// entirely shipped a control that was invisible to most of its target orders.
+	ShippingMethod        ShippingMethod
 	RequestedDeliveryDate *time.Time
 	// ScheduledDeliveryDate is the local-delivery run this order was promised
 	// to when it was placed, resolved against the delivery weekdays and cutoff

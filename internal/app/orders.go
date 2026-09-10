@@ -1483,7 +1483,8 @@ func (s *OrderService) SetOrderInternalNote(ctx context.Context, tx pgx.Tx, id u
 // Unlike SwapLocalShippingMethod this is a deliberate, explicit conversion:
 // once the order is "shipped" the order page surfaces the rate/label flow.
 // ConvertShippedOrderToLocal below is the way back, available until a label is
-// bought — this was a genuine one-way door until that existed.
+// *live* on the order — a bought-then-refunded label re-opens it, since both
+// read Shipment.BlocksRebuy. This was a genuine one-way door until that existed.
 // Shipping is comped — local orders carry no shipping line and staff make this
 // change as a courtesy after talking to the customer, so we leave the order
 // total untouched and do not re-charge or recompute tax. No customer email is

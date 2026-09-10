@@ -460,7 +460,8 @@ func shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) templ.
 }
 
 // convertToShippedForm flips a local order onto the carrier "shipped" channel
-// so staff can buy a label. One-way and comped — the dialog spells that out.
+// so staff can buy a label. Comped, and reversible from the same card until a
+// label is live — the dialog spells both out.
 func convertToShippedForm(orderID uuid.UUID) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -489,7 +490,7 @@ func convertToShippedForm(orderID uuid.UUID) templ.Component {
 		var templ_7745c5c3_Var6 templ.SafeURL
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 398, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 399, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -521,7 +522,7 @@ func convertToShippedForm(orderID uuid.UUID) templ.Component {
 				Points: []string{
 					"Shipping stays comped — the customer is not charged extra.",
 					"The customer is not notified of the change.",
-					"You can convert it back to local from this same card, as long as no label has been bought yet.",
+					"You can convert it back to local from this same card, until a label is live on the order — refunding a label re-opens it.",
 				},
 				Confirm: "Convert to mail-out",
 			}))
@@ -626,7 +627,7 @@ func convertToLocalForm(orderID uuid.UUID, target domain.ShippingMethod, label s
 		var templ_7745c5c3_Var9 templ.SafeURL
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/convert-to-local", orderID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 477, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 478, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -639,7 +640,7 @@ func convertToLocalForm(orderID uuid.UUID, target domain.ShippingMethod, label s
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(target))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 480, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 481, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -668,7 +669,7 @@ func convertToLocalForm(orderID uuid.UUID, target domain.ShippingMethod, label s
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(hintID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 485, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 486, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
@@ -694,7 +695,7 @@ func convertToLocalForm(orderID uuid.UUID, target domain.ShippingMethod, label s
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 492, Col: 11}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 493, Col: 11}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -787,7 +788,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 			var templ_7745c5c3_Var15 templ.SafeURL
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/line-items/%s/variant", orderID.String(), eli.LineItem.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 541, Col: 124}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 542, Col: 124}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -806,7 +807,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(sv.ID.String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 550, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 551, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 					if templ_7745c5c3_Err != nil {
@@ -819,7 +820,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 550, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 551, Col: 58}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -837,7 +838,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(sv.ID.String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 552, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 553, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 					if templ_7745c5c3_Err != nil {
@@ -850,7 +851,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 					var templ_7745c5c3_Var19 string
 					templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 552, Col: 49}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 553, Col: 49}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 					if templ_7745c5c3_Err != nil {
@@ -871,7 +872,7 @@ func grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) templ.Comp
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(eli.CurrentLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 563, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 564, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -972,7 +973,7 @@ func railCard(title string) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 628, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 629, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -1023,7 +1024,7 @@ func railRow(label string) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 638, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 639, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -1148,7 +1149,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var27 string
 					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(sh.DeliveredAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 669, Col: 127}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 670, Col: 127}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 					if templ_7745c5c3_Err != nil {
@@ -1171,7 +1172,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(sh.CarrierName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 674, Col: 23}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 675, Col: 23}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
@@ -1189,7 +1190,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var29 templ.SafeURL
 						templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(track))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 676, Col: 38}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 677, Col: 38}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 						if templ_7745c5c3_Err != nil {
@@ -1202,7 +1203,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var30 string
 						templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(sh.TrackingNumber)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 676, Col: 191}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 677, Col: 191}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 						if templ_7745c5c3_Err != nil {
@@ -1216,7 +1217,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var31 string
 						templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(sh.TrackingNumber)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 678, Col: 27}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 679, Col: 27}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 						if templ_7745c5c3_Err != nil {
@@ -1251,7 +1252,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var33 templ.SafeURL
 					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 685, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 686, Col: 86}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 					if templ_7745c5c3_Err != nil {
@@ -1264,7 +1265,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(shipmentHintID("hint-download-label", sh.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 687, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 688, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 					if templ_7745c5c3_Err != nil {
@@ -1288,7 +1289,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var35 templ.SafeURL
 					templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/refund", sh.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 699, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 700, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 					if templ_7745c5c3_Err != nil {
@@ -1334,7 +1335,7 @@ func orderShipmentsBlock(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var37 string
 						templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(shipmentHintID("hint-label-refund", sh.ID))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 714, Col: 71}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 715, Col: 71}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 						if templ_7745c5c3_Err != nil {
@@ -1417,7 +1418,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var40 templ.SafeURL
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/mark-paid", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 741, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 742, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 				if templ_7745c5c3_Err != nil {
@@ -1500,7 +1501,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var43 templ.SafeURL
 				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/fulfill", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 774, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 775, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 				if templ_7745c5c3_Err != nil {
@@ -1561,7 +1562,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var46 string
 					templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/admin/orders/%s/rates", props.Order.ID.String()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 796, Col: 77}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 797, Col: 77}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 					if templ_7745c5c3_Err != nil {
@@ -1601,7 +1602,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var47 templ.SafeURL
 				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/ship", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 818, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 819, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 				if templ_7745c5c3_Err != nil {
@@ -1646,7 +1647,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var49 templ.SafeURL
 				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/ready-for-pickup", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 834, Col: 121}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 835, Col: 121}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 				if templ_7745c5c3_Err != nil {
@@ -1691,7 +1692,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var51 templ.SafeURL
 				templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/picked-up", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 847, Col: 114}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 848, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 				if templ_7745c5c3_Err != nil {
@@ -1736,7 +1737,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var53 templ.SafeURL
 				templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/out-for-delivery", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 860, Col: 121}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 861, Col: 121}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 				if templ_7745c5c3_Err != nil {
@@ -1781,7 +1782,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var55 string
 				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(nextActionReason(props))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 873, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 874, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 				if templ_7745c5c3_Err != nil {
@@ -1809,7 +1810,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var56 templ.SafeURL
 					templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-fulfillment", props.Order.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 883, Col: 106}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 884, Col: 106}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 					if templ_7745c5c3_Err != nil {
@@ -1871,7 +1872,7 @@ func orderActionRail(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var58 templ.SafeURL
 					templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-shipment", props.Order.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 909, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 910, Col: 103}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 					if templ_7745c5c3_Err != nil {
@@ -1984,7 +1985,7 @@ func orderDangerZone(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var62 templ.SafeURL
 				templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 943, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 944, Col: 92}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 				if templ_7745c5c3_Err != nil {
@@ -2047,7 +2048,7 @@ func orderDangerZone(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var64 templ.SafeURL
 				templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/refund", props.Order.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 970, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 971, Col: 92}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 				if templ_7745c5c3_Err != nil {
@@ -2165,7 +2166,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var67 string
 					templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(eli.ProductTitle)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1022, Col: 70}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1023, Col: 70}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 					if templ_7745c5c3_Err != nil {
@@ -2183,7 +2184,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var68 string
 					templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(eli.LineItem.VariantID.String()[:8])
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1024, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1025, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 					if templ_7745c5c3_Err != nil {
@@ -2210,7 +2211,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var69 string
 					templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(eli.VariantSKU)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1032, Col: 26}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1033, Col: 26}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 					if templ_7745c5c3_Err != nil {
@@ -2229,7 +2230,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var70 string
 				templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", eli.LineItem.Quantity))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1038, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1039, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 				if templ_7745c5c3_Err != nil {
@@ -2242,7 +2243,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var71 string
 				templ_7745c5c3_Var71, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.UnitPrice))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1041, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1042, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var71))
 				if templ_7745c5c3_Err != nil {
@@ -2255,7 +2256,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var72 string
 				templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.Total))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1044, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1045, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 				if templ_7745c5c3_Err != nil {
@@ -2281,7 +2282,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var73 string
 			templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Subtotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1053, Col: 130}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1054, Col: 130}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 			if templ_7745c5c3_Err != nil {
@@ -2307,7 +2308,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var74 string
 				templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.DiscountTotal))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1059, Col: 137}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1060, Col: 137}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 				if templ_7745c5c3_Err != nil {
@@ -2333,7 +2334,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var75 string
 			templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.ShippingTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1065, Col: 135}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1066, Col: 135}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 			if templ_7745c5c3_Err != nil {
@@ -2364,7 +2365,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var76 string
 			templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.TaxTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1075, Col: 130}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1076, Col: 130}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 			if templ_7745c5c3_Err != nil {
@@ -2385,7 +2386,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var77 string
 			templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1080, Col: 141}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1081, Col: 141}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 			if templ_7745c5c3_Err != nil {
@@ -2403,7 +2404,7 @@ func orderLineItemsTable(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var78 string
 				templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.TaxExemptReason)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1086, Col: 87}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1087, Col: 87}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 				if templ_7745c5c3_Err != nil {
@@ -2491,7 +2492,7 @@ func orderAdjustmentsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(adj.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1117, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1118, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
@@ -2504,7 +2505,7 @@ func orderAdjustmentsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(adj.SourceType)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1118, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1119, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
@@ -2517,7 +2518,7 @@ func orderAdjustmentsTable(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(adj.Amount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1119, Col: 120}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1120, Col: 120}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -2564,7 +2565,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var85 string
 		templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.ResolveAttributeValue(orderShowActivePath(props.Order))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1131, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1132, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var85)
 		if templ_7745c5c3_Err != nil {
@@ -2597,7 +2598,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var86 templ.SafeURL
 				templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1144, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1145, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 				if templ_7745c5c3_Err != nil {
@@ -2620,7 +2621,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var87 string
 		templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1152, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1153, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 		if templ_7745c5c3_Err != nil {
@@ -2641,7 +2642,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var88 string
 		templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1154, Col: 128}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1155, Col: 128}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 		if templ_7745c5c3_Err != nil {
@@ -2654,7 +2655,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var89 templ.SafeURL
 		templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/invoice", props.Order.ID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1158, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1159, Col: 90}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 		if templ_7745c5c3_Err != nil {
@@ -2667,7 +2668,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var90 templ.SafeURL
 		templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/packing-slip", props.Order.ID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1168, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1169, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var90))
 		if templ_7745c5c3_Err != nil {
@@ -2680,7 +2681,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 		var templ_7745c5c3_Var91 templ.SafeURL
 		templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(orderShowActivePath(props.Order)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1177, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1178, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
 		if templ_7745c5c3_Err != nil {
@@ -2705,7 +2706,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var92 string
 					templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(headline)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1186, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1187, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 					if templ_7745c5c3_Err != nil {
@@ -2718,7 +2719,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var93 string
 					templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(detail)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1187, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1188, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
 					if templ_7745c5c3_Err != nil {
@@ -2736,7 +2737,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var94 string
 					templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(headline)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1191, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1192, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 					if templ_7745c5c3_Err != nil {
@@ -2776,7 +2777,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var95 string
 			templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.ResolveAttributeValue(nextLabelPollURL(props))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1210, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1211, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 			if templ_7745c5c3_Err != nil {
@@ -2923,7 +2924,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var97 string
 		templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(addr.FirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1293, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1294, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 		if templ_7745c5c3_Err != nil {
@@ -2936,7 +2937,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var98 string
 		templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(addr.LastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1293, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1294, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 		if templ_7745c5c3_Err != nil {
@@ -2954,7 +2955,7 @@ func addressLines(addr *domain.Address) templ.Component {
 			var templ_7745c5c3_Var99 string
 			templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(*addr.Company)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1295, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1296, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 			if templ_7745c5c3_Err != nil {
@@ -2972,7 +2973,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var100 string
 		templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(addr.Line1)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1297, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1298, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 		if templ_7745c5c3_Err != nil {
@@ -2990,7 +2991,7 @@ func addressLines(addr *domain.Address) templ.Component {
 			var templ_7745c5c3_Var101 string
 			templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(*addr.Line2)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1299, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1300, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 			if templ_7745c5c3_Err != nil {
@@ -3008,7 +3009,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var102 string
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinStringErrs(addr.City)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1301, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1302, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 		if templ_7745c5c3_Err != nil {
@@ -3021,7 +3022,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var103 string
 		templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinStringErrs(addr.State)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1301, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1302, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 		if templ_7745c5c3_Err != nil {
@@ -3034,7 +3035,7 @@ func addressLines(addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var104 string
 		templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.JoinStringErrs(addr.PostalCode)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1301, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1302, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var104))
 		if templ_7745c5c3_Err != nil {
@@ -3109,7 +3110,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var108 string
 				templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Total))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1314, Col: 87}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1315, Col: 87}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 				if templ_7745c5c3_Err != nil {
@@ -3145,7 +3146,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var110 string
 					templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.DiscountTotal))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1318, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1319, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var110))
 					if templ_7745c5c3_Err != nil {
@@ -3163,7 +3164,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var111 string
 						templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(props.CouponCode)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1320, Col: 77}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1321, Col: 77}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 						if templ_7745c5c3_Err != nil {
@@ -3230,7 +3231,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var114 string
 						templ_7745c5c3_Var114, templ_7745c5c3_Err = templ.JoinStringErrs(props.PaymentDueAt.Format("January 2, 2006"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1336, Col: 92}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1337, Col: 92}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var114))
 						if templ_7745c5c3_Err != nil {
@@ -3244,7 +3245,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 						var templ_7745c5c3_Var115 string
 						templ_7745c5c3_Var115, templ_7745c5c3_Err = templ.JoinStringErrs(props.PaymentDueAt.Format("January 2, 2006"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1338, Col: 52}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1339, Col: 52}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var115))
 						if templ_7745c5c3_Err != nil {
@@ -3278,7 +3279,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var117 string
 					templ_7745c5c3_Var117, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.QBInvoiceNo)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1344, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1345, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var117))
 					if templ_7745c5c3_Err != nil {
@@ -3315,7 +3316,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var119 string
 					templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.QBSyncedAt.In(props.MerchantTZ).Format("Jan 2, 3:04 PM"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1349, Col: 97}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1350, Col: 97}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
 					if templ_7745c5c3_Err != nil {
@@ -3340,7 +3341,7 @@ func orderPaymentCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var120 string
 				templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.StripePaymentIntentID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1355, Col: 96}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1356, Col: 96}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var120))
 				if templ_7745c5c3_Err != nil {
@@ -3405,7 +3406,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var123 templ.SafeURL
 			templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1366, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1367, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 			if templ_7745c5c3_Err != nil {
@@ -3418,7 +3419,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var124 string
 			templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1369, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1370, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var124))
 			if templ_7745c5c3_Err != nil {
@@ -3431,7 +3432,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var125 string
 			templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1369, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1370, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
 			if templ_7745c5c3_Err != nil {
@@ -3449,7 +3450,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var126 string
 				templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Customer.CompanyName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1372, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1373, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var126))
 				if templ_7745c5c3_Err != nil {
@@ -3467,7 +3468,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var127 templ.SafeURL
 			templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("mailto:" + props.Customer.Email))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1374, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1375, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
 			if templ_7745c5c3_Err != nil {
@@ -3480,7 +3481,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var128 string
 			templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1374, Col: 143}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1375, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
 			if templ_7745c5c3_Err != nil {
@@ -3498,7 +3499,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var129 templ.SafeURL
 				templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("tel:" + *props.Customer.Phone))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1376, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1377, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
 				if templ_7745c5c3_Err != nil {
@@ -3511,7 +3512,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var130 string
 				templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Customer.Phone)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1376, Col: 133}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1377, Col: 133}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var130))
 				if templ_7745c5c3_Err != nil {
@@ -3530,7 +3531,7 @@ func orderCustomerCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var131 string
 				templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(ordinalOrderCount(props.CustomerOrderCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1379, Col: 87}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1380, Col: 87}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
 				if templ_7745c5c3_Err != nil {
@@ -3727,7 +3728,7 @@ func orderShippingCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var137 string
 					templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.ScheduledDeliveryDate.Format("Monday, January 2"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1438, Col: 94}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1439, Col: 94}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var137))
 					if templ_7745c5c3_Err != nil {
@@ -3760,7 +3761,7 @@ func orderShippingCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var139 string
 					templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.RequestedDeliveryDate.In(props.MerchantTZ).Format("January 2, 2006"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1443, Col: 87}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1444, Col: 87}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var139))
 					if templ_7745c5c3_Err != nil {
@@ -3789,7 +3790,7 @@ func orderShippingCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var141 string
 					templ_7745c5c3_Var141, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.CustomerPONumber)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1448, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1449, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var141))
 					if templ_7745c5c3_Err != nil {
@@ -3822,7 +3823,7 @@ func orderShippingCard(props OrderShowProps) templ.Component {
 					var templ_7745c5c3_Var143 templ.SafeURL
 					templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", props.Order.SubscriptionID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1454, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1455, Col: 103}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var143))
 					if templ_7745c5c3_Err != nil {
@@ -3936,7 +3937,7 @@ func orderNotesCard(props OrderShowProps) templ.Component {
 				var templ_7745c5c3_Var146 string
 				templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.Notes)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1489, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1490, Col: 86}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var146))
 				if templ_7745c5c3_Err != nil {
@@ -3954,7 +3955,7 @@ func orderNotesCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var147 templ.SafeURL
 			templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s/internal-note", props.Order.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1494, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1495, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var147))
 			if templ_7745c5c3_Err != nil {
@@ -3967,7 +3968,7 @@ func orderNotesCard(props OrderShowProps) templ.Component {
 			var templ_7745c5c3_Var148 string
 			templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.JoinStringErrs(internalNoteValue(props.Order))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1504, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_show.templ`, Line: 1505, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var148))
 			if templ_7745c5c3_Err != nil {

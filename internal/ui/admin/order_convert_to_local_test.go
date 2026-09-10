@@ -217,6 +217,11 @@ func TestOrderShowContent_NilMethodOrderGetsTheConvertControl(t *testing.T) {
 
 // The counterpart: with no local channel enabled there is nothing to offer, and
 // an order with nothing to display must not gain an empty Shipping card.
+//
+// Asserting only that "convert-to-local" is absent would not test this — the
+// per-channel guards inside the card already guarantee that string's absence,
+// so the assertion passes even when the card renders as an empty titled box.
+// The card heading is what actually pins it.
 func TestOrderShowContent_NoLocalChannelLeavesTheCardAlone(t *testing.T) {
 	order := &domain.Order{
 		ID:                uuid.New(),
@@ -229,4 +234,6 @@ func TestOrderShowContent_NoLocalChannelLeavesTheCardAlone(t *testing.T) {
 	var sb strings.Builder
 	assert.NoError(t, OrderShowContent(props).Render(context.Background(), &sb))
 	assert.NotContains(t, sb.String(), "convert-to-local")
+	assert.NotContains(t, sb.String(), ">Shipping<",
+		"an order with nothing to show and nothing to do gets no Shipping card")
 }

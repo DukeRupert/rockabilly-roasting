@@ -391,7 +391,8 @@ templ shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) {
 }
 
 // convertToShippedForm flips a local order onto the carrier "shipped" channel
-// so staff can buy a label. One-way and comped — the dialog spells that out.
+// so staff can buy a label. Comped, and reversible from the same card until a
+// label is live — the dialog spells both out.
 templ convertToShippedForm(orderID uuid.UUID) {
 	<form
 		method="post"
@@ -410,7 +411,7 @@ templ convertToShippedForm(orderID uuid.UUID) {
 					Points: []string{
 						"Shipping stays comped — the customer is not charged extra.",
 						"The customer is not notified of the change.",
-						"You can convert it back to local from this same card, as long as no label has been bought yet.",
+						"You can convert it back to local from this same card, until a label is live on the order — refunding a label re-opens it.",
 					},
 					Confirm: "Convert to mail-out",
 				})... }

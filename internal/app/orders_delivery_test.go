@@ -155,8 +155,7 @@ func TestOrderService_ConvertLocalOrderToShipped(t *testing.T) {
 
 		got, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodShipped, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodShipped, got.ShippingMethod)
 		// Comped: shipping is not charged, so the order total is unchanged.
 		assert.Equal(t, order.Total, got.Total)
 		assert.Equal(t, order.ShippingTotal, got.ShippingTotal)
@@ -171,8 +170,7 @@ func TestOrderService_ConvertLocalOrderToShipped(t *testing.T) {
 
 		got, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodShipped, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodShipped, got.ShippingMethod)
 	})
 
 	t.Run("already-shipped-channel order is rejected", func(t *testing.T) {
@@ -353,26 +351,28 @@ func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
 
 		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, got.ShippingMethod)
 		// Shipping the customer already paid is left alone — refunding it is a
 		// Stripe call and cannot happen in this transaction.
 		assert.Equal(t, order.Total, got.Total)
 		assert.Equal(t, order.ShippingTotal, got.ShippingTotal)
 	})
 
-	t.Run("a nil method is the legacy spelling of shipped and converts", func(t *testing.T) {
+	// An order created without an explicit method lands on 'shipped' via the
+	// column default (migration 086), not on an empty string — so it is on the
+	// carrier channel and convertible. This is the invariant that replaced the
+	// old "nil is a second spelling of shipped" special case.
+	t.Run("an order created without a method defaults to shipped and converts", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		custID, shipID, billID := orderFixtures(t, tx)
-		// No WithShippingMethod: imported and pre-local-channel orders carry nil.
 		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
 			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
-		require.Nil(t, order.ShippingMethod)
+		require.Equal(t, domain.ShippingMethodShipped, order.ShippingMethod,
+			"the column default must fill an unset method")
 
 		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, got.ShippingMethod)
 	})
 
 	t.Run("a fulfilled order still in the shop converts", func(t *testing.T) {
@@ -384,8 +384,7 @@ func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
 
 		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, got.ShippingMethod)
 	})
 
 	t.Run("a live label blocks the conversion", func(t *testing.T) {
@@ -421,8 +420,7 @@ func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
 
 		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodLocalDelivery, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodLocalDelivery, got.ShippingMethod)
 	})
 
 	t.Run("pickup is refused while the shop has pickup switched off", func(t *testing.T) {
@@ -446,8 +444,7 @@ func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
 
 		got, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodPickup, actor)
 		require.NoError(t, err)
-		require.NotNil(t, got.ShippingMethod)
-		assert.Equal(t, domain.ShippingMethodPickup, *got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodPickup, got.ShippingMethod)
 	})
 
 	t.Run("an already-local order is rejected", func(t *testing.T) {
@@ -523,21 +520,20 @@ func TestOrderService_ConvertShippedOrderToLocal(t *testing.T) {
 		assert.Equal(t, "local_delivery", metadata["to"])
 	})
 
-	// A NULL column must not be reported as the "shipped" the conversion treats
-	// it as — NULL is the common spelling on retail mail-outs, and flattening
-	// the two would erase the distinction on the orders this targets.
-	t.Run("a nil method is audited as null, not as shipped", func(t *testing.T) {
+	// The audit records a real method on both ends. This used to need a special
+	// case because an unset method was NULL and reporting it as "shipped" would
+	// have invented history; there is no longer anything to invent.
+	t.Run("an order created without a method audits its real from-value", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		custID, shipID, billID := orderFixtures(t, tx)
 		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
 			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
-		require.Nil(t, order.ShippingMethod)
 
 		_, err := svc.ConvertShippedOrderToLocal(ctx, tx, order.ID, domain.ShippingMethodLocalDelivery, actor)
 		require.NoError(t, err)
 
 		_, metadata := lastShippingMethodAudit(t, tx, order.ID)
-		assert.Nil(t, metadata["from"], "a NULL method must audit as null")
+		assert.Equal(t, "shipped", metadata["from"])
 		assert.Equal(t, "local_delivery", metadata["to"])
 	})
 

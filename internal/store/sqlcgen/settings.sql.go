@@ -13,7 +13,7 @@ import (
 )
 
 const getStoreSettings = `-- name: GetStoreSettings :one
-SELECT id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id FROM store_settings WHERE id = true
+SELECT id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id, qb_billing_mode, qb_sales_item_id, qb_sales_item_name, qb_shipping_item_id, qb_shipping_item_name, service_labor_rate_cents, service_travel_rate_cents FROM store_settings WHERE id = true
 `
 
 func (q *Queries) GetStoreSettings(ctx context.Context) (StoreSetting, error) {
@@ -27,6 +27,13 @@ func (q *Queries) GetStoreSettings(ctx context.Context) (StoreSetting, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DefaultWholesalePriceListID,
+		&i.QbBillingMode,
+		&i.QbSalesItemID,
+		&i.QbSalesItemName,
+		&i.QbShippingItemID,
+		&i.QbShippingItemName,
+		&i.ServiceLaborRateCents,
+		&i.ServiceTravelRateCents,
 	)
 	return i, err
 }
@@ -36,7 +43,7 @@ UPDATE store_settings
 SET default_wholesale_price_list_id = $1,
     updated_at = now()
 WHERE id = true
-RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id
+RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id, qb_billing_mode, qb_sales_item_id, qb_sales_item_name, qb_shipping_item_id, qb_shipping_item_name, service_labor_rate_cents, service_travel_rate_cents
 `
 
 func (q *Queries) UpdateDefaultWholesalePriceList(ctx context.Context, defaultWholesalePriceListID *uuid.UUID) (StoreSetting, error) {
@@ -50,6 +57,13 @@ func (q *Queries) UpdateDefaultWholesalePriceList(ctx context.Context, defaultWh
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DefaultWholesalePriceListID,
+		&i.QbBillingMode,
+		&i.QbSalesItemID,
+		&i.QbSalesItemName,
+		&i.QbShippingItemID,
+		&i.QbShippingItemName,
+		&i.ServiceLaborRateCents,
+		&i.ServiceTravelRateCents,
 	)
 	return i, err
 }
@@ -61,7 +75,7 @@ SET tax_mode   = $1,
     tax_label  = $3,
     updated_at = now()
 WHERE id = true
-RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id
+RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id, qb_billing_mode, qb_sales_item_id, qb_sales_item_name, qb_shipping_item_id, qb_shipping_item_name, service_labor_rate_cents, service_travel_rate_cents
 `
 
 type UpdateTaxConfigParams struct {
@@ -81,6 +95,13 @@ func (q *Queries) UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DefaultWholesalePriceListID,
+		&i.QbBillingMode,
+		&i.QbSalesItemID,
+		&i.QbSalesItemName,
+		&i.QbShippingItemID,
+		&i.QbShippingItemName,
+		&i.ServiceLaborRateCents,
+		&i.ServiceTravelRateCents,
 	)
 	return i, err
 }

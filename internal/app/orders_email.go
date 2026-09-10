@@ -178,7 +178,7 @@ type deliveryOffer struct {
 // being offered a switch, and in the worst case simply gets the confirmation
 // they always got. A confirmation email is not worth failing over an offer.
 func (s *OrderService) deliveryOfferFor(ctx context.Context, tx pgx.Tx, order *domain.Order) deliveryOffer {
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+	if order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return deliveryOffer{}
 	}
 	if order.ScheduledDeliveryDate == nil {

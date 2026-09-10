@@ -812,7 +812,7 @@ func (s *OrderService) MarkReadyForPickup(ctx context.Context, tx pgx.Tx, id uui
 		return nil, fmt.Errorf("get order for ready-for-pickup: %w", err)
 	}
 
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodPickup {
+	if order.ShippingMethod != domain.ShippingMethodPickup {
 		return nil, fmt.Errorf("order is not a pickup order: %w", ErrInvalidOrderStatus)
 	}
 	switch order.FulfillmentStatus {
@@ -877,10 +877,10 @@ func (s *OrderService) SwitchToPickup(ctx context.Context, tx pgx.Tx, id uuid.UU
 	}
 
 	// Already switched — report success without touching the row.
-	if order.ShippingMethod != nil && *order.ShippingMethod == domain.ShippingMethodPickup {
+	if order.ShippingMethod == domain.ShippingMethodPickup {
 		return order, false, nil
 	}
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+	if order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return nil, false, ErrOrderNotSwitchable
 	}
 	if order.FulfillmentStatus != domain.FulfillmentStatusUnfulfilled {
@@ -1196,7 +1196,7 @@ func (s *OrderService) MarkOutForDelivery(ctx context.Context, tx pgx.Tx, id uui
 		return nil, fmt.Errorf("get order for out-for-delivery: %w", err)
 	}
 
-	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+	if order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return nil, fmt.Errorf("order is not a local delivery order: %w", ErrInvalidOrderStatus)
 	}
 	switch order.FulfillmentStatus {
@@ -1389,11 +1389,11 @@ func (s *OrderService) SwapLocalShippingMethod(ctx context.Context, tx pgx.Tx, i
 		return nil, fmt.Errorf("get order for shipping-method swap: %w", err)
 	}
 
-	if order.ShippingMethod == nil ||
-		(*order.ShippingMethod != domain.ShippingMethodPickup && *order.ShippingMethod != domain.ShippingMethodLocalDelivery) {
+	if order.ShippingMethod != domain.ShippingMethodPickup &&
+		order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return nil, fmt.Errorf("order is not a local fulfillment order: %w", ErrInvalidOrderStatus)
 	}
-	if *order.ShippingMethod == target {
+	if order.ShippingMethod == target {
 		return order, nil
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -1406,7 +1406,7 @@ func (s *OrderService) SwapLocalShippingMethod(ctx context.Context, tx pgx.Tx, i
 		return nil, fmt.Errorf("order has already left the shop: %w", ErrInvalidOrderStatus)
 	}
 
-	previous := *order.ShippingMethod
+	previous := order.ShippingMethod
 	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, target)
 	if err != nil {
 		return nil, fmt.Errorf("set shipping method: %w", err)
@@ -1499,8 +1499,8 @@ func (s *OrderService) ConvertLocalOrderToShipped(ctx context.Context, tx pgx.Tx
 		return nil, fmt.Errorf("get order for shipped conversion: %w", err)
 	}
 
-	if order.ShippingMethod == nil ||
-		(*order.ShippingMethod != domain.ShippingMethodPickup && *order.ShippingMethod != domain.ShippingMethodLocalDelivery) {
+	if order.ShippingMethod != domain.ShippingMethodPickup &&
+		order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return nil, fmt.Errorf("order is not a local fulfillment order: %w", ErrInvalidOrderStatus)
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -1513,7 +1513,7 @@ func (s *OrderService) ConvertLocalOrderToShipped(ctx context.Context, tx pgx.Tx
 		return nil, fmt.Errorf("order has already left the shop: %w", ErrInvalidOrderStatus)
 	}
 
-	previous := *order.ShippingMethod
+	previous := order.ShippingMethod
 	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, domain.ShippingMethodShipped)
 	if err != nil {
 		return nil, fmt.Errorf("set shipping method: %w", err)
@@ -1582,7 +1582,7 @@ func (s *OrderService) ConvertShippedOrderToLocal(ctx context.Context, tx pgx.Tx
 	// everything placed before the local channel existed carry it, and
 	// CalculateForMethod already reads nil that way. Those are exactly the
 	// orders most likely to need this, so they convert too.
-	if order.ShippingMethod != nil && *order.ShippingMethod != domain.ShippingMethodShipped {
+	if order.ShippingMethod != domain.ShippingMethodShipped {
 		return nil, fmt.Errorf("order is not on the shipped channel: %w", ErrInvalidOrderStatus)
 	}
 	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
@@ -1629,14 +1629,7 @@ func (s *OrderService) ConvertShippedOrderToLocal(ctx context.Context, tx pgx.Tx
 		}
 	}
 
-	// JSON null when the column held NULL, rather than reporting the "shipped"
-	// this method treats it as. NULL is the common spelling on ordinary retail
-	// mail-outs, so flattening the two would erase the distinction on exactly
-	// the population this conversion targets.
-	var previous any
-	if order.ShippingMethod != nil {
-		previous = string(*order.ShippingMethod)
-	}
+	previous := order.ShippingMethod
 	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, target)
 	if err != nil {
 		return nil, fmt.Errorf("set shipping method: %w", err)
@@ -1651,7 +1644,7 @@ func (s *OrderService) ConvertShippedOrderToLocal(ctx context.Context, tx pgx.Tx
 		ResourceID:   id,
 		After:        order,
 		Metadata: map[string]any{
-			"from": previous,
+			"from": string(previous),
 			"to":   string(target),
 		},
 	}); err != nil {

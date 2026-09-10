@@ -65,10 +65,15 @@ type CreateOrderParams struct {
 // CreateOrder inserts a new order and returns it.
 func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderParams) (_ *domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.create", time.Now(), &err)
-	var shippingMethod *string
+	// The column is NOT NULL DEFAULT 'shipped' (migration 086) and sqlc types it
+	// as a plain string, so an unset param must resolve to the default here
+	// rather than being passed through as "" — which would write an empty
+	// method rather than falling back to the default. This is the only place
+	// that decision is made; CreateOrderParams.ShippingMethod stays optional
+	// because plenty of callers genuinely do not care how the order ships.
+	shippingMethod := string(domain.ShippingMethodShipped)
 	if p.ShippingMethod != nil {
-		s := string(*p.ShippingMethod)
-		shippingMethod = &s
+		shippingMethod = string(*p.ShippingMethod)
 	}
 	// Default to retail so callers that don't care about channel (and the DB
 	// DEFAULT) stay consistent; the CHECK constraint rejects an empty string.
@@ -203,7 +208,7 @@ func (s *OrderStore) UpdateOrderShippingMethod(ctx context.Context, tx pgx.Tx, i
 	m := string(method)
 	row, err := sqlcgen.New(tx).UpdateOrderShippingMethod(ctx, sqlcgen.UpdateOrderShippingMethodParams{
 		ID:             id,
-		ShippingMethod: &m,
+		ShippingMethod: m,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update order shipping method: %w", err)
@@ -584,8 +589,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		o.TaxTotal = int(taxTotal)
 		o.Total = int(total)
 		if shippingMethod != nil {
-			sm := domain.ShippingMethod(*shippingMethod)
-			o.ShippingMethod = &sm
+			o.ShippingMethod = domain.ShippingMethod(*shippingMethod)
 		}
 		o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
 		o.ScheduledDeliveryDate = dateFromPG(scheduledDeliveryDate)
@@ -1171,8 +1175,7 @@ func scanQBOrder(row pgx.Row) (*domain.Order, error) {
 	o.Total = int(total)
 	o.OverdueReminderStage = int(overdueReminderStage)
 	if shippingMethod != nil {
-		sm := domain.ShippingMethod(*shippingMethod)
-		o.ShippingMethod = &sm
+		o.ShippingMethod = domain.ShippingMethod(*shippingMethod)
 	}
 	o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
 	o.Metadata = metadataFromJSON(metadata)
@@ -1648,10 +1651,7 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		CreatedAt:             r.CreatedAt,
 		UpdatedAt:             r.UpdatedAt,
 	}
-	if r.ShippingMethod != nil {
-		sm := domain.ShippingMethod(*r.ShippingMethod)
-		o.ShippingMethod = &sm
-	}
+	o.ShippingMethod = domain.ShippingMethod(r.ShippingMethod)
 	return o
 }
 

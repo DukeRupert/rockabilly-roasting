@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/domain"
 )
@@ -15,9 +16,28 @@ func TestResolveLocalMethod(t *testing.T) {
 	bothEligible := []domain.ShippingMethod{delivery, pickup}
 	pickupOnly := []domain.ShippingMethod{pickup}
 
-	t.Run("non-local returns nil regardless of input", func(t *testing.T) {
-		assert.Nil(t, resolveLocalMethod(nil, "pickup", &pickup))
-		assert.Nil(t, resolveLocalMethod([]domain.ShippingMethod{}, "", nil))
+	// This used to return nil, leaving shipping_method NULL — a second spelling
+	// of "shipped" that read sites had to remember and some forgot. It is the
+	// write side of migration 086: no new NULL-equivalents get created, and an
+	// out-of-zone address says plainly what it is.
+	t.Run("non-local resolves to shipped regardless of input", func(t *testing.T) {
+		for _, tc := range []struct {
+			name      string
+			requested string
+			pref      *domain.ShippingMethod
+		}{
+			{"a pickup request it cannot honour", "pickup", &pickup},
+			{"nothing asked for at all", "", nil},
+			{"a saved local preference", "", &delivery},
+		} {
+			got := resolveLocalMethod(nil, tc.requested, tc.pref)
+			require.NotNil(t, got, tc.name)
+			assert.Equal(t, domain.ShippingMethodShipped, *got, tc.name)
+		}
+		// An empty (non-nil) eligible set is the same case.
+		got := resolveLocalMethod([]domain.ShippingMethod{}, "", nil)
+		require.NotNil(t, got)
+		assert.Equal(t, domain.ShippingMethodShipped, *got)
 	})
 
 	t.Run("explicit valid request wins over preference", func(t *testing.T) {

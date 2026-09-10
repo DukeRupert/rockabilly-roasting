@@ -455,18 +455,16 @@ func WithDeliveryRun(d time.Time) OrderOption {
 		Time:  time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
 		Valid: true,
 	}
-	method := string(domain.ShippingMethodLocalDelivery)
 	return func(p *sqlcgen.CreateOrderParams) {
 		p.ScheduledDeliveryDate = day
 		p.DeliveryRunDate = day
-		p.ShippingMethod = &method
+		p.ShippingMethod = string(domain.ShippingMethodLocalDelivery)
 	}
 }
 
 func WithShippingMethod(m domain.ShippingMethod) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) {
-		s := string(m)
-		p.ShippingMethod = &s
+		p.ShippingMethod = string(m)
 	}
 }
 
@@ -490,6 +488,10 @@ func CreateOrder(t *testing.T, tx pgx.Tx, customerID, shippingAddrID, billingAdd
 		BillingAddressID:  billingAddrID,
 		Metadata:          json.RawMessage(`{}`),
 		PlacedAt:          time.Now(),
+		// Fixtures build sqlc params directly rather than going through
+		// store.CreateOrder, so they miss its defaulting and would insert ''.
+		// Mirror the column default here; WithShippingMethod overrides it.
+		ShippingMethod: string(domain.ShippingMethodShipped),
 	}
 	for _, o := range opts {
 		o(&p)
@@ -514,9 +516,14 @@ func CreateOrder(t *testing.T, tx pgx.Tx, customerID, shippingAddrID, billingAdd
 		Total:             int(row.Total),
 		ShippingAddressID: row.ShippingAddressID,
 		BillingAddressID:  row.BillingAddressID,
-		PlacedAt:          row.PlacedAt,
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
+		// Was omitted, so the returned order carried the zero value whatever was
+		// actually inserted — which made an assertion that it was unset pass for
+		// the wrong reason. Fixtures are only useful if what they hand back
+		// matches what they wrote.
+		ShippingMethod: domain.ShippingMethod(row.ShippingMethod),
+		PlacedAt:       row.PlacedAt,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
 

@@ -137,10 +137,20 @@ func (m *OAuthManager) ExchangeCallback(ctx context.Context, r *http.Request) (*
 		return nil, fmt.Errorf("qb oauth: encrypt refresh token: %w", err)
 	}
 
+	// The realm ID is encrypted alongside the tokens. It is not a bearer
+	// credential, but it does identify the customer's company file, and
+	// Intuit's security requirements name it explicitly beside the refresh
+	// token. Same key, same algorithm — there is no reason for it to be the
+	// one field left readable in a database backup.
+	encRealm, err := m.encrypter.Encrypt(realmID)
+	if err != nil {
+		return nil, fmt.Errorf("qb oauth: encrypt realm id: %w", err)
+	}
+
 	now := time.Now()
 	return &domain.QBCredentials{
 		TenantID:         m.tenantID,
-		RealmID:          realmID,
+		RealmID:          encRealm,
 		AccessToken:      encAccess,
 		RefreshToken:     encRefresh,
 		AccessExpiresAt:  now.Add(time.Duration(tokenResp.ExpiresIn) * time.Second),
@@ -209,13 +219,13 @@ type ConnectionStatus struct {
 // connected QuickBooks" the same answer — and the settings page then told staff
 // to go and reconnect a connection that was fine.
 func (m *OAuthManager) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus, error) {
-	return connectionStatus(ctx, tx, m.credStore, m.tenantID)
+	return connectionStatus(ctx, tx, m.credStore, m.tenantID, m.config.EncryptionKey)
 }
 
 // connectionStatus reads the stored connection for a tenant. Shared with
 // Provider.Status, which answers the same question without needing a
 // configured app to ask it through.
-func connectionStatus(ctx context.Context, tx pgx.Tx, creds CredentialStore, tenantID uuid.UUID) (ConnectionStatus, error) {
+func connectionStatus(ctx context.Context, tx pgx.Tx, creds CredentialStore, tenantID uuid.UUID, key []byte) (ConnectionStatus, error) {
 	c, err := creds.GetByTenantID(ctx, tx, tenantID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ConnectionStatus{}, nil
@@ -223,9 +233,19 @@ func connectionStatus(ctx context.Context, tx pgx.Tx, creds CredentialStore, ten
 	if err != nil {
 		return ConnectionStatus{}, fmt.Errorf("qb status: %w", err)
 	}
+	// The realm is stored encrypted, and this is the one place it is shown to
+	// a human. A key that cannot read it is reported as connected-without-a-
+	// realm rather than as an error: whether a connection exists is a separate
+	// question from whether this server can still read it, the settings page
+	// already omits the field when empty, and the token paths raise the key
+	// problem in their own words where it actually blocks work.
+	realm, decErr := decryptWithKey(key, c.RealmID)
+	if decErr != nil {
+		realm = ""
+	}
 	return ConnectionStatus{
 		Connected:        true,
-		RealmID:          c.RealmID,
+		RealmID:          realm,
 		RefreshExpiresAt: &c.RefreshExpiresAt,
 	}, nil
 }

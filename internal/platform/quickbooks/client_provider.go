@@ -322,7 +322,7 @@ func (p *Provider) OAuth(ctx context.Context) (*OAuthManager, error) {
 // is missing or unreadable — which is the case where a staffer most needs the
 // settings page to still render.
 func (p *Provider) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus, error) {
-	return connectionStatus(ctx, tx, p.cfg.Credentials, p.cfg.TenantID)
+	return connectionStatus(ctx, tx, p.cfg.Credentials, p.cfg.TenantID, p.cfg.EncryptionKey)
 }
 
 // resolve returns the client for the configuration in force, rebuilding it

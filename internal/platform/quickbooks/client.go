@@ -100,6 +100,18 @@ func (c *QBClient) readCredentials(ctx context.Context) (*domain.QBCredentials, 
 	if err != nil {
 		return nil, fmt.Errorf("get QB credentials: %w", err)
 	}
+	if creds != nil {
+		// Decrypt the realm ID centrally, so every caller downstream works in
+		// plaintext and no site has to remember that this one field is stored
+		// encrypted. The tokens beside it stay encrypted until their own use
+		// site, because they are handed straight to Intuit and the window
+		// where they sit decrypted in memory is worth keeping short.
+		realm, decErr := c.decrypt(creds.RealmID)
+		if decErr != nil {
+			return nil, fmt.Errorf("decrypt realm id: %w", decErr)
+		}
+		creds.RealmID = realm
+	}
 	return creds, tx.Commit(ctx)
 }
 

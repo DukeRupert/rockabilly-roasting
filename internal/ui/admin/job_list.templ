@@ -56,14 +56,18 @@ func jobErrorDisplay(msg string) string {
 	if msg == "" {
 		return "No error recorded"
 	}
-	// Truncate by runes, not bytes: error text carries provider messages and
-	// customer data, and slicing mid-rune renders a replacement character.
-	const max = 140
-	r := []rune(msg)
+	return truncateRunes(msg, 140)
+}
+
+// truncateRunes keeps a long value from blowing out the confirm dialog. By
+// runes, not bytes: job args carry customer data, and slicing mid-rune renders
+// a replacement character.
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
 	if len(r) > max {
 		return string(r[:max]) + "…"
 	}
-	return msg
+	return s
 }
 
 // failureSpan answers the operator's next question after "how many": is this
@@ -277,7 +281,7 @@ func dismissConfirm(j domain.DeadJob) ActionConfirm {
 		Points: []string{
 			"The work it was going to do does not happen — if it was an email, nobody gets it",
 			"Retry instead if the cause is fixed; dismiss only when running it again cannot help",
-			"The audit log keeps the kind, args and error: " + jobErrorDisplay(j.Args),
+			"The audit log keeps the kind, args and error: " + truncateRunes(j.Args, 140),
 		},
 		Confirm: "Dismiss job",
 		Danger:  true,

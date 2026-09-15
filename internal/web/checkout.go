@@ -798,8 +798,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return app.ErrAddressIncomplete
 		}
 
-		isWholesale := customer.AccountType == domain.AccountTypeWholesale
-		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale, shippingAddr.State)
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, shippingAddr.State)
 		if txErr != nil {
 			return fmt.Errorf("calculate tax: %w", txErr)
 		}

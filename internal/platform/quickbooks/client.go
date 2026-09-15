@@ -62,6 +62,7 @@ type QBClient struct {
 	httpClient *http.Client
 	baseURL    string
 	terms      *termCache
+	taxCodes   *taxCodeCache
 }
 
 // NewQBClient creates a new QuickBooks client.
@@ -78,8 +79,9 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		baseURL: baseURL,
-		terms:   newTermCache(),
+		baseURL:  baseURL,
+		terms:    newTermCache(),
+		taxCodes: newTaxCodeCache(),
 	}
 }
 

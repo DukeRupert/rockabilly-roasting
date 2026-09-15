@@ -185,12 +185,21 @@ func (s *CheckoutService) CalculateShipping(ctx context.Context, tx pgx.Tx, subt
 	return cfg.Calculate(subtotalCents, shipToZip), cfg, nil
 }
 
-// taxCalculatorForConfig returns the appropriate TaxCalculator for the given config and customer type.
-// B2B (wholesale) always gets NoneCalculator regardless of store config.
-func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalculator {
-	if isWholesale {
-		return &tax.NoneCalculator{}
-	}
+// taxCalculatorForConfig returns the TaxCalculator for the store's configuration.
+//
+// Wholesale used to be short-circuited to NoneCalculator here regardless of
+// config — a blanket "B2B is never taxed" that was true of a catalog which is
+// entirely bagged coffee, and stops being true the moment the shop invoices a
+// cafe for a grinder or a repair. Taxability is a property of what is being
+// sold, not of which channel sold it, so both channels now run the same
+// per-line rule: products.tax_exempt decides, and the flat rate applies only
+// inside the nexus state. With every product currently exempt, this changes no
+// existing order's total — it starts mattering when staff flip a SKU taxable.
+//
+// Customer-level exemption (a reseller permit on file) is handled separately,
+// by TaxOrder.CustomerExempt, which is how a resale account stays untaxed even
+// on a taxable SKU.
+func taxCalculatorForConfig(cfg *domain.TaxConfig) tax.TaxCalculator {
 	switch cfg.Mode {
 	case domain.TaxModeFlatRate:
 		// Single-nexus WA merchant. If a second nexus state is added,
@@ -211,13 +220,13 @@ func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalc
 // CalculateTax computes tax for the given line items using the store's tax configuration.
 // shippingState is the 2-letter state code of the ship-to address; pass "" if unknown
 // (flat-rate with a Jurisdiction will return zero in that case).
-func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []domain.TaxLineItem, customerExempt, isWholesale bool, shippingState string) (*domain.TaxResult, error) {
+func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []domain.TaxLineItem, customerExempt bool, shippingState string) (*domain.TaxResult, error) {
 	cfg, err := s.settings.GetTaxConfig(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("get tax config: %w", err)
 	}
 
-	calculator := taxCalculatorForConfig(cfg, isWholesale)
+	calculator := taxCalculatorForConfig(cfg)
 	result, err := calculator.Calculate(ctx, tax.TaxOrder{
 		CustomerExempt: customerExempt,
 		ShippingState:  shippingState,

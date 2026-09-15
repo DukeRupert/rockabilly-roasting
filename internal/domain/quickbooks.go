@@ -87,7 +87,12 @@ type QBInvoicePreview struct {
 	DueDate       time.Time
 	SubtotalCents int
 	ShippingCents int
-	TotalCents    int
+	// TaxCents is the sales tax on the order, which the invoice will carry.
+	// Recorded on the preview so a proof period reports the number the
+	// customer would actually be billed rather than a total that quietly
+	// excludes tax.
+	TaxCents   int
+	TotalCents int
 	TermID        *string
 	Lines         []QBInvoiceLinePreview
 

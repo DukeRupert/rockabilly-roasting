@@ -196,6 +196,10 @@ templ QBPreviewContent(props QBPreviewProps) {
 							</td>
 							<td class="px-4 py-3 text-right text-sm text-rr-heading">
 								{ formatCents(row.TotalCents) }
+								if row.TaxCents > 0 {
+									<!-- The breakdown, not a correction: the total already includes tax. -->
+									<p class="text-xs text-rr-muted">incl. { formatCents(row.TaxCents) } tax</p>
+								}
 							</td>
 							if props.Mode.IsLive() {
 								<td class="px-4 py-3 text-right">

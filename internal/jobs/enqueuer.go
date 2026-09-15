@@ -36,6 +36,17 @@ func (e *Enqueuer) RetryJob(ctx context.Context, tx pgx.Tx, jobID int64) error {
 	return nil
 }
 
+// DeleteJob implements app.JobRetrier: it removes a discarded job from River
+// entirely, inside the caller's transaction so the deletion commits with the
+// audit record that explains it. River will not delete a running job, and
+// app.JobHealthService only ever passes ids it has just confirmed discarded.
+func (e *Enqueuer) DeleteJob(ctx context.Context, tx pgx.Tx, jobID int64) error {
+	if _, err := e.client.JobDeleteTx(ctx, tx, jobID); err != nil {
+		return fmt.Errorf("river delete job %d: %w", jobID, err)
+	}
+	return nil
+}
+
 // WithQuietHours holds subscription notification emails (renewal receipt,
 // past-due, subscription-ended) that would otherwise fire from the pre-dawn
 // renewal batch until sendHour:00 merchant-local, so customers aren't pinged at

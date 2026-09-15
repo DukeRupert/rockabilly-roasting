@@ -3,8 +3,12 @@ package audit
 // Audit action constants — namespaced as "resource.verb".
 const (
 	// Order actions
-	// Background jobs — an operator handing a discarded job back to River.
-	AuditJobRetried = "job.retried"
+	// Background jobs — an operator handing a discarded job back to River, or
+	// writing one off. Dismissing deletes the River row, so this audit entry
+	// carries the kind, args and final error: it is the only surviving record
+	// that the work was dropped, and by whom.
+	AuditJobRetried   = "job.retried"
+	AuditJobDismissed = "job.dismissed"
 
 	// Equipment service — the machines a shop maintains for its customers.
 	// Retiring and returning to service get their own actions rather than one

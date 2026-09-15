@@ -127,17 +127,29 @@ func (s *JobStore) ListDeadJobs(ctx context.Context, tx pgx.Tx, kind string, lim
 	return out, rows.Err()
 }
 
-// GetDeadJobKind returns a job's kind, or "" if the job is not discarded. The
-// retry handler uses it to confirm the job is actually dead before touching
-// it, and to name the kind in the audit record.
-func (s *JobStore) GetDeadJobKind(ctx context.Context, tx pgx.Tx, id int64) (_ string, err error) {
-	var kind string
-	query := `SELECT kind FROM river_job` + deadJobWhere + ` AND id = $1`
-	if err := tx.QueryRow(ctx, query, id).Scan(&kind); err != nil {
+// GetDeadJob returns one discarded job, or ok=false if the id names a job that
+// is not discarded (or no job at all). The retry and dismiss handlers use it to
+// confirm the job is actually dead before touching it, and to describe it in
+// the audit record — which, for a dismissal, outlives the River row itself.
+func (s *JobStore) GetDeadJob(ctx context.Context, tx pgx.Tx, id int64) (_ domain.DeadJob, _ bool, err error) {
+	query := `SELECT id, kind, queue, attempt, max_attempts,
+	                 COALESCE(errors[array_upper(errors, 1)]->>'error', '') AS last_error,
+	                 args, created_at, finalized_at
+	          FROM river_job` + deadJobWhere + ` AND id = $1`
+
+	var j domain.DeadJob
+	var argsJSON json.RawMessage
+	var finalizedAt *time.Time
+	if err := tx.QueryRow(ctx, query, id).Scan(&j.ID, &j.Kind, &j.Queue, &j.Attempt, &j.MaxAttempts,
+		&j.LastError, &argsJSON, &j.CreatedAt, &finalizedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", nil
+			return domain.DeadJob{}, false, nil
 		}
-		return "", fmt.Errorf("get dead job kind: %w", err)
+		return domain.DeadJob{}, false, fmt.Errorf("get dead job: %w", err)
 	}
-	return kind, nil
+	j.Args = string(argsJSON)
+	if finalizedAt != nil {
+		j.FinalizedAt = *finalizedAt
+	}
+	return j, true, nil
 }

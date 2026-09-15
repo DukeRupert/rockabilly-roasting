@@ -391,7 +391,8 @@ var (
 	// back in line helps nobody.
 	ErrJobNotDead = errors.New("this job is not waiting to be retried")
 	// ErrJobRetryUnavailable means no River client is wired in this process,
-	// so there is nothing to hand the job back to.
+	// so there is nothing to hand the job back to — or take it away from, in
+	// the dismiss case, which goes through the same client.
 	ErrJobRetryUnavailable = errors.New("background job retry is unavailable")
 
 	// --- Preventive maintenance ---

@@ -46,8 +46,8 @@ func TestSupportRemainsReadOnlyElsewhere(t *testing.T) {
 
 // system:write is the operator-plumbing grant: failed background jobs and the
 // whole Settings section. Both can reach past their own page — a retried job
-// sends real mail, and the flat rate applies to every order placed after it is
-// saved — so the grant stays admin-only. Assert the four departmental roles are
+// sends real mail, a dismissed one is gone for good, and the flat rate applies
+// to every order placed after it is saved — so the grant stays admin-only. Assert the four departmental roles are
 // still out, so widening it has to break this test on the way through.
 func TestManageSystemIsAdminOnly(t *testing.T) {
 	assert.True(t, auth.HasPermission(domain.StaffRoleAdmin, auth.PermManageSystem))

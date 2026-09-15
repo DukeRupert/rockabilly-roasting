@@ -12,19 +12,22 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// JobRetrier puts a discarded background job back on the queue. River's client
-// implements it; the interface keeps app/ off the worker package, the same way
-// JobEnqueuer does for inserts.
+// JobRetrier is the pair of things an operator can do to a discarded job: put
+// it back on the queue, or throw it away. River's client implements both; the
+// interface keeps app/ off the worker package, the same way JobEnqueuer does
+// for inserts.
 //
-// The retry rides on the caller's transaction so it commits with its own audit
+// Both ride on the caller's transaction so they commit with their own audit
 // record — a job that was re-queued but not logged, or logged but not
 // re-queued, leaves an operator unable to tell what was already tried.
 type JobRetrier interface {
 	RetryJob(ctx context.Context, tx pgx.Tx, jobID int64) error
+	DeleteJob(ctx context.Context, tx pgx.Tx, jobID int64) error
 }
 
-// JobHealthService reports on background jobs River has given up on, and puts
-// them back when an operator decides the underlying cause is fixed.
+// JobHealthService reports on background jobs River has given up on, puts them
+// back when an operator decides the underlying cause is fixed, and throws them
+// away when it cannot be.
 //
 // This exists because a dead job is invisible everywhere else. Every customer
 // email, label, invoice, and renewal in this system is a job; when the worker
@@ -85,13 +88,14 @@ func (s *JobHealthService) RetryDeadJob(ctx context.Context, tx pgx.Tx, jobID in
 		return ErrJobRetryUnavailable
 	}
 
-	kind, err := s.jobs.GetDeadJobKind(ctx, tx, jobID)
+	job, ok, err := s.jobs.GetDeadJob(ctx, tx, jobID)
 	if err != nil {
 		return fmt.Errorf("load dead job: %w", err)
 	}
-	if kind == "" {
+	if !ok {
 		return ErrJobNotDead
 	}
+	kind := job.Kind
 
 	if err := s.retrier.RetryJob(ctx, tx, jobID); err != nil {
 		return fmt.Errorf("retry job %d: %w", jobID, err)
@@ -109,6 +113,59 @@ func (s *JobHealthService) RetryDeadJob(ctx context.Context, tx pgx.Tx, jobID in
 		Metadata:     map[string]any{"job_id": jobID, "kind": kind},
 	}); err != nil {
 		return fmt.Errorf("audit job retried: %w", err)
+	}
+	return nil
+}
+
+// DismissDeadJob throws a discarded job away: River's row is deleted and the
+// job is gone from the failed-jobs list for good.
+//
+// It exists because retrying is not always on the table. Plenty of dead jobs
+// are unresolvable by the time anyone reads them — an email for a customer who
+// has since been deleted, a job from a worker that no longer exists, a burst
+// from an outage that has already been handled another way. Without a way to
+// clear those, the list only ever grows, and a list that never reaches zero
+// stops being read at all: the next real failure lands among a hundred rows
+// nobody can do anything about.
+//
+// The deletion is permanent — River has no "undiscard" — so the audit record
+// carries the job's kind, args, attempts and final error. After this commits
+// that entry is the only surviving evidence the work existed, which is the
+// point: dropping a customer's email is a decision somebody made, not an
+// absence that quietly happened.
+func (s *JobHealthService) DismissDeadJob(ctx context.Context, tx pgx.Tx, jobID int64, actor Actor) error {
+	if s.retrier == nil {
+		return ErrJobRetryUnavailable
+	}
+
+	job, ok, err := s.jobs.GetDeadJob(ctx, tx, jobID)
+	if err != nil {
+		return fmt.Errorf("load dead job: %w", err)
+	}
+	if !ok {
+		return ErrJobNotDead
+	}
+
+	if err := s.retrier.DeleteJob(ctx, tx, jobID); err != nil {
+		return fmt.Errorf("dismiss job %d: %w", jobID, err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditJobDismissed,
+		ResourceType: "river_job",
+		ResourceID:   uuid.Nil,
+		Metadata: map[string]any{
+			"job_id":     jobID,
+			"kind":       job.Kind,
+			"args":       job.Args,
+			"attempts":   job.Attempt,
+			"last_error": job.LastError,
+		},
+	}); err != nil {
+		return fmt.Errorf("audit job dismissed: %w", err)
 	}
 	return nil
 }

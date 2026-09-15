@@ -192,28 +192,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Background jobs that exhausted their retries. Deliberately first in the
-		// Urgent band: broken automation often explains the rest of the page, and
-		// a quiet dashboard is exactly what a failing worker produces.
-		//
-		// Admin-only, because /admin/jobs is: the row is the only link on this
-		// page whose destination is permission-gated, and the same rule the
-		// maintenance chip follows above applies here — a row that 403s on
-		// click is worse than no row. It would also inflate the Urgent chip
-		// with work four of the five roles cannot act on.
-		if staffCan(r, auth.PermManageSystem) {
-			props.DeadJobCount, txErr = d.JobHealthService.CountDeadJobs(ctx, tx)
-			if txErr != nil {
-				return txErr
-			}
-			if props.DeadJobCount > 0 {
-				props.DeadJobKinds, txErr = d.JobHealthService.CountDeadJobsByKind(ctx, tx)
-				if txErr != nil {
-					return txErr
-				}
-			}
-		}
-
 		// Pickup orders nobody collected. The fulfillment queue does list
 		// ready_for_pickup in its needs-action tab, but it lists them beside
 		// every other order awaiting action and never ages them — so a bag that

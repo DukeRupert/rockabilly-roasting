@@ -27,6 +27,32 @@ type qbInvoiceRequest struct {
 	// caller meant to turn off.
 	AllowOnlineACHPayment        bool `json:"AllowOnlineACHPayment"`
 	AllowOnlineCreditCardPayment bool `json:"AllowOnlineCreditCardPayment"`
+	// TxnTaxDetail is omitted entirely on an untaxed invoice. Sending an empty
+	// one on a company that charges no sales tax is a needless way to find out
+	// how QBO reacts to a tax code it has no rate for.
+	TxnTaxDetail *qbTxnTaxDetail `json:"TxnTaxDetail,omitempty"`
+}
+
+// qbTxnTaxDetail carries the invoice's tax. Both halves are required: the
+// TxnTaxCodeRef is what the transaction is taxed under, and the TaxLine is
+// what actually produces an amount. Supplying TotalTax on its own is accepted
+// with a 200 and silently ignored — see taxcodes.go.
+type qbTxnTaxDetail struct {
+	TxnTaxCodeRef qbRef       `json:"TxnTaxCodeRef"`
+	TaxLine       []qbTaxLine `json:"TaxLine"`
+}
+
+type qbTaxLine struct {
+	DetailType    string          `json:"DetailType"` // always "TaxLineDetail"
+	Amount        float64         `json:"Amount"`
+	TaxLineDetail qbTaxLineDetail `json:"TaxLineDetail"`
+}
+
+type qbTaxLineDetail struct {
+	TaxRateRef       qbRef   `json:"TaxRateRef"`
+	PercentBased     bool    `json:"PercentBased"`
+	TaxPercent       float64 `json:"TaxPercent"`
+	NetAmountTaxable float64 `json:"NetAmountTaxable"`
 }
 
 type qbRef struct {
@@ -45,21 +71,30 @@ type qbInvoiceLine struct {
 }
 
 type qbSalesItemDetail struct {
-	ItemRef   qbRef   `json:"ItemRef"` // required by QBO on every sales line
-	Qty       float64 `json:"Qty,omitempty"`
-	UnitPrice float64 `json:"UnitPrice,omitempty"`
+	ItemRef qbRef `json:"ItemRef"` // required by QBO on every sales line
+	// TaxCodeRef marks the line taxable ("TAX") or not ("NON"). It decides the
+	// taxable base QBO applies the rate to, so an exempt line here is what
+	// keeps bagged coffee out of the tax on an invoice that also bills a
+	// taxable grinder. Omitted on an untaxed invoice, where the company may
+	// have no tax codes at all.
+	TaxCodeRef *qbRef  `json:"TaxCodeRef,omitempty"`
+	Qty        float64 `json:"Qty,omitempty"`
+	UnitPrice  float64 `json:"UnitPrice,omitempty"`
 }
 
 // qbInvoiceResponse is the JSON response from QB invoice endpoints.
 type qbInvoiceResponse struct {
 	Invoice struct {
-		ID          string  `json:"Id"`
-		DocNumber   string  `json:"DocNumber"`
-		Balance     float64 `json:"Balance"`
-		TotalAmt    float64 `json:"TotalAmt"`
-		DueDate     string  `json:"DueDate"` // YYYY-MM-DD
-		EmailStatus string  `json:"EmailStatus"`
-		SyncToken   string  `json:"SyncToken"`
+		ID           string  `json:"Id"`
+		DocNumber    string  `json:"DocNumber"`
+		Balance      float64 `json:"Balance"`
+		TotalAmt     float64 `json:"TotalAmt"`
+		TxnTaxDetail struct {
+			TotalTax float64 `json:"TotalTax"`
+		} `json:"TxnTaxDetail"`
+		DueDate     string `json:"DueDate"` // YYYY-MM-DD
+		EmailStatus string `json:"EmailStatus"`
+		SyncToken   string `json:"SyncToken"`
 	} `json:"Invoice"`
 }
 
@@ -80,6 +115,7 @@ func invoiceFromResponse(resp qbInvoiceResponse) *Invoice {
 		TotalAmt:    resp.Invoice.TotalAmt,
 		DueDate:     dueDate,
 		EmailStatus: resp.Invoice.EmailStatus,
+		TaxTotal:    resp.Invoice.TxnTaxDetail.TotalTax,
 	}
 }
 
@@ -90,35 +126,70 @@ func buildInvoiceLines(p InvoiceParams, salesItemID, shippingItemID string) []qb
 	if shippingItemID == "" {
 		shippingItemID = salesItemID
 	}
+	taxed := p.Tax.Amount > 0
 
 	lines := make([]qbInvoiceLine, 0, len(p.Lines)+1)
 	for _, line := range p.Lines {
+		detail := &qbSalesItemDetail{
+			ItemRef:   qbRef{Value: salesItemID},
+			Qty:       float64(line.Quantity),
+			UnitPrice: centsToFloat(line.UnitAmount),
+		}
+		if taxed {
+			detail.TaxCodeRef = &qbRef{Value: lineTaxCode(line.Taxable)}
+		}
 		lines = append(lines, qbInvoiceLine{
-			DetailType:  "SalesItemLineDetail",
-			Amount:      centsToFloat(line.Amount),
-			Description: line.Description,
-			SalesItemLineDetail: &qbSalesItemDetail{
-				ItemRef:   qbRef{Value: salesItemID},
-				Qty:       float64(line.Quantity),
-				UnitPrice: centsToFloat(line.UnitAmount),
-			},
+			DetailType:          "SalesItemLineDetail",
+			Amount:              centsToFloat(line.Amount),
+			Description:         line.Description,
+			SalesItemLineDetail: detail,
 		})
 	}
 
 	if p.Shipping > 0 {
+		detail := &qbSalesItemDetail{
+			ItemRef:   qbRef{Value: shippingItemID},
+			Qty:       1,
+			UnitPrice: centsToFloat(p.Shipping),
+		}
+		if taxed {
+			// Shipping follows the shop's own calculation, which does not tax
+			// it: domain.CalculateFlatRateTax works from line items only. A
+			// taxable shipping line here would have QBO add tax Hiri never
+			// charged, and the invoice would stop matching the order.
+			detail.TaxCodeRef = &qbRef{Value: lineTaxCode(false)}
+		}
 		lines = append(lines, qbInvoiceLine{
-			DetailType:  "SalesItemLineDetail",
-			Amount:      centsToFloat(p.Shipping),
-			Description: "Shipping",
-			SalesItemLineDetail: &qbSalesItemDetail{
-				ItemRef:   qbRef{Value: shippingItemID},
-				Qty:       1,
-				UnitPrice: centsToFloat(p.Shipping),
-			},
+			DetailType:          "SalesItemLineDetail",
+			Amount:              centsToFloat(p.Shipping),
+			Description:         "Shipping",
+			SalesItemLineDetail: detail,
 		})
 	}
 
 	return lines
+}
+
+// lineTaxCode maps taxability to QBO's two built-in codes. Every company that
+// charges sales tax has both.
+func lineTaxCode(taxable bool) string {
+	if taxable {
+		return "TAX"
+	}
+	return "NON"
+}
+
+// taxableBaseCents is the amount QBO applies the rate to: the taxable lines,
+// and nothing else. It is sent as NetAmountTaxable so QBO's arithmetic starts
+// from the same base Hiri's did.
+func taxableBaseCents(p InvoiceParams) int {
+	base := 0
+	for _, line := range p.Lines {
+		if line.Taxable {
+			base += line.Amount
+		}
+	}
+	return base
 }
 
 // resolveInvoiceItems decides which items an invoice's lines bill against:
@@ -138,22 +209,26 @@ func resolveInvoiceItems(p InvoiceParams, config ClientConfig) (salesItemID, shi
 	return config.SalesItemID, config.ShippingItemID
 }
 
-// CreateInvoice creates an invoice in QBO.
-func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
+// buildInvoiceRequest assembles the request body, including every refusal that
+// can be decided without talking to QBO.
+//
+// Split from CreateInvoice so the body an invoice is actually billed from can
+// be asserted in a test. The previous test built this struct by hand and
+// checked its JSON tags, which cannot fail when the builder is wrong — and the
+// builder is where the money is.
+func buildInvoiceRequest(p InvoiceParams, config ClientConfig) (qbInvoiceRequest, error) {
 	// Wrapped in ErrBadRequest so IsRetryable classifies it permanent — a
 	// missing item mapping never fixes itself on retry.
-	salesItemID, shippingItemID := resolveInvoiceItems(p, c.config)
+	salesItemID, shippingItemID := resolveInvoiceItems(p, config)
 	if salesItemID == "" {
-		return nil, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
+		return qbInvoiceRequest{}, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
 	}
-
-	lines := buildInvoiceLines(p, salesItemID, shippingItemID)
 
 	body := qbInvoiceRequest{
 		CustomerRef:                  qbRef{Value: p.CustomerID},
 		DocNumber:                    p.DocNumber,
 		DueDate:                      p.DueDate.Format("2006-01-02"),
-		Line:                         lines,
+		Line:                         buildInvoiceLines(p, salesItemID, shippingItemID),
 		AllowOnlineACHPayment:        p.AllowOnlineACHPayment,
 		AllowOnlineCreditCardPayment: p.AllowOnlineCreditCardPayment,
 	}
@@ -162,6 +237,37 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 	if p.TermID != "" {
 		body.SalesTermRef = &qbRef{Value: p.TermID}
+	}
+	if p.Tax.Amount > 0 {
+		if p.Tax.TaxCodeID == "" || p.Tax.TaxRateID == "" {
+			// Reaching QBO with tax to charge and nothing to charge it under
+			// would create an invoice short by the tax, silently — the exact
+			// failure a TotalTax-only request produces. Refuse instead: the job
+			// alerts staff and the order stays billable once the rate exists.
+			return qbInvoiceRequest{}, fmt.Errorf("%w: invoice carries tax but no QuickBooks tax code was resolved", ErrBadRequest)
+		}
+		body.TxnTaxDetail = &qbTxnTaxDetail{
+			TxnTaxCodeRef: qbRef{Value: p.Tax.TaxCodeID},
+			TaxLine: []qbTaxLine{{
+				DetailType: "TaxLineDetail",
+				Amount:     centsToFloat(p.Tax.Amount),
+				TaxLineDetail: qbTaxLineDetail{
+					TaxRateRef:       qbRef{Value: p.Tax.TaxRateID},
+					PercentBased:     true,
+					TaxPercent:       p.Tax.RatePercent.Float64(),
+					NetAmountTaxable: centsToFloat(taxableBaseCents(p)),
+				},
+			}},
+		}
+	}
+	return body, nil
+}
+
+// CreateInvoice creates an invoice in QBO.
+func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
+	body, err := buildInvoiceRequest(p, c.config)
+	if err != nil {
+		return nil, err
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)

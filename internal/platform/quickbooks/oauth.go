@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,25 @@ const (
 	oauthStateCookieMaxAge = 600 // 10 minutes
 )
 
+// CallbackPath is the route Intuit redirects back to after authorization. It
+// is registered in web/router.go and must match the redirect URI registered in
+// the Intuit developer portal character for character.
+const CallbackPath = "/admin/settings/integrations/quickbooks/callback"
+
+// DefaultRedirectURI builds the OAuth redirect URI from the deployment's own
+// public base URL. The redirect URI is not configuration in any interesting
+// sense — it is this host plus a route this binary registers — so a deployment
+// that already knows its BASE_URL should not have to restate it, and cannot
+// then get the two out of step. Returns "" for an empty base URL; the caller
+// decides whether that is fatal.
+func DefaultRedirectURI(baseURL string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if trimmed == "" {
+		return ""
+	}
+	return trimmed + CallbackPath
+}
+
 // ErrInvalidState is returned when the OAuth callback's state parameter does
 // not match the signed cookie (CSRF check failed).
 var ErrInvalidState = errors.New("qb oauth: invalid state")
@@ -33,8 +53,9 @@ var ErrMissingCallbackParams = errors.New("qb oauth: missing code or realmId")
 
 // OAuthManager orchestrates the QuickBooks OAuth2 authorization flow:
 // signing state cookies, exchanging codes for tokens, encrypting tokens, and
-// persisting credentials. It is constructed once per process for a given
-// tenant; the web layer calls it from the admin settings handler.
+// persisting credentials. Provider constructs it alongside the client it
+// belongs to, and rebuilds both when the configured Intuit app changes; the
+// web layer reaches it from the admin settings handler.
 type OAuthManager struct {
 	config     ClientConfig
 	encrypter  *QBClient
@@ -188,7 +209,14 @@ type ConnectionStatus struct {
 // connected QuickBooks" the same answer — and the settings page then told staff
 // to go and reconnect a connection that was fine.
 func (m *OAuthManager) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus, error) {
-	creds, err := m.credStore.GetByTenantID(ctx, tx, m.tenantID)
+	return connectionStatus(ctx, tx, m.credStore, m.tenantID)
+}
+
+// connectionStatus reads the stored connection for a tenant. Shared with
+// Provider.Status, which answers the same question without needing a
+// configured app to ask it through.
+func connectionStatus(ctx context.Context, tx pgx.Tx, creds CredentialStore, tenantID uuid.UUID) (ConnectionStatus, error) {
+	c, err := creds.GetByTenantID(ctx, tx, tenantID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ConnectionStatus{}, nil
 	}
@@ -197,8 +225,8 @@ func (m *OAuthManager) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus,
 	}
 	return ConnectionStatus{
 		Connected:        true,
-		RealmID:          creds.RealmID,
-		RefreshExpiresAt: &creds.RefreshExpiresAt,
+		RealmID:          c.RealmID,
+		RefreshExpiresAt: &c.RefreshExpiresAt,
 	}, nil
 }
 

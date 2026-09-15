@@ -922,6 +922,44 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			}
 		}
 
+		// Tax. Wholesale was exempt by construction until now — the calculator
+		// short-circuited on the channel — so this is the first thing that puts
+		// a non-zero tax_total on a wholesale order. The rule is the same one
+		// retail uses: each line is taxable unless its product is exempt, the
+		// whole order is exempt if the account holds a reseller permit
+		// (customers.tax_exempt), and the flat rate applies only inside the
+		// nexus state. Every product in the catalog is currently exempt, so
+		// this computes zero today and starts billing the day a taxable SKU —
+		// a grinder, merch — is added.
+		//
+		// The ship-to address is read back by id rather than off the form: it
+		// has just been resolved (and possibly created) above, so this is the
+		// one spelling that is right for both a saved address and a new one.
+		taxLineItems := make([]domain.TaxLineItem, len(items))
+		for i, ci := range items {
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+			if vErr != nil {
+				return fmt.Errorf("get variant for tax: %w", vErr)
+			}
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				return fmt.Errorf("get product for tax: %w", pErr)
+			}
+			taxLineItems[i] = domain.TaxLineItem{
+				LineIndex: i,
+				Subtotal:  ci.UnitPrice * ci.Quantity,
+				TaxExempt: product.TaxExempt,
+			}
+		}
+		var shipState string
+		if a, aErr := d.CustomerService.GetAddress(ctx, tx, shipID, customer.ID); aErr == nil {
+			shipState = a.State
+		}
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, shipState)
+		if txErr != nil {
+			return fmt.Errorf("calculate wholesale tax: %w", txErr)
+		}
+
 		orderParams := app.PlaceWholesaleOrderParams{
 			CustomerID:   customer.ID,
 			Items:        items,
@@ -929,6 +967,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			// Wholesale is invoiced; shipping is negotiated offline and billed
 			// on the invoice, not calculated at checkout.
 			ShippingCents:     0,
+			TaxCents:          taxResult.TaxTotal,
 			ShippingAddressID: shipID,
 			BillingAddressID:  billID,
 			ShippingMethod:    &method,
@@ -958,7 +997,11 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		}
 
 		// Enqueue QB customer + invoice chain if QB is connected.
-		if d.QBClient != nil {
+		qbConfigured, txErr := d.QB.ConfiguredTx(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		if qbConfigured {
 			_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
 				CustomerID: customer.ID,
 				OrderID:    order.ID,

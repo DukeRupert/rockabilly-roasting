@@ -41,9 +41,17 @@ func (d *Deps) handleQBWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify HMAC signature
+	// Verify HMAC signature. The verifier token belongs to the configured
+	// Intuit app, so it is read per request rather than captured at boot — a
+	// shop that connects a different app starts verifying against its token
+	// without a restart. A read failure verifies against an empty token, which
+	// VerifySignature rejects: this endpoint fails closed.
+	verifier, verifierErr := d.QB.WebhookVerifier(ctx)
+	if verifierErr != nil {
+		logger.Error("qb webhook: read verifier token", "error", verifierErr)
+	}
 	sig := r.Header.Get("intuit-signature")
-	if !quickbooks.VerifySignature(sig, body, d.QBWebhookVerifierToken) {
+	if !quickbooks.VerifySignature(sig, body, verifier) {
 		logger.Warn("qb webhook: invalid signature")
 		w.WriteHeader(http.StatusUnauthorized)
 		return

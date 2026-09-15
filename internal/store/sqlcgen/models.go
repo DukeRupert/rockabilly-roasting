@@ -555,6 +555,16 @@ type ProductOptionValue struct {
 	Position        int32     `json:"position"`
 }
 
+type QbAppConfig struct {
+	TenantID        uuid.UUID `json:"tenant_id"`
+	ClientID        string    `json:"client_id"`
+	ClientSecret    string    `json:"client_secret"`
+	WebhookVerifier string    `json:"webhook_verifier"`
+	Environment     string    `json:"environment"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 type QbCredential struct {
 	ID               uuid.UUID `json:"id"`
 	RealmID          string    `json:"realm_id"`

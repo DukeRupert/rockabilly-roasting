@@ -284,6 +284,25 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 							<td class="font-special text-lg text-ink sm:px-4 sm:py-3 sm:text-right">{ formatCents(props.Subtotal) }</td>
 							<td class="hidden sm:table-cell"></td>
 						</tr>
+						<!--
+							The buyer commits to the invoice, not to this subtotal, so any gap
+							between the two belongs here rather than in the confirmation email.
+							Sales tax is the only gap there can be: shipping is free on every
+							wholesale option (see the section below, and ShippingCents is
+							hardcoded 0 at order time), so naming it here would contradict this
+							page three times over.
+
+							Deliberately says nothing about which items are taxable. That is
+							products.tax_exempt, per product, changed by hand — an assertion
+							about it baked into markup is the same defect as the silent surprise
+							this line exists to fix, one layer up.
+						-->
+						<tr class="flex items-center justify-between px-3 pb-3 sm:table-row">
+							<td colspan="5" class="font-oswald text-chrome-deep text-xs sm:px-4 sm:pb-3 sm:text-right">
+								Any sales tax is added on the invoice.
+							</td>
+							<td class="hidden sm:table-cell"></td>
+						</tr>
 					</tfoot>
 				</table>
 			</div>

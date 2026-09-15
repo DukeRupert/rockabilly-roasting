@@ -108,6 +108,44 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 	return err
 }
 
+// taxRoundingTolerance is how far QBO's tax may sit from Hiri's before it stops
+// being arithmetic and starts being disagreement.
+//
+// It is a function of the taxable line count, not a constant. An earlier
+// version of this was a flat 1 cent, on the stated grounds that the gap "cannot
+// exceed a cent for any realistic number of lines" — which is false, and was
+// falsified by simulation rather than argument. Hiri rounds each line
+// separately (domain.CalculateFlatRateTax) and QBO rounds once over the summed
+// base, so each line contributes up to half a cent of error and the errors do
+// not cancel. Twelve taxable lines of $6.31 at 8.8% diverge by six cents.
+//
+// Half a cent per line, rounded up, is therefore the bound: ceil(n/2). A flat
+// cent would have logged every large order at Error — a steady trickle of false
+// alarms into Sentry, which is the outcome the tolerance exists to prevent.
+func taxRoundingTolerance(taxableLines int) int {
+	if taxableLines < 1 {
+		// No taxable line and yet a divergence: nothing about that is rounding.
+		return 0
+	}
+	return (taxableLines + 1) / 2
+}
+
+// taxConfig reads the store's tax settings.
+//
+// The rate is stored as a fraction (0.088) and QuickBooks wants a percentage
+// (8.8). Callers must not do that conversion themselves: TaxConfig.RatePercent
+// returns a domain.TaxRatePercent, and the QB client takes that type, so
+// handing it the raw fraction does not compile.
+func (w *CreateQBInvoiceWorker) taxConfig(ctx context.Context) (*domain.TaxConfig, error) {
+	var cfg *domain.TaxConfig
+	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+		var txErr error
+		cfg, txErr = w.settings.GetTaxConfig(ctx, tx)
+		return txErr
+	})
+	return cfg, err
+}
+
 func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQBInvoiceArgs]) error {
 	// Read order, line items, and the customer's NET terms
 	var order *domain.Order
@@ -150,33 +188,60 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	}
 	termsDays := app.EffectivePaymentTermsDays(customer)
 
-	// Build QB invoice lines
+	// Build QB invoice lines.
+	//
+	// The catalog read is one transaction over every line rather than one per
+	// line, because it now carries taxability as well as the description, and
+	// those two have different tolerances. A missing description is cosmetic —
+	// "Order item (qty 2)" bills correctly. A missing taxability is not: the
+	// line's TAX/NON code decides the base QBO applies the rate to, so getting
+	// it wrong bills the customer a different number from the one the order
+	// says. On a taxed order the read is therefore fatal, and on an untaxed
+	// one (every order in the catalog's present state) it stays best-effort.
 	lines := make([]quickbooks.InvoiceLine, 0, len(items))
-	for _, item := range items {
-		// Build a description from variant info
-		desc := fmt.Sprintf("Order item (qty %d)", item.Quantity)
+	lineErr := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+		for _, item := range items {
+			desc := fmt.Sprintf("Order item (qty %d)", item.Quantity)
+			taxable := false
 
-		// Try to get product/variant description from catalog
-		_ = store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 			variant, txErr := w.catalog.GetVariantByID(ctx, tx, item.VariantID)
-			if txErr == nil && variant != nil {
-				product, pErr := w.catalog.GetProductByID(ctx, tx, variant.ProductID)
-				if pErr == nil && product != nil {
-					desc = product.Title
-					if variant.SKU != "" {
-						desc += " (" + variant.SKU + ")"
-					}
+			if txErr != nil || variant == nil {
+				if order.TaxTotal > 0 {
+					return fmt.Errorf("load variant %s for taxability: %w", item.VariantID, txErr)
 				}
+				lines = append(lines, quickbooks.InvoiceLine{
+					Description: desc,
+					Quantity:    item.Quantity,
+					UnitAmount:  item.UnitPrice,
+					Amount:      item.Total,
+				})
+				continue
 			}
-			return nil // non-fatal if we can't get descriptions
-		})
+			product, pErr := w.catalog.GetProductByID(ctx, tx, variant.ProductID)
+			if pErr != nil || product == nil {
+				if order.TaxTotal > 0 {
+					return fmt.Errorf("load product %s for taxability: %w", variant.ProductID, pErr)
+				}
+			} else {
+				desc = product.Title
+				if variant.SKU != "" {
+					desc += " (" + variant.SKU + ")"
+				}
+				taxable = !product.TaxExempt
+			}
 
-		lines = append(lines, quickbooks.InvoiceLine{
-			Description: desc,
-			Quantity:    item.Quantity,
-			UnitAmount:  item.UnitPrice,
-			Amount:      item.Total,
-		})
+			lines = append(lines, quickbooks.InvoiceLine{
+				Description: desc,
+				Quantity:    item.Quantity,
+				UnitAmount:  item.UnitPrice,
+				Amount:      item.Total,
+				Taxable:     taxable,
+			})
+		}
+		return nil
+	})
+	if lineErr != nil {
+		return fmt.Errorf("build invoice lines: %w", lineErr)
 	}
 
 	// The order-level idempotency check above can't see an invoice a previous
@@ -292,9 +357,72 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		} else {
 			params.TermID = termID
 		}
+		// Sales tax. Unlike the Term above, a failure here is fatal: the tax
+		// label is not presentational, it is money. Billing the order without
+		// it would send the customer an invoice short by the tax the order
+		// says they owe, and nothing downstream would notice — the shop would
+		// simply be out of pocket for the difference at filing time.
+		if order.TaxTotal > 0 {
+			taxCfg, cfgErr := w.taxConfig(ctx)
+			if cfgErr != nil {
+				return fmt.Errorf("qb create invoice: read tax config: %w", cfgErr)
+			}
+			ref, taxErr := w.qb.FindOrCreateTaxCode(ctx, taxCfg.Label, taxCfg.RatePercent())
+			if taxErr != nil {
+				return fmt.Errorf("qb create invoice: resolve tax code: %w", taxErr)
+			}
+			params.Tax = quickbooks.InvoiceTax{
+				Amount:      order.TaxTotal,
+				RatePercent: taxCfg.RatePercent(),
+				TaxCodeID:   ref.TaxCodeID,
+				TaxRateID:   ref.TaxRateID,
+			}
+		}
+
 		invoice, err = w.qb.CreateInvoice(ctx, params)
 		if err != nil {
 			return fmt.Errorf("qb create invoice: %w", err)
+		}
+
+		// QBO computes the tax itself from the rate the invoice references, so
+		// the number it settled on is a fact to check rather than assume. A
+		// divergence means the customer is being billed something other than
+		// what the order says — a rate edited in QBO, or a rounding difference
+		// on a base the two sides disagree about. The invoice exists and is
+		// already chained to a send, so this alerts rather than fails: staff
+		// can correct it in QBO, and a silent mismatch is the outcome worth
+		// preventing.
+		if got := invoice.TaxCents(); got != order.TaxTotal {
+			// A cent either way is arithmetic, not disagreement: Hiri rounds
+			// tax per line (domain.CalculateFlatRateTax) and QBO rounds once
+			// over the summed taxable base, so an order with several taxable
+			// lines can legitimately land a cent apart. Logging that at Error
+			// would put a steady trickle of false alarms into Sentry and teach
+			// everyone to ignore the alert that matters.
+			//
+			// Anything larger is a real divergence — a rate edited in QBO, a
+			// line taxed on one side and not the other — and means the customer
+			// is being billed something other than what the order says.
+			delta := got - order.TaxTotal
+			if delta < 0 {
+				delta = -delta
+			}
+			attrs := []any{
+				"order_id", order.ID, "order_number", order.Number,
+				"order_tax_cents", order.TaxTotal, "qb_tax_cents", got,
+				"qb_invoice_id", invoice.ID,
+			}
+			taxableLines := 0
+			for _, line := range lines {
+				if line.Taxable {
+					taxableLines++
+				}
+			}
+			if delta <= taxRoundingTolerance(taxableLines) {
+				slog.WarnContext(ctx, "qb create invoice: QuickBooks tax differs from the order by a rounding step", attrs...)
+			} else {
+				slog.ErrorContext(ctx, "qb create invoice: QuickBooks tax differs from the order", attrs...)
+			}
 		}
 	}
 
@@ -363,6 +491,7 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 		DueDate:       app.InvoiceDueDate(order.PlacedAt, termsDays, w.loc),
 		SubtotalCents: order.Subtotal,
 		ShippingCents: order.ShippingTotal,
+		TaxCents:      order.TaxTotal,
 		TotalCents:    order.Total,
 	}
 	// Default true so an order with no customer row — which cannot happen
@@ -429,6 +558,27 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 		lookupErrs = append(lookupErrs, "term lookup: "+err.Error())
 	} else if termID != "" {
 		preview.TermID = &termID
+	}
+	// Tax, on the same read-only footing. Surfacing a missing rate is worth
+	// more here than anywhere else: going live creates it silently on the
+	// first invoice, and a rate created into the wrong agency is a mess to
+	// unpick in a real company's books. An order with no tax asks nothing.
+	if order.TaxTotal > 0 {
+		taxCfg, cfgErr := w.taxConfig(ctx)
+		switch {
+		case cfgErr != nil:
+			lookupErrs = append(lookupErrs, "tax config: "+cfgErr.Error())
+		default:
+			ref, taxErr := w.qb.FindTaxCode(ctx, taxCfg.RatePercent())
+			switch {
+			case taxErr != nil:
+				lookupErrs = append(lookupErrs, "tax rate lookup: "+taxErr.Error())
+			case ref.TaxCodeID == "":
+				lookupErrs = append(lookupErrs, fmt.Sprintf(
+					"QuickBooks has no %.4g%% sales tax rate — going live creates one under a new tax agency, so check that is what you want",
+					taxCfg.RatePercent()))
+			}
+		}
 	}
 	if len(lookupErrs) > 0 {
 		joined := strings.Join(lookupErrs, "; ")

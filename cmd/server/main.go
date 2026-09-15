@@ -253,12 +253,28 @@ func run() error {
 		}
 		reminderWeekday = d
 	}
+	// One high-entropy value in the environment, expanded into a distinct key
+	// per feature that needs one. The per-feature variables below still win
+	// when set: a running deployment must not have its keys change underneath
+	// it, which would invalidate the links already sitting in customers'
+	// inboxes and lock away the stored QuickBooks tokens. APP_SECRET is the
+	// fallback for a deployment that never set them, not an override.
+	appSecrets := auth.NewSecrets(os.Getenv("APP_SECRET"))
+
 	// Signs the opt-out links in reminder emails. Unset means the reminder
 	// falls back to "reply and we'll take you off the list" — safe, but manual,
 	// so warn loudly rather than failing the boot.
-	unsubscribeSigner := auth.NewUnsubscribeSigner(os.Getenv("UNSUBSCRIBE_SECRET"))
+	unsubscribeSecret := os.Getenv("UNSUBSCRIBE_SECRET")
+	if strings.TrimSpace(unsubscribeSecret) == "" {
+		derived, derr := appSecrets.Secret(auth.PurposeUnsubscribe)
+		if derr != nil {
+			return fmt.Errorf("derive unsubscribe key: %w", derr)
+		}
+		unsubscribeSecret = derived
+	}
+	unsubscribeSigner := auth.NewUnsubscribeSigner(unsubscribeSecret)
 	if !unsubscribeSigner.Enabled() {
-		logger.Warn("UNSUBSCRIBE_SECRET is not set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
+		logger.Warn("neither UNSUBSCRIBE_SECRET nor APP_SECRET is set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
 	}
 
 	// Signs the one-click links in transactional email — "switch to pickup" in
@@ -272,11 +288,21 @@ func run() error {
 	// one-click link and tell the customer to reply instead.
 	orderActionSecret := os.Getenv("ORDER_ACTION_SECRET")
 	if strings.TrimSpace(orderActionSecret) == "" {
+		// The raw variable, not the possibly-derived value above: a deployment
+		// that set UNSUBSCRIBE_SECRET has order links in the wild signed with
+		// it, and this fallback is what keeps them verifying.
 		orderActionSecret = os.Getenv("UNSUBSCRIBE_SECRET")
+	}
+	if strings.TrimSpace(orderActionSecret) == "" {
+		derived, derr := appSecrets.Secret(auth.PurposeOrderAction)
+		if derr != nil {
+			return fmt.Errorf("derive order action key: %w", derr)
+		}
+		orderActionSecret = derived
 	}
 	orderActionSigner := auth.NewOrderActionSigner(orderActionSecret)
 	if !orderActionSigner.Enabled() {
-		logger.Warn("neither ORDER_ACTION_SECRET nor UNSUBSCRIBE_SECRET is set; order confirmations will omit the switch-to-pickup link and subscription skip notices the undo link, asking customers to reply instead")
+		logger.Warn("none of ORDER_ACTION_SECRET, UNSUBSCRIBE_SECRET or APP_SECRET is set; order confirmations will omit the switch-to-pickup link and subscription skip notices the undo link, asking customers to reply instead")
 	}
 
 	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
@@ -285,60 +311,115 @@ func run() error {
 		reminderScheduleNote = "Automatic sending is disabled on this deployment (DISABLE_ORDER_REMINDERS)."
 	}
 
-	// QuickBooks Online integration
+	// QuickBooks Online integration.
+	//
+	// Wired unconditionally. Which Intuit app the shop connects through lives
+	// in the database now (migration 086), so it can change while the server
+	// runs and cannot be read here — which means the workers, routes and
+	// settings card below can no longer be gated on a boot-time environment
+	// variable the way QB_CLIENT_ID used to gate them. The provider answers
+	// "is QuickBooks configured" at the moment each caller asks, and returns
+	// ErrNotConfigured when it is not.
 	qbCredStore := store.NewQBCredentialStore()
 	qbPreviewStore := store.NewQBPreviewStore()
-	// The environment's fallback invoice item, read here so both the client
-	// config and the worker registration below can see it.
+	qbAppConfigStore := store.NewQBAppConfigStore()
+	// The environment's fallback invoice item, read here so both the provider
+	// and the worker registration below can see it.
 	qbEnvSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
-	var qbClient quickbooks.Client
-	var qbOAuthManager *quickbooks.OAuthManager
-	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
 	secureCookies := os.Getenv("INSECURE_COOKIES") != "true"
 	qbHTTPClient := &http.Client{Timeout: 30 * time.Second}
-	if qbClientID := os.Getenv("QB_CLIENT_ID"); qbClientID != "" {
-		if qbWebhookVerifier == "" {
-			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
-		}
-		// No longer fatal. The item invoices bill against is chosen in the
-		// admin now (migration 079), and it cannot be chosen before the shop
-		// has connected and we can list that company's items — so refusing to
-		// boot without it made the first deploy of a new connection
-		// impossible to do honestly: you had to invent an ID, connect, look up
-		// the real one, and redeploy. An unset item now fails the invoice job
-		// with a message naming the setting, which is visible in the admin
-		// instead of in a crash loop.
-		qbSalesItemID := qbEnvSalesItemID
-		if qbSalesItemID == "" {
-			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
-		}
-		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
-		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
+	// TenantID: for single-tenant, use a fixed UUID or derive from config.
+	// In a multi-tenant setup this would come from the request context.
+	tenantID := tenantIDFromEnv()
+
+	// The key that encrypts the QuickBooks secrets at rest — the OAuth tokens
+	// and, since migration 086, the app credentials beside them. This is the
+	// one QuickBooks secret that cannot move into the database, because it is
+	// what protects what is in the database. It does not have to be
+	// QuickBooks-specific though: an unset variable derives a key of its own
+	// from APP_SECRET. An explicit QB_TOKEN_ENCRYPTION_KEY still wins, because
+	// changing this key on a connected deployment makes the stored refresh
+	// token undecryptable and the shop has to reconnect.
+	//
+	// It may end up nil, on a deployment that has neither variable and no
+	// QuickBooks configuration to protect. Reaching for a stored row without
+	// one is an error the provider raises by name.
+	var qbEncKey []byte
+	if qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY"); qbEncKeyB64 != "" {
+		decoded, decodeErr := base64DecodeKey(qbEncKeyB64)
 		if decodeErr != nil {
 			return fmt.Errorf("decode QB_TOKEN_ENCRYPTION_KEY: %w", decodeErr)
 		}
-		// TenantID: for single-tenant, use a fixed UUID or derive from config.
-		// In a multi-tenant setup this would come from the request context.
-		tenantID := tenantIDFromEnv()
-
-		qbConfig := quickbooks.ClientConfig{
-			ClientID:       qbClientID,
-			ClientSecret:   os.Getenv("QB_CLIENT_SECRET"),
-			EncryptionKey:  qbEncKey,
-			Environment:    os.Getenv("QB_ENVIRONMENT"),
-			RedirectURI:    os.Getenv("QB_REDIRECT_URI"),
-			SalesItemID:    qbSalesItemID,
-			ShippingItemID: os.Getenv("QB_SHIPPING_ITEM_ID"),
+		qbEncKey = decoded
+	} else {
+		derived, derr := appSecrets.Key(auth.PurposeQBTokenEncryption, 32)
+		if derr != nil {
+			return fmt.Errorf("derive quickbooks token encryption key: %w", derr)
 		}
-		qbConcrete := quickbooks.NewQBClient(qbConfig, tenantID, qbCredStore, pool)
-		qbClient = qbConcrete
-		qbOAuthManager = quickbooks.NewOAuthManager(
-			qbConfig, qbConcrete, qbCredStore, tenantID,
-			qbEncKey, // reuse the encryption key for HMAC signing
-			qbHTTPClient, secureCookies,
-		)
-		logger.Info("quickbooks integration configured", "environment", os.Getenv("QB_ENVIRONMENT"))
+		qbEncKey = derived
 	}
+
+	// The redirect URI is this host plus a route this binary registers, so
+	// derive it from BASE_URL rather than making a deployment restate it and
+	// risk the two drifting apart. QB_REDIRECT_URI stays as an override for
+	// the case where the public hostname Intuit was given is not the one the
+	// rest of the app links to.
+	qbRedirectURI := os.Getenv("QB_REDIRECT_URI")
+	if strings.TrimSpace(qbRedirectURI) == "" {
+		qbRedirectURI = quickbooks.DefaultRedirectURI(baseURL)
+	}
+
+	// What the environment supplies, used only when no configuration has been
+	// saved in the admin. It keeps deployments that predate the settings form
+	// connected across the migration that introduced it.
+	qbEnvConfig := quickbooks.AppConfig{
+		ClientID:        os.Getenv("QB_CLIENT_ID"),
+		ClientSecret:    os.Getenv("QB_CLIENT_SECRET"),
+		WebhookVerifier: os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN"),
+		Environment:     os.Getenv("QB_ENVIRONMENT"),
+	}
+	// A deployment still configured by the environment is held to the same
+	// checks it was before: these are conditions it can do nothing about at
+	// runtime, so failing the boot is still right for them. A deployment
+	// configured from the admin reaches none of this — its equivalents are
+	// form validation, where a staffer can actually fix them.
+	if qbEnvConfig.ClientID != "" {
+		if qbEnvConfig.WebhookVerifier == "" {
+			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
+		}
+		if len(qbEncKey) == 0 {
+			return fmt.Errorf("QB_TOKEN_ENCRYPTION_KEY or APP_SECRET is required when QB_CLIENT_ID is set")
+		}
+		if qbRedirectURI == "" {
+			return fmt.Errorf("BASE_URL or QB_REDIRECT_URI is required when QB_CLIENT_ID is set")
+		}
+		// Not fatal. The item invoices bill against is chosen in the admin now
+		// (migration 079), and it cannot be chosen before the shop has
+		// connected and we can list that company's items — so refusing to boot
+		// without it made the first deploy of a new connection impossible to
+		// do honestly: you had to invent an ID, connect, look up the real one,
+		// and redeploy. An unset item now fails the invoice job with a message
+		// naming the setting, which is visible in the admin instead of in a
+		// crash loop.
+		if qbEnvSalesItemID == "" {
+			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
+		}
+		logger.Info("quickbooks configured from the environment", "environment", qbEnvConfig.Environment)
+	}
+
+	qbProvider := quickbooks.NewProvider(quickbooks.ProviderConfig{
+		Pool:           pool,
+		AppConfigs:     qbAppConfigStore,
+		Credentials:    qbCredStore,
+		TenantID:       tenantID,
+		EncryptionKey:  qbEncKey,
+		RedirectURI:    qbRedirectURI,
+		EnvFallback:    qbEnvConfig,
+		SalesItemID:    qbEnvSalesItemID,
+		ShippingItemID: os.Getenv("QB_SHIPPING_ITEM_ID"),
+		HTTPClient:     qbHTTPClient,
+		SecureCookies:  secureCookies,
+	})
 
 	// Media (R2 storage + Cloudflare Image Transformations)
 	mediaConfig := &media.Config{
@@ -641,7 +722,7 @@ func run() error {
 	} else {
 		logger.Warn("subscription renewal scheduler disabled via DISABLE_RENEWAL_SCHEDULER")
 	}
-	if qbClient != nil {
+	{
 		// Reconcile open wholesale QB invoices daily. This is the safety net for
 		// missed Intuit webhooks and the detector that flips unpaid invoices to
 		// overdue and sends the milestone past-due reminders.
@@ -731,19 +812,21 @@ func run() error {
 	// job atomically with the shipment write.
 	river.AddWorker(workers, jobs.NewBuyLabelWorker(fulfillmentSvc, pool, riverClient))
 
-	// Register QB workers (need riverClient for job chaining)
-	if qbClient != nil {
-		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, settingsStore, qbClient, auditWriter, pool, riverClient, metricsReg))
-		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbEnvSalesItemID, qbClient, merchantTZ, auditWriter, pool, riverClient, metricsReg))
-		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbClient, auditWriter, pool, riverClient, metricsReg))
+	// Register QB workers (need riverClient for job chaining). Registered
+	// whether or not QuickBooks is configured: the configuration can arrive
+	// after boot now, and a worker that was never registered would leave any
+	// job enqueued in the meantime stuck in River with no worker to run it.
+	{
+		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, settingsStore, qbProvider, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbEnvSalesItemID, qbProvider, merchantTZ, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbProvider, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewQBInvoiceAlertEmailWorker(orderSvc, pool))
 		river.AddWorker(workers, jobs.NewQBShadowDigestWorker(orderSvc, pool))
 		river.AddWorker(workers, jobs.NewCheckQBTokenWorker(qbCredStore, tenantIDFromEnv(), orderSvc, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbClient, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbClient, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, settingsStore, qbClient, auditWriter, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewSyncQBPaymentWorker(orderStore, customerStore, settingsStore, qbClient, auditWriter, pool, metricsReg))
-		logger.Info("quickbooks workers registered")
+		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbProvider, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbProvider, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, settingsStore, qbProvider, auditWriter, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewSyncQBPaymentWorker(orderStore, customerStore, settingsStore, qbProvider, auditWriter, pool, metricsReg))
 	}
 
 	// Run River migrations
@@ -776,61 +859,58 @@ func run() error {
 
 	// Router
 	deps := &web.Deps{
-		Pool:                   pool,
-		Logger:                 logger,
-		Metrics:                metricsReg,
-		Sessions:               sessionMgr,
-		OrderService:           orderSvc,
-		RouteService:           routeSvc,
-		CustomerService:        customerSvc,
-		CatalogService:         catalogSvc,
-		CheckoutService:        checkoutSvc,
-		FulfillmentService:     fulfillmentSvc,
-		SubscriptionService:    subscriptionSvc,
-		DiscountService:        discountSvc,
-		AuthService:            authSvc,
-		CustomerUserService:    customerUserSvc,
-		StaffService:           staffSvc,
-		PricingService:         pricingSvc,
-		CartService:            cartSvc,
-		WholesaleService:       wholesaleSvc,
-		WhiteLabelService:      whiteLabelSvc,
-		AttributeService:       attributeSvc,
-		InvoiceService:         invoiceSvc,
-		PriceListService:       priceListSvc,
-		AuditQueryService:      auditQuerySvc,
-		WebhookService:         webhookSvc,
-		JobHealthService:       jobHealthSvc,
-		AuditWriter:            auditWriter,
-		PaymentProvider:        paymentProvider,
-		RiverClient:            riverClient,
-		AnnouncementService:    announcementSvc,
-		ModuleService:          moduleSvc,
-		EquipmentService:       equipmentSvc,
-		ServiceTicketService:   serviceTicketSvc,
-		ServicePlanService:     servicePlanSvc,
-		Enqueuer:               enqueuer,
-		R2Client:               r2Client,
-		MediaConfig:            mediaConfig,
-		QBClient:               qbClient,
-		QBOAuthManager:         qbOAuthManager,
-		QBWebhookVerifierToken: qbWebhookVerifier,
-		ShippoWebhookSecret:    shippoWebhookSecret,
-		QBHTTPClient:           qbHTTPClient,
-		HelpRegistry:           helpRegistry,
-		RateLimiter:            rateLimiter,
-		TurnstileVerifier:      turnstileVerifier,
-		TurnstileSiteKey:       turnstileSiteKey,
-		Newsletter:             newsletterClient,
-		SecureCookies:          secureCookies,
-		BaseURL:                baseURL,
-		Mailer:                 mailer,
-		EmailFrom:              fromAddr,
-		StaffEmail:             staffEmail,
-		MerchantTZ:             merchantTZ,
-		ReminderScheduleNote:   reminderScheduleNote,
-		UnsubscribeSigner:      unsubscribeSigner,
-		OrderActionSigner:      orderActionSigner,
+		Pool:                 pool,
+		Logger:               logger,
+		Metrics:              metricsReg,
+		Sessions:             sessionMgr,
+		OrderService:         orderSvc,
+		RouteService:         routeSvc,
+		CustomerService:      customerSvc,
+		CatalogService:       catalogSvc,
+		CheckoutService:      checkoutSvc,
+		FulfillmentService:   fulfillmentSvc,
+		SubscriptionService:  subscriptionSvc,
+		DiscountService:      discountSvc,
+		AuthService:          authSvc,
+		CustomerUserService:  customerUserSvc,
+		StaffService:         staffSvc,
+		PricingService:       pricingSvc,
+		CartService:          cartSvc,
+		WholesaleService:     wholesaleSvc,
+		WhiteLabelService:    whiteLabelSvc,
+		AttributeService:     attributeSvc,
+		InvoiceService:       invoiceSvc,
+		PriceListService:     priceListSvc,
+		AuditQueryService:    auditQuerySvc,
+		WebhookService:       webhookSvc,
+		JobHealthService:     jobHealthSvc,
+		AuditWriter:          auditWriter,
+		PaymentProvider:      paymentProvider,
+		RiverClient:          riverClient,
+		AnnouncementService:  announcementSvc,
+		ModuleService:        moduleSvc,
+		EquipmentService:     equipmentSvc,
+		ServiceTicketService: serviceTicketSvc,
+		ServicePlanService:   servicePlanSvc,
+		Enqueuer:             enqueuer,
+		R2Client:             r2Client,
+		MediaConfig:          mediaConfig,
+		QB:                   qbProvider,
+		ShippoWebhookSecret:  shippoWebhookSecret,
+		HelpRegistry:         helpRegistry,
+		RateLimiter:          rateLimiter,
+		TurnstileVerifier:    turnstileVerifier,
+		TurnstileSiteKey:     turnstileSiteKey,
+		Newsletter:           newsletterClient,
+		SecureCookies:        secureCookies,
+		BaseURL:              baseURL,
+		Mailer:               mailer,
+		EmailFrom:            fromAddr,
+		StaffEmail:           staffEmail,
+		MerchantTZ:           merchantTZ,
+		ReminderScheduleNote: reminderScheduleNote,
+		UnsubscribeSigner:    unsubscribeSigner,
+		OrderActionSigner:    orderActionSigner,
 	}
 
 	handler := web.NewRouter(deps)

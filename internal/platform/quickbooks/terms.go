@@ -46,7 +46,7 @@ type qbTermRequest struct {
 	Type    string `json:"Type"`
 }
 
-// termCache memoizes DueDays -> Term ID for the life of the process. Terms are
+// termCache memoizes DueDays -> Term ID for the life of the client. Terms are
 // a tiny, effectively static list, and the invoice job would otherwise query
 // QBO twice per invoice.
 type termCache struct {
@@ -72,7 +72,7 @@ func (c *termCache) put(dueDays int, id string) {
 // forget drops any entry pointing at the given Term ID. Called when QBO
 // rejects an invoice that referenced it — a Term deleted or deactivated in
 // QBO after being cached would otherwise poison every later invoice for the
-// life of the process.
+// life of the client.
 func (c *termCache) forget(id string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -92,7 +92,7 @@ func (c *termCache) forget(id string) {
 // because the name is user-editable in QBO — a bookkeeper who renames "Net 30"
 // to "30 days" must not cause a duplicate Term to be created.
 //
-// Terms are matched and created per realm; the cache is per process and keyed
+// Terms are matched and created per realm; the cache belongs to the client and is keyed
 // on DueDays alone, which is safe because a QBClient is bound to one tenant.
 func (c *QBClient) FindOrCreateTerm(ctx context.Context, dueDays int) (string, error) {
 	if dueDays < 0 {
@@ -151,7 +151,7 @@ func (c *QBClient) FindTerm(ctx context.Context, dueDays int) (string, error) {
 	// Every Term is fetched and matched here rather than filtered with a
 	// WHERE clause: QBO's query language rejects an integer comparison on
 	// DueDays ("Error parsing query ... was expecting true/false"). The list
-	// is a handful of rows, and this call is cached per process anyway.
+	// is a handful of rows, and this call is cached on the client anyway.
 	respBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode("SELECT * FROM Term"), nil)
 	if err != nil {
 		return "", fmt.Errorf("query QB terms: %w", err)

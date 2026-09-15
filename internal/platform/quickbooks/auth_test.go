@@ -49,3 +49,24 @@ func TestRevokeToken(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid_token")
 	})
 }
+
+func TestDefaultRedirectURI(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{"plain", "https://shop.example.com", "https://shop.example.com/admin/settings/integrations/quickbooks/callback"},
+		{"trailing slash", "https://shop.example.com/", "https://shop.example.com/admin/settings/integrations/quickbooks/callback"},
+		{"surrounding space", "  https://shop.example.com  ", "https://shop.example.com/admin/settings/integrations/quickbooks/callback"},
+		{"local dev port", "http://localhost:8099", "http://localhost:8099/admin/settings/integrations/quickbooks/callback"},
+		{"unset", "", ""},
+		{"blank", "   ", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, DefaultRedirectURI(tc.baseURL))
+		})
+	}
+}

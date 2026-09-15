@@ -2,6 +2,12 @@
 -- Enable flat-rate WA Sales Tax for B2C.
 -- 8.8% = 6.5% WA state + 2.3% local (Kennewick).
 -- Wholesale orders remain exempt (hardcoded in app layer).
+--
+-- SUPERSEDED 2026-09-15: that hardcode is gone. Wholesale now runs the same
+-- per-line rule as retail — products.tax_exempt decides, customers.tax_exempt
+-- (a reseller permit) exempts the whole order. The line above describes what
+-- was true when this migration ran, not what is true now. See the Wholesale &
+-- B2B section of docs/CLAUDE-backend.md.
 UPDATE store_settings
    SET tax_mode   = 'flat_rate',
        tax_rate   = 0.0880,

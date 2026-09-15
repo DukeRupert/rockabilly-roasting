@@ -45,6 +45,27 @@ type InvoiceParams struct {
 	// pay buttons on the emailed invoice.
 	AllowOnlineACHPayment        bool
 	AllowOnlineCreditCardPayment bool
+
+	// Tax is the sales tax Hiri charged on this order, and the QBO references
+	// under which QuickBooks will arrive at the same number. Zero Amount means
+	// an untaxed invoice and nothing tax-related is sent at all.
+	Tax InvoiceTax
+}
+
+// InvoiceTax is what an invoice needs to report the tax the shop charged.
+//
+// Amount is authoritative for what was charged; RatePercent and the two refs
+// are how QBO is made to agree with it. QBO will not accept a tax total on
+// faith — it recomputes from the TaxRate the invoice references — so Amount
+// and RatePercent must describe the same rate the referenced TaxRate holds.
+// FindOrCreateTaxCode is what guarantees that: it matches or creates a rate
+// equal to the shop's configured one. See taxcodes.go for what was verified
+// against the sandbox and why this indirection is unavoidable.
+type InvoiceTax struct {
+	Amount      int                   // cents, from order.TaxTotal
+	RatePercent domain.TaxRatePercent // 8.8, not 0.088 — the type is the guard
+	TaxCodeID   string
+	TaxRateID   string
 }
 
 // InvoiceLine represents a single line item on a QB invoice.
@@ -53,6 +74,11 @@ type InvoiceLine struct {
 	Quantity    int
 	UnitAmount  int // in cents
 	Amount      int // total in cents (quantity * unit_amount)
+	// Taxable mirrors the product's own taxability, which is what Hiri taxed
+	// the line on. It reaches QBO as the line's TAX/NON code and so decides
+	// the base the rate is applied to — get it wrong and QBO's total diverges
+	// from the order's.
+	Taxable bool
 }
 
 // EmailStatusSent is QB's EmailStatus once an invoice has been emailed —
@@ -67,7 +93,15 @@ type Invoice struct {
 	TotalAmt    float64   // invoice total in dollars; 0 on a voided invoice
 	DueDate     time.Time // payment due date (net terms); zero if QB omitted it
 	EmailStatus string    // NotSet | NeedToSend | EmailSent
+	// TaxTotal is the tax QBO decided on, in dollars — not necessarily the tax
+	// that was asked for. QBO recomputes from the referenced rate, so this is
+	// the only way to find out whether it agreed, and a caller that charged
+	// tax should check. See taxcodes.go.
+	TaxTotal float64
 }
+
+// TaxCents returns the invoice's tax in integer cents.
+func (i Invoice) TaxCents() int { return dollarsToCents(i.TaxTotal) }
 
 // BalanceCents returns the remaining balance in integer cents, rounded to the
 // nearest cent. QB carries money as float dollars; callers compare in cents.
@@ -149,6 +183,18 @@ type Client interface {
 	// a proof run can report the Term an invoice would carry without writing
 	// one into the merchant's books.
 	FindTerm(ctx context.Context, dueDays int) (string, error)
+
+	// FindOrCreateTaxCode returns the QBO tax code and rate for a percentage,
+	// creating both if the company has no matching rate. An invoice cannot
+	// simply state its tax — QBO recomputes from the rate the invoice points
+	// at — so this is how the invoice comes to report the number Hiri charged.
+	FindOrCreateTaxCode(ctx context.Context, label string, rate domain.TaxRatePercent) (TaxCodeRef, error)
+
+	// FindTaxCode is FindOrCreateTaxCode without the create, returning a zero
+	// TaxCodeRef when the company has no matching rate. Shadow billing uses it
+	// for the same reason it uses FindTerm: a proof run must report what an
+	// invoice would carry without writing anything into the merchant's books.
+	FindTaxCode(ctx context.Context, rate domain.TaxRatePercent) (TaxCodeRef, error)
 
 	// CreatePayment records a payment against a QB invoice.
 	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)

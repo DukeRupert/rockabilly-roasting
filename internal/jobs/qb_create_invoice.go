@@ -108,10 +108,6 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 	return err
 }
 
-// taxConfig reads the store's tax settings. The rate is held as a fraction
-// (0.088) and QBO wants a percentage, so every caller here multiplies by 100 —
-// deliberately at the call site, so the two spellings never travel together in
-// one variable.
 // taxRoundingTolerance is how far QBO's tax may sit from Hiri's before it stops
 // being arithmetic and starts being disagreement.
 //
@@ -134,6 +130,12 @@ func taxRoundingTolerance(taxableLines int) int {
 	return (taxableLines + 1) / 2
 }
 
+// taxConfig reads the store's tax settings.
+//
+// The rate is stored as a fraction (0.088) and QuickBooks wants a percentage
+// (8.8). Callers must not do that conversion themselves: TaxConfig.RatePercent
+// returns a domain.TaxRatePercent, and the QB client takes that type, so
+// handing it the raw fraction does not compile.
 func (w *CreateQBInvoiceWorker) taxConfig(ctx context.Context) (*domain.TaxConfig, error) {
 	var cfg *domain.TaxConfig
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {

@@ -295,46 +295,22 @@ func TestPickupWaitDetail(t *testing.T) {
 	assert.NotContains(t, pickupWaitDetail(now.Add(-3*time.Hour), now), "ago")
 }
 
-// The failure mode this row exists for: a worker discarding jobs makes the rest
-// of the dashboard look calmer, not busier. So it has to lead the Urgent band
-// and count toward the chip, even though no order row is involved.
-func TestDashboard_DeadJobsLeadTheUrgentBand(t *testing.T) {
+// Failed background jobs used to lead the Urgent band. They are gone on
+// purpose: the band is for work the shop can act on, and a discarding worker
+// is fixed by an engineer, not by anyone reading this page. They live on
+// /admin/jobs now, which is admin-only and where the Sentry alert already
+// points whoever is going to do something about it.
+func TestDashboard_NoBackgroundJobsInTheUrgentBand(t *testing.T) {
 	props := DashboardProps{
-		DeadJobCount: 7,
-		DeadJobKinds: []domain.DeadJobKindCount{
-			{Kind: "renew_subscription", Count: 5},
-			{Kind: "email_order_confirm", Count: 2},
-		},
+		PastDueAccountCount: 2,
+		OnHold:              []UrgentOrderGroup{{Count: 1, Orders: []domain.Order{testOrder("1001")}}},
 	}
 	html := renderDashboard(t, props)
 
-	assert.Equal(t, 7, props.urgentCount())
-	assert.Contains(t, html, "7 background jobs failed")
-	assert.Contains(t, html, "renew_subscription ×5")
-	assert.Contains(t, html, `href="/admin/jobs"`)
-
-	// It precedes the order-shaped groups: the automation failure is usually
-	// the reason those queues look the way they do.
-	jobs := strings.Index(html, "background jobs failed")
-	band := strings.Index(html, "band-urgent")
-	assert.Greater(t, jobs, band)
-}
-
-// The kinds are the diagnosis, so they get named — but not unboundedly, and a
-// missing breakdown must still say something useful.
-func TestDeadJobDetail(t *testing.T) {
-	assert.Contains(t, deadJobDetail(nil), "nothing retries them")
-
-	five := []domain.DeadJobKindCount{
-		{Kind: "a", Count: 1}, {Kind: "b", Count: 2}, {Kind: "c", Count: 3},
-		{Kind: "d", Count: 4}, {Kind: "e", Count: 5},
-	}
-	got := deadJobDetail(five)
-	assert.Contains(t, got, "a ×1 · b ×2 · c ×3 · +2 more")
-	assert.NotContains(t, got, "d ×4")
-
-	// Exactly three fits with no overflow marker.
-	assert.NotContains(t, deadJobDetail(five[:3]), "more")
+	assert.NotContains(t, html, "background job")
+	assert.NotContains(t, html, "/admin/jobs")
+	// The band still counts the work that belongs to the shop.
+	assert.Equal(t, 3, props.urgentCount())
 }
 
 func renderForecast(t *testing.T, props RenewalForecastProps) string {

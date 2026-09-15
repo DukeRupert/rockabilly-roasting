@@ -19,7 +19,7 @@ import (
 const jobListPerPage = 50
 
 // handleAdminJobList renders background jobs River has discarded: what failed,
-// why, and a per-row retry.
+// why, and a per-row retry or dismissal.
 func (d *Deps) handleAdminJobList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := r.URL.Query()
@@ -106,12 +106,44 @@ func (d *Deps) handleAdminJobRetry(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/jobs?flash=job_retried", http.StatusSeeOther)
 }
 
+// handleAdminJobDismiss drops one discarded job for good.
+//
+// It shares the retry handler's shape, including the not-dead redirect: by the
+// time two people are looking at the same list, whichever action lands second
+// finds nothing, and that is not an error either way.
+func (d *Deps) handleAdminJobDismiss(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	jobID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	actor := staffActor(r)
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.JobHealthService.DismissDeadJob(ctx, tx, jobID, actor)
+	})
+	switch {
+	case errors.Is(err, app.ErrJobNotDead):
+		http.Redirect(w, r, "/admin/jobs?flash=job_not_pending", http.StatusSeeOther)
+		return
+	case err != nil:
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/jobs?flash=job_dismissed", http.StatusSeeOther)
+}
+
 // flashMessage maps the redirect's flash key to operator-facing copy. Keys
 // rather than free text so a crafted URL cannot put words on the page.
 func flashMessage(key string) string {
 	switch key {
 	case "job_retried":
 		return "Job re-queued. It runs as soon as a worker picks it up."
+	case "job_dismissed":
+		return "Job dismissed. It is gone from this list — the audit log keeps what it was."
 	case "job_not_pending":
 		return "That job is no longer waiting to be retried — nothing to do."
 	default:

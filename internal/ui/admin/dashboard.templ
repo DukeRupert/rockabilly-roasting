@@ -2,7 +2,6 @@ package admin
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -248,14 +247,13 @@ type DashboardProps struct {
 	// import app to go and look.
 	PickupStaleDays int
 
-	// DeadJobCount is background jobs that exhausted their retries, and
-	// DeadJobKinds the per-kind breakdown behind it. This is the one urgent
-	// signal that makes the rest of the dashboard look *better* when it fires:
-	// if the renewal or email worker is discarding jobs, fewer orders appear,
-	// queues shorten, and a quiet page reads as a good day. buy_label is
-	// excluded — those already have their own group naming the stuck orders.
-	DeadJobCount int
-	DeadJobKinds []domain.DeadJobKindCount
+	// Background jobs that exhausted their retries are deliberately absent.
+	// They read as urgent — a discarding renewal worker quietly stops the
+	// store — but nobody working this page can act on one: the fix is a token,
+	// a deploy, or a code change. They page engineering through Sentry and are
+	// worked on /admin/jobs, which is admin-only and where the person who
+	// answers that alert already is. Failed *labels* stay, in LabelFailures
+	// below, because those name stuck orders the shop can actually chase.
 
 	// Urgent action queues, each split by sales channel — see UrgentOrderGroup.
 	OnHold         []UrgentOrderGroup
@@ -330,7 +328,7 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount + p.DeadJobCount +
+	return p.PastDueAccountCount +
 		urgentGroupTotal(p.OnHold) + urgentGroupTotal(p.FailedPayments) + urgentGroupTotal(p.LabelFailures)
 }
 
@@ -396,13 +394,6 @@ templ DashboardContent(props DashboardProps) {
 			<div id="band-urgent" class="mt-8 scroll-mt-6">
 				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
 				<div class="mt-3 space-y-3">
-					if props.DeadJobCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d background job%s failed", props.DeadJobCount, pluralS(props.DeadJobCount)),
-							deadJobDetail(props.DeadJobKinds),
-							"/admin/jobs",
-						)
-					}
 					if props.PastDueAccountCount > 0 {
 						@urgentGroupLink(
 							fmt.Sprintf("%d past-due wholesale account%s", props.PastDueAccountCount, pluralS(props.PastDueAccountCount)),
@@ -961,26 +952,6 @@ func pickupWaitDetail(oldest, now time.Time) string {
 		return "Marked ready and never collected — coffee is going stale."
 	}
 	return fmt.Sprintf("Oldest was ready %d day%s ago — coffee is going stale.", days, pluralS(days))
-}
-
-// deadJobDetail names the kinds that failed. Dead jobs cluster by cause — one
-// expired token discards every job of a kind at once — so the kinds are the
-// diagnosis, and a generic "some jobs failed" would send staff to the list to
-// learn what this line could have told them. Three kinds is enough to see the
-// pattern; the rest are a count.
-func deadJobDetail(kinds []domain.DeadJobKindCount) string {
-	if len(kinds) == 0 {
-		return "Emails, invoices and renewals run as background jobs — these gave up, and nothing retries them."
-	}
-	parts := make([]string, 0, 4)
-	for i, k := range kinds {
-		if i == 3 {
-			parts = append(parts, fmt.Sprintf("+%d more", len(kinds)-3))
-			break
-		}
-		parts = append(parts, fmt.Sprintf("%s ×%d", k.Kind, k.Count))
-	}
-	return strings.Join(parts, " · ") + " — nothing retries these on its own."
 }
 
 // RenewalForecastCard answers "what do we need to roast." The headline is total

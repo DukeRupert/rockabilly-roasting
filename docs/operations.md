@@ -188,6 +188,22 @@ Version by what the release contains, not by how much work it was: new user-visi
 
 ---
 
+## Failed background jobs
+
+Every customer email, shipping label, invoice and subscription renewal runs as a River job, so a job that exhausts its retries is work that silently did not happen. Its symptom is an absence — a receipt nobody got — which means nothing else in the admin can show it.
+
+**Where they surface:** Sentry, via `jobs.ErrorHandler`, and the admin-only **/admin/jobs** page (user menu → Failed jobs, `system:write`). They are deliberately *not* on the staff dashboard: the Urgent band is for work the shop can act on, and an expired API token or a panicking QuickBooks worker is fixed by an engineer. Failed *shipping labels* are the exception — `buy_label` is excluded from this page and has its own dashboard group naming the stuck orders, because the shop really can chase those.
+
+**What the page gives you:**
+
+- A per-kind rollup at the top. Failures cluster by cause — one expired token discards every job of a kind at once — so the breakdown is usually the whole diagnosis.
+- **Retry** — hands the job back to River. Use it once the underlying cause is actually fixed. Jobs are idempotent by contract, but idempotent covers the database, not the customer's inbox: a retried email job sends the email.
+- **Dismiss** — deletes the River row. Permanent; there is no undiscard. Use it for failures retrying cannot fix — a job for a record that no longer exists, a worker that was deleted, a burst from an outage already handled another way. Both actions are audited; the dismissal record carries the kind, args, attempt count and final error, and after the delete it is the only surviving evidence the job existed.
+
+A list that never reaches zero stops being read, so clearing the unfixable ones is the point — it keeps the next real failure visible.
+
+---
+
 ## Hiri runs as exactly one process
 
 Not a deployment preference — a correctness constraint, and the only thing enforcing it is this paragraph.

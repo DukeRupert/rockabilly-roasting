@@ -36,6 +36,24 @@ func deadJob(id int64, kind string) domain.DeadJob {
 	}
 }
 
+// Dismiss is the way out for a job retrying cannot fix. It has to post to the
+// job's own id, and — because the work is written off rather than re-run — the
+// dialog has to say so before anyone clicks.
+func TestJobList_RowCarriesDismiss(t *testing.T) {
+	html := renderJobList(t, JobListProps{
+		Jobs:  []domain.DeadJob{deadJob(126125, "email_order_confirm")},
+		Total: 1,
+		Page:  1,
+	})
+
+	assert.Contains(t, html, "/admin/jobs/126125/dismiss")
+	assert.Contains(t, html, "Dismiss this job?")
+	assert.Contains(t, html, "does not happen")
+	// Destructive and unrecoverable, so it reads as such.
+	assert.Contains(t, html, "btn-danger")
+	assert.Contains(t, html, "cannot be brought back")
+}
+
 // The row exists to be retried, and the retry has to post to the job's own id.
 // Args are shown because they are the only thing identifying which record was
 // affected.

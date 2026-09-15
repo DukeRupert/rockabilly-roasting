@@ -29,8 +29,9 @@ func (r StaffRole) CanManageStaff() bool {
 
 // CanManageSystem reports whether the role may reach the operator-level pages:
 // failed background jobs and the Settings section. Admin only — retrying a job
-// re-runs real work including sending mail, and a settings change moves the
-// rules under every order at once. Mirrors the PermManageSystem grant in
+// re-runs real work including sending mail, dismissing one throws that work
+// away permanently, and a settings change moves the rules under every order at
+// once. Mirrors the PermManageSystem grant in
 // platform/auth.rolePermissions, which is the enforcement source of truth; this
 // helper exists so the UI layer can hide the affordances. Keep the two in sync.
 func (r StaffRole) CanManageSystem() bool {

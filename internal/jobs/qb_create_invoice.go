@@ -112,11 +112,27 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 // (0.088) and QBO wants a percentage, so every caller here multiplies by 100 —
 // deliberately at the call site, so the two spellings never travel together in
 // one variable.
-// taxRoundingToleranceCents is how far QBO's tax may sit from Hiri's before it
-// stops being arithmetic. One cent: the two sides round on different bases,
-// and the gap between per-line and whole-base rounding cannot exceed a cent
-// for any realistic number of lines.
-const taxRoundingToleranceCents = 1
+// taxRoundingTolerance is how far QBO's tax may sit from Hiri's before it stops
+// being arithmetic and starts being disagreement.
+//
+// It is a function of the taxable line count, not a constant. An earlier
+// version of this was a flat 1 cent, on the stated grounds that the gap "cannot
+// exceed a cent for any realistic number of lines" — which is false, and was
+// falsified by simulation rather than argument. Hiri rounds each line
+// separately (domain.CalculateFlatRateTax) and QBO rounds once over the summed
+// base, so each line contributes up to half a cent of error and the errors do
+// not cancel. Twelve taxable lines of $6.31 at 8.8% diverge by six cents.
+//
+// Half a cent per line, rounded up, is therefore the bound: ceil(n/2). A flat
+// cent would have logged every large order at Error — a steady trickle of false
+// alarms into Sentry, which is the outcome the tolerance exists to prevent.
+func taxRoundingTolerance(taxableLines int) int {
+	if taxableLines < 1 {
+		// No taxable line and yet a divergence: nothing about that is rounding.
+		return 0
+	}
+	return (taxableLines + 1) / 2
+}
 
 func (w *CreateQBInvoiceWorker) taxConfig(ctx context.Context) (*domain.TaxConfig, error) {
 	var cfg *domain.TaxConfig
@@ -394,7 +410,13 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 				"order_tax_cents", order.TaxTotal, "qb_tax_cents", got,
 				"qb_invoice_id", invoice.ID,
 			}
-			if delta <= taxRoundingToleranceCents {
+			taxableLines := 0
+			for _, line := range lines {
+				if line.Taxable {
+					taxableLines++
+				}
+			}
+			if delta <= taxRoundingTolerance(taxableLines) {
 				slog.WarnContext(ctx, "qb create invoice: QuickBooks tax differs from the order by a rounding step", attrs...)
 			} else {
 				slog.ErrorContext(ctx, "qb create invoice: QuickBooks tax differs from the order", attrs...)

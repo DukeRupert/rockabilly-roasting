@@ -80,7 +80,7 @@ A note below the button confirms: "An invoice will be sent after your order is c
 Wholesale orders work differently from retail purchases in several important ways:
 
 - **No immediate payment.** Retail customers pay by credit card at checkout through Stripe. Wholesale orders are placed on invoice -- you order now and pay later according to your agreed terms.
-- **The checkout page shows a subtotal only.** Shipping is negotiated offline and billed on the invoice. Sales tax, where it applies, is also added on the invoice — most wholesale coffee is exempt (it is food, and it is bought for resale), so for most accounts the invoice total is the subtotal plus shipping. Taxable items such as equipment are the exception.
+- **The checkout page shows a subtotal only.** Shipping is free on every wholesale fulfillment option, so the subtotal is the order. Sales tax, where it applies, is added on the invoice — coffee is exempt (it is food, and it is bought for resale), so for most accounts the invoice matches the subtotal. Taxable items such as equipment are the exception.
 - **PO number support.** Wholesale orders can carry your internal purchase order number for easier reconciliation with your accounting.
 - **Separate cart.** Your wholesale cart is completely independent of the retail cart. You can browse the retail storefront without affecting your wholesale order, and vice versa.
 - **Order numbers.** Wholesale orders are prefixed with "WO-" to distinguish them from retail orders.

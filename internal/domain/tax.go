@@ -18,16 +18,26 @@ type TaxConfig struct {
 	Label string  // e.g. "WA Sales Tax"
 }
 
-// RatePercent is the rate as a percentage (8.8), where Rate is the fraction
-// (0.088) the column holds.
+// TaxRatePercent is a tax rate expressed as a percentage (8.8), as distinct
+// from the fraction (0.088) that store_settings.tax_rate holds.
 //
-// It exists so the conversion has exactly one spelling. QuickBooks wants a
-// percentage, and a caller that passes the fraction by mistake does not fail —
-// it asks QuickBooks to create a 0.088% tax rate, and a tax agency to report
-// it under, in the merchant's real books. That is a silent, hand-cleaned mess,
-// so the multiplication lives here with a test on it rather than at each call
-// site.
-func (c TaxConfig) RatePercent() float64 { return c.Rate * 100 }
+// It is a named type rather than a float64 so the two cannot be confused at a
+// call site. They are not interchangeable and the mistake is silent: handing
+// the fraction to QuickBooks where a percentage belongs does not fail, it asks
+// QuickBooks to create a 0.088% tax rate — and a tax agency to report it under
+// — in the merchant's real books, to be cleaned up by hand.
+//
+// Centralising the multiplication in RatePercent below shrank that class from
+// every call site to four. Making the result a type the compiler checks closes
+// it: `FindOrCreateTaxCode(ctx, label, cfg.Rate)` no longer builds.
+type TaxRatePercent float64
+
+// Float64 is the percentage as a plain number, for the JSON body that finally
+// carries it to QuickBooks.
+func (p TaxRatePercent) Float64() float64 { return float64(p) }
+
+// RatePercent converts the stored fraction to the percentage QuickBooks wants.
+func (c TaxConfig) RatePercent() TaxRatePercent { return TaxRatePercent(c.Rate * 100) }
 
 // TaxLineItem represents a single line item for tax calculation.
 type TaxLineItem struct {

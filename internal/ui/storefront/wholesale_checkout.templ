@@ -285,15 +285,21 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 							<td class="hidden sm:table-cell"></td>
 						</tr>
 						<!--
-							This page shows a subtotal, and the invoice shows more: shipping is
-							negotiated offline, and taxable items carry sales tax. Coffee is
-							exempt, so for most orders the two numbers agree — but the buyer is
-							about to commit to the invoice, not to the subtotal, and should be
-							told which is which before clicking rather than in the email after.
+							The buyer commits to the invoice, not to this subtotal, so any gap
+							between the two belongs here rather than in the confirmation email.
+							Sales tax is the only gap there can be: shipping is free on every
+							wholesale option (see the section below, and ShippingCents is
+							hardcoded 0 at order time), so naming it here would contradict this
+							page three times over.
+
+							Deliberately says nothing about which items are taxable. That is
+							products.tax_exempt, per product, changed by hand — an assertion
+							about it baked into markup is the same defect as the silent surprise
+							this line exists to fix, one layer up.
 						-->
 						<tr class="flex items-center justify-between px-3 pb-3 sm:table-row">
 							<td colspan="5" class="font-oswald text-chrome-deep text-xs sm:px-4 sm:pb-3 sm:text-right">
-								Shipping and any sales tax are added on the invoice. Coffee is tax-exempt; equipment is not.
+								Any sales tax is added on the invoice.
 							</td>
 							<td class="hidden sm:table-cell"></td>
 						</tr>

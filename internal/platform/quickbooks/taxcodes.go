@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/dukerupert/hiri/internal/domain"
 )
 
 // Sales tax on a QBO invoice cannot be asserted — it has to be referenced.
@@ -195,7 +197,8 @@ func taxCodeName(label string, percent float64) string {
 // and the caller converts, because QBO's RateValue is a percentage and doing
 // the conversion at the boundary keeps one spelling of the rate inside this
 // package.
-func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, percent float64) (TaxCodeRef, error) {
+func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, rate domain.TaxRatePercent) (TaxCodeRef, error) {
+	percent := rate.Float64()
 	if percent <= 0 {
 		return TaxCodeRef{}, fmt.Errorf("%w: tax rate must be positive, got %v", ErrBadRequest, percent)
 	}
@@ -204,7 +207,7 @@ func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, percen
 		return ref, nil
 	}
 
-	ref, err := c.FindTaxCode(ctx, percent)
+	ref, err := c.FindTaxCode(ctx, rate)
 	if err != nil {
 		return TaxCodeRef{}, err
 	}
@@ -233,7 +236,7 @@ func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, percen
 		// Check-then-create is not atomic and River runs invoice workers
 		// concurrently — the same race FindOrCreateTerm documents. A second
 		// lookup answers whether the rival attempt got there first.
-		if found, findErr := c.FindTaxCode(ctx, percent); findErr == nil && found.TaxCodeID != "" {
+		if found, findErr := c.FindTaxCode(ctx, rate); findErr == nil && found.TaxCodeID != "" {
 			c.taxCodes.put(bps, found)
 			return found, nil
 		}
@@ -256,7 +259,7 @@ func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, percen
 // TaxCodeRef when it has none. It never writes, which is what shadow billing
 // needs: a proof run reports the tax an invoice would carry without creating
 // anything in the merchant's books.
-func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef, error) {
+func (c *QBClient) FindTaxCode(ctx context.Context, rate domain.TaxRatePercent) (TaxCodeRef, error) {
 	rateBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode("select * from TaxRate maxresults 200"), nil)
 	if err != nil {
 		return TaxCodeRef{}, fmt.Errorf("query QB tax rates: %w", err)
@@ -275,7 +278,7 @@ func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef
 		return TaxCodeRef{}, fmt.Errorf("unmarshal QB tax codes: %w", err)
 	}
 
-	return matchTaxCode(rates.QueryResponse.TaxRate, codes.QueryResponse.TaxCode, percent), nil
+	return matchTaxCode(rates.QueryResponse.TaxRate, codes.QueryResponse.TaxCode, rate.Float64()), nil
 }
 
 // isActive reads QBO's tri-state Active flag: present and true, present and

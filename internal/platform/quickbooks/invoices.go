@@ -254,7 +254,7 @@ func buildInvoiceRequest(p InvoiceParams, config ClientConfig) (qbInvoiceRequest
 				TaxLineDetail: qbTaxLineDetail{
 					TaxRateRef:       qbRef{Value: p.Tax.TaxRateID},
 					PercentBased:     true,
-					TaxPercent:       p.Tax.RatePercent,
+					TaxPercent:       p.Tax.RatePercent.Float64(),
 					NetAmountTaxable: centsToFloat(taxableBaseCents(p)),
 				},
 			}},

@@ -62,8 +62,8 @@ type InvoiceParams struct {
 // equal to the shop's configured one. See taxcodes.go for what was verified
 // against the sandbox and why this indirection is unavoidable.
 type InvoiceTax struct {
-	Amount      int     // cents, from order.TaxTotal
-	RatePercent float64 // 8.8, not 0.088
+	Amount      int                   // cents, from order.TaxTotal
+	RatePercent domain.TaxRatePercent // 8.8, not 0.088 — the type is the guard
 	TaxCodeID   string
 	TaxRateID   string
 }
@@ -188,13 +188,13 @@ type Client interface {
 	// creating both if the company has no matching rate. An invoice cannot
 	// simply state its tax — QBO recomputes from the rate the invoice points
 	// at — so this is how the invoice comes to report the number Hiri charged.
-	FindOrCreateTaxCode(ctx context.Context, label string, percent float64) (TaxCodeRef, error)
+	FindOrCreateTaxCode(ctx context.Context, label string, rate domain.TaxRatePercent) (TaxCodeRef, error)
 
 	// FindTaxCode is FindOrCreateTaxCode without the create, returning a zero
 	// TaxCodeRef when the company has no matching rate. Shadow billing uses it
 	// for the same reason it uses FindTerm: a proof run must report what an
 	// invoice would carry without writing anything into the merchant's books.
-	FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef, error)
+	FindTaxCode(ctx context.Context, rate domain.TaxRatePercent) (TaxCodeRef, error)
 
 	// CreatePayment records a payment against a QB invoice.
 	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)

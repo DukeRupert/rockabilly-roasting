@@ -22,11 +22,15 @@ import (
 // came back as 8%, $8.00, on a $158.00 invoice the shop meant to bill at
 // $158.80.
 //
-// So the only way an invoice can report the number Hiri computed is for QBO to
-// hold a rate equal to the one Hiri charged, and for the invoice to point at
-// it. That is what this file does, and it is deliberately the same shape as
+// So an invoice can only report something close to the number Hiri computed by
+// QBO holding a rate equal to the one Hiri charged and the invoice pointing at
+// it. Close, not equal: matching the rate is necessary but not sufficient,
+// because Hiri rounds tax per line and QBO rounds once over the summed taxable
+// base, so an order with several taxable lines can land a cent apart. The
+// invoice job treats a cent as arithmetic and anything larger as a real
+// divergence — see taxRoundingToleranceCents. That is what this file does, and it is deliberately the same shape as
 // FindOrCreateTerm: match what the company already has, create it once if it
-// has nothing, cache per process.
+// has nothing, cache for the life of the client (see taxCodeCache).
 //
 // Matching is by rate value rather than by name for the same reason terms are
 // matched by DueDays — a bookkeeper who renames "WA Sales Tax" must not cause
@@ -39,7 +43,11 @@ type qbTaxRate struct {
 	ID        string  `json:"Id"`
 	Name      string  `json:"Name"`
 	RateValue float64 `json:"RateValue"`
-	Active    bool    `json:"Active"`
+	// Active is a pointer because QBO omits it on the built-in entries and
+	// sends it on user-defined ones. Absent must read as active: a plain bool
+	// would zero-value to false and reject exactly the codes every company
+	// has. See isActive.
+	Active *bool `json:"Active"`
 }
 
 // qbTaxCode is a QBO TaxCode: what an invoice line or transaction points at.
@@ -47,7 +55,7 @@ type qbTaxRate struct {
 type qbTaxCode struct {
 	ID       string `json:"Id"`
 	Name     string `json:"Name"`
-	Active   bool   `json:"Active"`
+	Active   *bool  `json:"Active"` // see qbTaxRate.Active
 	Taxable  bool   `json:"Taxable"`
 	TaxGroup bool   `json:"TaxGroup"`
 
@@ -249,8 +257,6 @@ func (c *QBClient) FindOrCreateTaxCode(ctx context.Context, label string, percen
 // needs: a proof run reports the tax an invoice would carry without creating
 // anything in the merchant's books.
 func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef, error) {
-	want := rateBasisPoints(percent)
-
 	rateBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode("select * from TaxRate maxresults 200"), nil)
 	if err != nil {
 		return TaxCodeRef{}, fmt.Errorf("query QB tax rates: %w", err)
@@ -258,15 +264,6 @@ func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef
 	var rates qbTaxRateQueryResponse
 	if err := json.Unmarshal(rateBody, &rates); err != nil {
 		return TaxCodeRef{}, fmt.Errorf("unmarshal QB tax rates: %w", err)
-	}
-	matching := make(map[string]bool)
-	for _, r := range rates.QueryResponse.TaxRate {
-		if rateBasisPoints(r.RateValue) == want {
-			matching[r.ID] = true
-		}
-	}
-	if len(matching) == 0 {
-		return TaxCodeRef{}, nil
 	}
 
 	codeBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode("select * from TaxCode maxresults 200"), nil)
@@ -277,8 +274,42 @@ func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef
 	if err := json.Unmarshal(codeBody, &codes); err != nil {
 		return TaxCodeRef{}, fmt.Errorf("unmarshal QB tax codes: %w", err)
 	}
-	for _, code := range codes.QueryResponse.TaxCode {
-		if !code.Taxable {
+
+	return matchTaxCode(rates.QueryResponse.TaxRate, codes.QueryResponse.TaxCode, percent), nil
+}
+
+// isActive reads QBO's tri-state Active flag: present and true, present and
+// false, or absent. Absent means active — the built-in TAX and NON codes carry
+// no Active field at all.
+func isActive(flag *bool) bool { return flag == nil || *flag }
+
+// matchTaxCode picks the code that charges exactly the rate asked for, or a
+// zero TaxCodeRef when the company has none.
+//
+// Split from the two queries above so the rules below can be tested without a
+// QuickBooks. Each one rejects a code that would bill something other than the
+// rate requested, which is the only outcome worth protecting against here — a
+// near miss is a wrong invoice, and a wrong invoice is a wrong amount of money
+// collected from a real customer.
+func matchTaxCode(rates []qbTaxRate, codes []qbTaxCode, percent float64) TaxCodeRef {
+	want := rateBasisPoints(percent)
+
+	matching := make(map[string]bool)
+	for _, r := range rates {
+		// A deactivated rate still answers the query and still has the right
+		// value. Referencing one produces an invoice QBO rejects, cached for
+		// the life of the client — forget() exists to recover from that, but
+		// only after the first failure has already happened.
+		if rateBasisPoints(r.RateValue) == want && isActive(r.Active) {
+			matching[r.ID] = true
+		}
+	}
+	if len(matching) == 0 {
+		return TaxCodeRef{}
+	}
+
+	for _, code := range codes {
+		if !code.Taxable || !isActive(code.Active) {
 			continue
 		}
 		// A code carrying more than one rate charges their sum, which is not
@@ -289,10 +320,10 @@ func (c *QBClient) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef
 			continue
 		}
 		if matching[details[0].TaxRateRef.Value] {
-			return TaxCodeRef{TaxCodeID: code.ID, TaxRateID: details[0].TaxRateRef.Value}, nil
+			return TaxCodeRef{TaxCodeID: code.ID, TaxRateID: details[0].TaxRateRef.Value}
 		}
 	}
-	return TaxCodeRef{}, nil
+	return TaxCodeRef{}
 }
 
 // findOrCreateTaxAgency returns the agency a created rate is reported under.

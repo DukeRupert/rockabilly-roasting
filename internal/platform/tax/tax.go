@@ -37,7 +37,11 @@ func (c *FlatRateCalculator) Calculate(_ context.Context, order TaxOrder) (domai
 }
 
 // NoneCalculator implements TaxCalculator for tax_mode = 'none'.
-// Also used for all B2B orders regardless of tenant tax_mode.
+//
+// It used to be returned for every B2B order as well, whatever the store's
+// mode. That ended on 2026-09-15: taxability is a property of the product, not
+// of the channel, so wholesale now runs the same per-line rule as retail. See
+// app.taxCalculatorForConfig.
 type NoneCalculator struct{}
 
 func (c *NoneCalculator) Calculate(_ context.Context, _ TaxOrder) (domain.TaxResult, error) {

@@ -112,6 +112,12 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 // (0.088) and QBO wants a percentage, so every caller here multiplies by 100 —
 // deliberately at the call site, so the two spellings never travel together in
 // one variable.
+// taxRoundingToleranceCents is how far QBO's tax may sit from Hiri's before it
+// stops being arithmetic. One cent: the two sides round on different bases,
+// and the gap between per-line and whole-base rounding cannot exceed a cent
+// for any realistic number of lines.
+const taxRoundingToleranceCents = 1
+
 func (w *CreateQBInvoiceWorker) taxConfig(ctx context.Context) (*domain.TaxConfig, error) {
 	var cfg *domain.TaxConfig
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
@@ -343,13 +349,13 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			if cfgErr != nil {
 				return fmt.Errorf("qb create invoice: read tax config: %w", cfgErr)
 			}
-			ref, taxErr := w.qb.FindOrCreateTaxCode(ctx, taxCfg.Label, taxCfg.Rate*100)
+			ref, taxErr := w.qb.FindOrCreateTaxCode(ctx, taxCfg.Label, taxCfg.RatePercent())
 			if taxErr != nil {
 				return fmt.Errorf("qb create invoice: resolve tax code: %w", taxErr)
 			}
 			params.Tax = quickbooks.InvoiceTax{
 				Amount:      order.TaxTotal,
-				RatePercent: taxCfg.Rate * 100,
+				RatePercent: taxCfg.RatePercent(),
 				TaxCodeID:   ref.TaxCodeID,
 				TaxRateID:   ref.TaxRateID,
 			}
@@ -369,10 +375,30 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		// can correct it in QBO, and a silent mismatch is the outcome worth
 		// preventing.
 		if got := invoice.TaxCents(); got != order.TaxTotal {
-			slog.ErrorContext(ctx, "qb create invoice: QuickBooks tax differs from the order",
+			// A cent either way is arithmetic, not disagreement: Hiri rounds
+			// tax per line (domain.CalculateFlatRateTax) and QBO rounds once
+			// over the summed taxable base, so an order with several taxable
+			// lines can legitimately land a cent apart. Logging that at Error
+			// would put a steady trickle of false alarms into Sentry and teach
+			// everyone to ignore the alert that matters.
+			//
+			// Anything larger is a real divergence — a rate edited in QBO, a
+			// line taxed on one side and not the other — and means the customer
+			// is being billed something other than what the order says.
+			delta := got - order.TaxTotal
+			if delta < 0 {
+				delta = -delta
+			}
+			attrs := []any{
 				"order_id", order.ID, "order_number", order.Number,
 				"order_tax_cents", order.TaxTotal, "qb_tax_cents", got,
-				"qb_invoice_id", invoice.ID)
+				"qb_invoice_id", invoice.ID,
+			}
+			if delta <= taxRoundingToleranceCents {
+				slog.WarnContext(ctx, "qb create invoice: QuickBooks tax differs from the order by a rounding step", attrs...)
+			} else {
+				slog.ErrorContext(ctx, "qb create invoice: QuickBooks tax differs from the order", attrs...)
+			}
 		}
 	}
 
@@ -519,14 +545,14 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 		case cfgErr != nil:
 			lookupErrs = append(lookupErrs, "tax config: "+cfgErr.Error())
 		default:
-			ref, taxErr := w.qb.FindTaxCode(ctx, taxCfg.Rate*100)
+			ref, taxErr := w.qb.FindTaxCode(ctx, taxCfg.RatePercent())
 			switch {
 			case taxErr != nil:
 				lookupErrs = append(lookupErrs, "tax rate lookup: "+taxErr.Error())
 			case ref.TaxCodeID == "":
 				lookupErrs = append(lookupErrs, fmt.Sprintf(
 					"QuickBooks has no %.4g%% sales tax rate — going live creates one under a new tax agency, so check that is what you want",
-					taxCfg.Rate*100))
+					taxCfg.RatePercent()))
 			}
 		}
 	}

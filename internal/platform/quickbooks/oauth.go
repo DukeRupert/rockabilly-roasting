@@ -53,8 +53,9 @@ var ErrMissingCallbackParams = errors.New("qb oauth: missing code or realmId")
 
 // OAuthManager orchestrates the QuickBooks OAuth2 authorization flow:
 // signing state cookies, exchanging codes for tokens, encrypting tokens, and
-// persisting credentials. It is constructed once per process for a given
-// tenant; the web layer calls it from the admin settings handler.
+// persisting credentials. Provider constructs it alongside the client it
+// belongs to, and rebuilds both when the configured Intuit app changes; the
+// web layer reaches it from the admin settings handler.
 type OAuthManager struct {
 	config     ClientConfig
 	encrypter  *QBClient

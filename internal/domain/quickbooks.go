@@ -122,8 +122,8 @@ type QBInvoicePreview struct {
 	// excludes tax.
 	TaxCents   int
 	TotalCents int
-	TermID        *string
-	Lines         []QBInvoiceLinePreview
+	TermID     *string
+	Lines      []QBInvoiceLinePreview
 
 	// ExistingQBInvoiceID is set when QBO already holds an invoice with this
 	// DocNumber, which during a proof period usually means someone billed the

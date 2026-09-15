@@ -93,3 +93,18 @@ func TestCalculateFlatRateTax(t *testing.T) {
 		assert.Empty(t, result.Breakdown)
 	})
 }
+
+// store_settings holds the rate as a fraction and QuickBooks wants a
+// percentage. Passing the fraction by mistake does not fail — it asks
+// QuickBooks to create a 0.088% tax rate, and a tax agency to report it
+// under, in the merchant's real books. One spelling, tested.
+func TestTaxConfigRatePercent(t *testing.T) {
+	assert.InDelta(t, 8.8, TaxConfig{Rate: 0.088}.RatePercent(), 0.0001)
+	assert.InDelta(t, 6.5, TaxConfig{Rate: 0.065}.RatePercent(), 0.0001)
+	assert.InDelta(t, 0, TaxConfig{}.RatePercent(), 0.0001)
+
+	// The value that actually reaches QuickBooks must read as a percentage,
+	// not as a fraction: anything under 1 for a US sales tax rate is the
+	// fraction leaking through.
+	assert.Greater(t, TaxConfig{Rate: 0.088}.RatePercent(), 1.0)
+}

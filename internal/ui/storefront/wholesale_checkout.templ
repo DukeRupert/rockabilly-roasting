@@ -284,6 +284,19 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 							<td class="font-special text-lg text-ink sm:px-4 sm:py-3 sm:text-right">{ formatCents(props.Subtotal) }</td>
 							<td class="hidden sm:table-cell"></td>
 						</tr>
+						<!--
+							This page shows a subtotal, and the invoice shows more: shipping is
+							negotiated offline, and taxable items carry sales tax. Coffee is
+							exempt, so for most orders the two numbers agree — but the buyer is
+							about to commit to the invoice, not to the subtotal, and should be
+							told which is which before clicking rather than in the email after.
+						-->
+						<tr class="flex items-center justify-between px-3 pb-3 sm:table-row">
+							<td colspan="5" class="font-oswald text-chrome-deep text-xs sm:px-4 sm:pb-3 sm:text-right">
+								Shipping and any sales tax are added on the invoice. Coffee is tax-exempt; equipment is not.
+							</td>
+							<td class="hidden sm:table-cell"></td>
+						</tr>
 					</tfoot>
 				</table>
 			</div>

@@ -18,6 +18,17 @@ type TaxConfig struct {
 	Label string  // e.g. "WA Sales Tax"
 }
 
+// RatePercent is the rate as a percentage (8.8), where Rate is the fraction
+// (0.088) the column holds.
+//
+// It exists so the conversion has exactly one spelling. QuickBooks wants a
+// percentage, and a caller that passes the fraction by mistake does not fail —
+// it asks QuickBooks to create a 0.088% tax rate, and a tax agency to report
+// it under, in the merchant's real books. That is a silent, hand-cleaned mess,
+// so the multiplication lives here with a test on it rather than at each call
+// site.
+func (c TaxConfig) RatePercent() float64 { return c.Rate * 100 }
+
 // TaxLineItem represents a single line item for tax calculation.
 type TaxLineItem struct {
 	LineIndex int

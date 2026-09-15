@@ -209,22 +209,26 @@ func resolveInvoiceItems(p InvoiceParams, config ClientConfig) (salesItemID, shi
 	return config.SalesItemID, config.ShippingItemID
 }
 
-// CreateInvoice creates an invoice in QBO.
-func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
+// buildInvoiceRequest assembles the request body, including every refusal that
+// can be decided without talking to QBO.
+//
+// Split from CreateInvoice so the body an invoice is actually billed from can
+// be asserted in a test. The previous test built this struct by hand and
+// checked its JSON tags, which cannot fail when the builder is wrong — and the
+// builder is where the money is.
+func buildInvoiceRequest(p InvoiceParams, config ClientConfig) (qbInvoiceRequest, error) {
 	// Wrapped in ErrBadRequest so IsRetryable classifies it permanent — a
 	// missing item mapping never fixes itself on retry.
-	salesItemID, shippingItemID := resolveInvoiceItems(p, c.config)
+	salesItemID, shippingItemID := resolveInvoiceItems(p, config)
 	if salesItemID == "" {
-		return nil, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
+		return qbInvoiceRequest{}, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
 	}
-
-	lines := buildInvoiceLines(p, salesItemID, shippingItemID)
 
 	body := qbInvoiceRequest{
 		CustomerRef:                  qbRef{Value: p.CustomerID},
 		DocNumber:                    p.DocNumber,
 		DueDate:                      p.DueDate.Format("2006-01-02"),
-		Line:                         lines,
+		Line:                         buildInvoiceLines(p, salesItemID, shippingItemID),
 		AllowOnlineACHPayment:        p.AllowOnlineACHPayment,
 		AllowOnlineCreditCardPayment: p.AllowOnlineCreditCardPayment,
 	}
@@ -238,9 +242,9 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 		if p.Tax.TaxCodeID == "" || p.Tax.TaxRateID == "" {
 			// Reaching QBO with tax to charge and nothing to charge it under
 			// would create an invoice short by the tax, silently — the exact
-			// failure TotalTax-only requests produce. Refuse instead: the job
+			// failure a TotalTax-only request produces. Refuse instead: the job
 			// alerts staff and the order stays billable once the rate exists.
-			return nil, fmt.Errorf("%w: invoice carries tax but no QuickBooks tax code was resolved", ErrBadRequest)
+			return qbInvoiceRequest{}, fmt.Errorf("%w: invoice carries tax but no QuickBooks tax code was resolved", ErrBadRequest)
 		}
 		body.TxnTaxDetail = &qbTxnTaxDetail{
 			TxnTaxCodeRef: qbRef{Value: p.Tax.TaxCodeID},
@@ -255,6 +259,15 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 				},
 			}},
 		}
+	}
+	return body, nil
+}
+
+// CreateInvoice creates an invoice in QBO.
+func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
+	body, err := buildInvoiceRequest(p, c.config)
+	if err != nil {
+		return nil, err
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)

@@ -106,7 +106,8 @@ templ JobListContent(props JobListProps) {
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Failed Jobs</h1>
 			<p class="mt-1 text-sm text-rr-muted">
-				Background work that ran out of retries. Nothing picks these up again on their own.
+				Background work that ran out of retries. Nothing picks these up again on their own —
+				retry once the cause is fixed, or dismiss what retrying cannot help.
 			</p>
 		</div>
 	</div>
@@ -221,16 +222,28 @@ templ jobRow(j domain.DeadJob, loc *time.Location) {
 			{ fmt.Sprintf("%d/%d", j.Attempt, j.MaxAttempts) }
 		</td>
 		<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
-			@ActionWrap(fmt.Sprintf("job-retry-hint-%d", j.ID), "Put this job back on the queue and run it again") {
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/jobs/%d/retry", j.ID)) } class="inline">
-					<button
-						type="submit"
-						class="btn-secondary"
-						aria-describedby={ fmt.Sprintf("job-retry-hint-%d", j.ID) }
-						{ ConfirmAttrs(retryConfirm(j))... }
-					>Retry</button>
-				</form>
-			}
+			<div class="inline-flex items-center gap-2">
+				@ActionWrap(fmt.Sprintf("job-retry-hint-%d", j.ID), "Put this job back on the queue and run it again") {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/jobs/%d/retry", j.ID)) } class="inline">
+						<button
+							type="submit"
+							class="btn-secondary"
+							aria-describedby={ fmt.Sprintf("job-retry-hint-%d", j.ID) }
+							{ ConfirmAttrs(retryConfirm(j))... }
+						>Retry</button>
+					</form>
+				}
+				@ActionWrap(fmt.Sprintf("job-dismiss-hint-%d", j.ID), "Drop this job for good — use it when retrying cannot help") {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/jobs/%d/dismiss", j.ID)) } class="inline">
+						<button
+							type="submit"
+							class="btn-danger"
+							aria-describedby={ fmt.Sprintf("job-dismiss-hint-%d", j.ID) }
+							{ ConfirmAttrs(dismissConfirm(j))... }
+						>Dismiss</button>
+					</form>
+				}
+			</div>
 		</td>
 	</tr>
 }
@@ -249,6 +262,25 @@ func retryConfirm(j domain.DeadJob) ActionConfirm {
 			"It disappears from this list either way",
 		},
 		Confirm: "Retry job",
+	}
+}
+
+// dismissConfirm is deliberately blunt about what dismissing costs. The work
+// itself is not recovered — a dismissed confirmation email is an email the
+// customer never gets — and River keeps nothing to undo, so the dialog names
+// the job's args: the operator is about to write off work for a specific order
+// or customer, and that id is the last chance to notice which one.
+func dismissConfirm(j domain.DeadJob) ActionConfirm {
+	return ActionConfirm{
+		Title: "Dismiss this job?",
+		Lead:  fmt.Sprintf("%s is removed from this list and from River. It cannot be brought back.", jobKindDisplay(j.Kind)),
+		Points: []string{
+			"The work it was going to do does not happen — if it was an email, nobody gets it",
+			"Retry instead if the cause is fixed; dismiss only when running it again cannot help",
+			"The audit log keeps the kind, args and error: " + jobErrorDisplay(j.Args),
+		},
+		Confirm: "Dismiss job",
+		Danger:  true,
 	}
 }
 

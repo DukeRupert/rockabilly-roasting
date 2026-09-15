@@ -813,6 +813,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// including sending customer mail.
 	adminMux.Handle("GET /admin/jobs", deps.requirePermission(auth.PermManageSystem, http.HandlerFunc(deps.handleAdminJobList)))
 	adminMux.Handle("POST /admin/jobs/{id}/retry", deps.requirePermission(auth.PermManageSystem, http.HandlerFunc(deps.handleAdminJobRetry)))
+	adminMux.Handle("POST /admin/jobs/{id}/dismiss", deps.requirePermission(auth.PermManageSystem, http.HandlerFunc(deps.handleAdminJobDismiss)))
 
 	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)
 

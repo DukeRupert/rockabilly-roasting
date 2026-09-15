@@ -130,8 +130,7 @@ func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []
 	if s.settings != nil {
 		taxCfg, err := s.settings.GetTaxConfig(ctx, tx)
 		if err == nil {
-			isWholesale := customer.AccountType == domain.AccountTypeWholesale
-			calculator := taxCalculatorForConfig(taxCfg, isWholesale)
+			calculator := taxCalculatorForConfig(taxCfg)
 			if res, cErr := calculator.Calculate(ctx, tax.TaxOrder{
 				CustomerExempt: customer.TaxExempt,
 				ShippingState:  addr.State,

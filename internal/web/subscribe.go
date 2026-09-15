@@ -346,8 +346,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			return fmt.Errorf("get product for tax: %w", txErr)
 		}
 		taxLines := []domain.TaxLineItem{{LineIndex: 0, Subtotal: subtotal, TaxExempt: product.TaxExempt}}
-		isWholesale := customer.AccountType == domain.AccountTypeWholesale
-		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLines, customer.TaxExempt, isWholesale, addr.State)
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLines, customer.TaxExempt, addr.State)
 		if txErr != nil {
 			return fmt.Errorf("calculate tax: %w", txErr)
 		}

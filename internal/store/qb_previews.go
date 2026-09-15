@@ -37,9 +37,9 @@ func (s *QBPreviewStore) Upsert(ctx context.Context, tx pgx.Tx, p *domain.QBInvo
 		INSERT INTO qb_invoice_previews (
 			order_id, customer_id, qb_customer_id, would_create_customer,
 			doc_number, bill_email, terms_days, due_date,
-			subtotal_cents, shipping_cents, total_cents, term_id, lines,
+			subtotal_cents, shipping_cents, tax_cents, total_cents, term_id, lines,
 			existing_qb_invoice_id, lookup_error, auto_billed, billing_method
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		ON CONFLICT (order_id) DO UPDATE SET
 			customer_id            = EXCLUDED.customer_id,
 			qb_customer_id         = EXCLUDED.qb_customer_id,
@@ -50,6 +50,7 @@ func (s *QBPreviewStore) Upsert(ctx context.Context, tx pgx.Tx, p *domain.QBInvo
 			due_date               = EXCLUDED.due_date,
 			subtotal_cents         = EXCLUDED.subtotal_cents,
 			shipping_cents         = EXCLUDED.shipping_cents,
+			tax_cents              = EXCLUDED.tax_cents,
 			total_cents            = EXCLUDED.total_cents,
 			term_id                = EXCLUDED.term_id,
 			lines                  = EXCLUDED.lines,
@@ -60,7 +61,7 @@ func (s *QBPreviewStore) Upsert(ctx context.Context, tx pgx.Tx, p *domain.QBInvo
 			updated_at             = now()`,
 		p.OrderID, p.CustomerID, p.QBCustomerID, p.WouldCreateCustomer,
 		p.DocNumber, p.BillEmail, p.TermsDays, p.DueDate,
-		p.SubtotalCents, p.ShippingCents, p.TotalCents, p.TermID, lines,
+		p.SubtotalCents, p.ShippingCents, p.TaxCents, p.TotalCents, p.TermID, lines,
 		p.ExistingQBInvoiceID, p.LookupError, p.AutoBilled, string(p.BillingMethod),
 	)
 	if err != nil {
@@ -81,7 +82,7 @@ type QBPreviewRow struct {
 const qbPreviewSelect = `
 	SELECT p.id, p.order_id, p.customer_id, p.qb_customer_id, p.would_create_customer,
 	       p.doc_number, p.bill_email, p.terms_days, p.due_date,
-	       p.subtotal_cents, p.shipping_cents, p.total_cents, p.term_id, p.lines,
+	       p.subtotal_cents, p.shipping_cents, p.tax_cents, p.total_cents, p.term_id, p.lines,
 	       p.existing_qb_invoice_id, p.lookup_error, p.auto_billed, p.billing_method,
 	       p.created_at, p.updated_at,
 	       o.number,
@@ -102,7 +103,7 @@ func scanQBPreviewRows(rows pgx.Rows) ([]QBPreviewRow, error) {
 		if err := rows.Scan(
 			&r.ID, &r.OrderID, &r.CustomerID, &r.QBCustomerID, &r.WouldCreateCustomer,
 			&r.DocNumber, &r.BillEmail, &r.TermsDays, &r.DueDate,
-			&r.SubtotalCents, &r.ShippingCents, &r.TotalCents, &r.TermID, &lines,
+			&r.SubtotalCents, &r.ShippingCents, &r.TaxCents, &r.TotalCents, &r.TermID, &lines,
 			&r.ExistingQBInvoiceID, &r.LookupError, &r.AutoBilled, &billingMethod,
 			&r.CreatedAt, &r.UpdatedAt,
 			&r.OrderNumber, &companyOrName,

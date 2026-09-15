@@ -150,9 +150,27 @@ Also worth checking during this period:
 
 - Do any orders show **"QuickBooks already has an invoice numbered …"**? That
   means someone billed it by hand.
-- Does the client discount wholesale orders? Discounts and tax are **not** on
-  QuickBooks invoices — the total is lines plus shipping only, so a discounted
-  order would be over-billed.
+- Does the client discount wholesale orders? **Discounts are still not on
+  QuickBooks invoices** — the total is taxable and exempt lines plus shipping
+  plus tax, with no discount line, so a discounted order would be over-billed.
+- **Sales tax is on the invoice** as of 2026-09-15, and the proof period is
+  where to check it. Each line is taxed according to its product's
+  `tax_exempt` flag, the rate is the store's configured one, and shipping is
+  never taxed. Every product in the catalog is currently exempt, so invoices
+  read $0 tax until a taxable SKU (equipment, merch) is added.
+
+  Watch for the row flagged **"QuickBooks has no N% sales tax rate"**. Going
+  live creates that rate — and, on a company that has never charged sales tax,
+  a tax agency to report it under — on the first taxable invoice. Creating it
+  yourself in QuickBooks beforehand, under the agency the client actually
+  files with, is the better order of operations: Hiri then matches the
+  existing rate instead of inventing one. Matching is by rate value, not by
+  name, so the client can call it whatever they like.
+
+  If an invoice's tax ever disagrees with the order's, the invoice job logs an
+  error naming both numbers and the QB invoice — it does not fail, because by
+  then the invoice exists. The usual cause is somebody editing the rate in
+  QuickBooks.
 
 ## 5a. Decide who is actually billed
 

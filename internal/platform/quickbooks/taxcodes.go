@@ -122,8 +122,13 @@ type TaxCodeRef struct {
 }
 
 // taxCodeCache memoizes rate-in-basis-points -> refs for the life of the
-// process. Rates change about once a legislative session; the invoice job
-// would otherwise run two queries per invoice.
+// client. Rates change about once a legislative session; the invoice job would
+// otherwise run two queries per invoice.
+//
+// The client outlives a request but not a change of Intuit app: Provider
+// rebuilds it when the configured credentials change, which drops this cache
+// with it. That is the correct behaviour rather than a limitation — the refs
+// are ids in one company's books, and they mean nothing in another's.
 type taxCodeCache struct {
 	mu   sync.Mutex
 	refs map[int]TaxCodeRef

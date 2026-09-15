@@ -86,6 +86,22 @@ func (p *Provider) FindTerm(ctx context.Context, dueDays int) (string, error) {
 	return c.FindTerm(ctx, dueDays)
 }
 
+func (p *Provider) FindOrCreateTaxCode(ctx context.Context, label string, percent float64) (TaxCodeRef, error) {
+	c, err := p.resolve(ctx)
+	if err != nil {
+		return TaxCodeRef{}, err
+	}
+	return c.FindOrCreateTaxCode(ctx, label, percent)
+}
+
+func (p *Provider) FindTaxCode(ctx context.Context, percent float64) (TaxCodeRef, error) {
+	c, err := p.resolve(ctx)
+	if err != nil {
+		return TaxCodeRef{}, err
+	}
+	return c.FindTaxCode(ctx, percent)
+}
+
 func (p *Provider) ListItems(ctx context.Context) ([]Item, error) {
 	c, err := p.resolve(ctx)
 	if err != nil {

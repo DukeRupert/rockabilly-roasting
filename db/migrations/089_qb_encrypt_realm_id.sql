@@ -20,6 +20,16 @@
 -- Not reversible in the useful sense: down re-creates the table's emptiness,
 -- not the credentials. That is correct — a rollback should never resurrect a
 -- bearer token the operator believes they revoked.
+--
+-- Note for whoever next touches this table: the UNIQUE constraint on
+-- realm_id (migration 031) stopped meaning anything the moment the column
+-- became ciphertext. AES-GCM uses a random nonce, so the same realm encrypts
+-- to a different value every time and the constraint can no longer prevent two
+-- tenants sharing a company file, which is what it was written to do. It is
+-- left in place here deliberately — a security fix going to production is the
+-- wrong change to widen into schema cleanup, and at one tenant, with an upsert
+-- keyed on tenant_id, it protects nothing either way. Drop it when the table
+-- is next altered for its own reasons.
 DELETE FROM qb_credentials;
 
 -- +goose Down

@@ -859,6 +859,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux
 	handler = deps.optionalCustomerSession(handler)
+	handler = crossOriginProtection(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/
 	handler = requestIDMiddleware(handler)
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
@@ -872,6 +873,31 @@ func NewRouter(deps *Deps) http.Handler {
 	}).Handle(handler)
 
 	return handler
+}
+
+// crossOriginProtection rejects cross-origin state-changing browser requests —
+// CSRF defence that does not require a token in every form.
+//
+// Until now the only defence was the session cookie's SameSite=Lax, which does
+// withhold the cookie on cross-site POST and so does stop the classic attack.
+// It was the whole defence though, resting on one cookie attribute, and
+// Intuit's security review tests for CSRF explicitly. This adds a second,
+// independent check: net/http's CrossOriginProtection reads Sec-Fetch-Site and
+// falls back to comparing Origin against Host, refusing anything a browser
+// labels cross-site — and also same-site, which means a sibling subdomain
+// (rockabilly-roasting.angmar.dev) posting to an absolute URL here would be
+// refused. Nothing does: every non-safe target in this app is a relative path,
+// so forms post same-origin wherever they are served from.
+//
+// It deliberately does NOT break the server-to-server callers. A request
+// carrying neither Sec-Fetch-Site nor Origin cannot have been made by a
+// browser on some other site's behalf, so it is allowed through — which is
+// what keeps the Stripe, Shippo and QuickBooks webhooks working. Safe methods
+// (GET, HEAD, OPTIONS) are never checked, so the QuickBooks OAuth callback,
+// which is a GET, is unaffected; it has its own signed state cookie anyway.
+func crossOriginProtection(next http.Handler) http.Handler {
+	protection := http.NewCrossOriginProtection()
+	return protection.Handler(next)
 }
 
 // bodyLimitOverrides raises the default body cap for the handful of routes that

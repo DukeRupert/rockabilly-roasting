@@ -88,6 +88,31 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 	}
 }
 
+// withPlainRealm returns a COPY of creds whose realm is decrypted.
+//
+// A copy, not a mutation, and that distinction is the whole point: the same
+// struct is written back to the database by the refresh path, where the realm
+// must still be ciphertext. Decrypting in place would persist the plaintext on
+// the next Upsert and quietly undo the encryption.
+//
+// Every path that hands credentials to a caller goes through here, because the
+// first version of this change decrypted only in readCredentials — and the
+// refresh path re-reads the row directly from the store inside its advisory
+// lock, so it returned the ciphertext realm straight into the QBO request URL.
+// One decrypt site per caller is how that happens; one helper is how it stops.
+func (c *QBClient) withPlainRealm(creds *domain.QBCredentials) (*domain.QBCredentials, error) {
+	if creds == nil {
+		return nil, nil
+	}
+	realm, err := c.decrypt(creds.RealmID)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt realm id: %w", err)
+	}
+	out := *creds
+	out.RealmID = realm
+	return &out, nil
+}
+
 // readCredentials reads the current stored credentials in a short read-only tx.
 func (c *QBClient) readCredentials(ctx context.Context) (*domain.QBCredentials, error) {
 	tx, err := c.pool.Begin(ctx)
@@ -100,7 +125,13 @@ func (c *QBClient) readCredentials(ctx context.Context) (*domain.QBCredentials, 
 	if err != nil {
 		return nil, fmt.Errorf("get QB credentials: %w", err)
 	}
-	return creds, tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	// The tokens beside the realm stay encrypted until their own use site:
+	// they are handed straight to Intuit, and the window where they sit
+	// decrypted in memory is worth keeping short.
+	return c.withPlainRealm(creds)
 }
 
 // ValidToken returns a valid access token, refreshing if it is within the
@@ -182,7 +213,7 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCre
 		if err := tx.Commit(ctx); err != nil {
 			return nil, err
 		}
-		return creds, nil
+		return c.withPlainRealm(creds)
 	}
 
 	// Check refresh token hasn't expired
@@ -231,7 +262,9 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCre
 	}
 
 	slog.Info("qb: token refreshed", "tenant_id", c.tenantID)
-	return creds, nil
+	// creds still carries the ciphertext realm, which is what Upsert just
+	// persisted and must stay that way. The caller gets the decrypted copy.
+	return c.withPlainRealm(creds)
 }
 
 // doAPI makes an authenticated JSON API request to QBO. On a 401 it forces a

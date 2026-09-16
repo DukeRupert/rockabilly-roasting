@@ -20,6 +20,15 @@ const sessionCookieName = "hiri_session"
 // session cookie. If no valid session exists, it redirects to the login page.
 func (d *Deps) requireStaffSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Nothing behind a session may be cached: these pages carry order
+		// history, customer addresses, and in the admin's case the settings
+		// that govern the shop. Set here rather than per handler so a route
+		// added tomorrow inherits it — Intuit's security requirements ask for
+		// no-store on authenticated pages, and a handler that forgets it is
+		// exactly the kind of omission nobody notices.
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || cookie.Value == "" {
 			redirectToStaffLogin(w, r)

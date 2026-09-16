@@ -953,7 +953,10 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 			Action:       audit.AuditQBConnected,
 			ResourceType: "qb_credentials",
 			ResourceID:   d.QB.TenantID(),
-			After:        map[string]any{"realm_id": creds.RealmID},
+			// The realm on creds is encrypted now, so read the plaintext from
+			// the callback Intuit just made. An audit row holding ciphertext
+			// would be worse than holding nothing: it reads as a value.
+			After: map[string]any{"realm_id": r.URL.Query().Get("realmId")},
 		})
 	})
 	if err != nil {
@@ -962,7 +965,7 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("qb: connected", "realm_id", creds.RealmID)
+	slog.Info("qb: connected", "realm_id", r.URL.Query().Get("realmId"))
 	redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks connected")
 }
 

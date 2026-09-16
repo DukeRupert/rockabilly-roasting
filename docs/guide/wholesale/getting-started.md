@@ -55,6 +55,18 @@ The portal is tailored to wholesale customers. It uses a separate cart from the 
 
 ## Logging Out
 
-To log out, use the logout action available in the site navigation. This posts to `/wholesale/logout`, ends your session, and redirects you away from the portal.
+**Sign out** is in the account menu on every page: the account icon in the top right on desktop, or the menu (three lines, top right) on a phone. It ends your session and returns you to the home page.
+
+Signing out also clears your wholesale cart, so finish and submit an order before you log out.
 
 After logging out, you will need to sign in again to access the wholesale portal. If you checked "Remember me" during login, your session will persist across browser restarts until you explicitly log out or the session expires.
+
+## Working With Two Accounts
+
+If you buy for more than one business, each one is a separate account with its own email address, pricing, order history, and addresses. One browser holds one session at a time, so you swap between them rather than having both open at once:
+
+1. Open the account menu and choose **Switch account**.
+2. Press **Sign out**.
+3. Sign in with the other business's email and password.
+
+Your cart clears on the way through, so a part-built order for one business can never follow you into the other. Submit one order before you switch.

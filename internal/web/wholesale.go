@@ -53,6 +53,19 @@ func setWholesaleCartCookie(w http.ResponseWriter, cartID uuid.UUID) {
 	})
 }
 
+// clearWholesaleCartCookie expires the wholesale cart cookie. Called on logout
+// so a cart never crosses from one account to the next on a shared device.
+func clearWholesaleCartCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     wholesaleCartCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 // wholesaleCartItemCount returns the cart item count for the wholesale cart cookie.
 func (d *Deps) wholesaleCartItemCount(r *http.Request) int {
 	cartID := getWholesaleCartID(r)

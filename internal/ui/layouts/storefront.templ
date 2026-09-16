@@ -16,6 +16,23 @@ func accountHref(c *domain.Customer) string {
 	return "/account"
 }
 
+// logoutHref returns the sign-out endpoint for the signed-in customer. The two
+// handlers differ in where they land the customer afterwards, so the header has
+// to post to the right one for the account it is showing.
+func logoutHref(c *domain.Customer) string {
+	if c != nil && c.AccountType == domain.AccountTypeWholesale {
+		return "/wholesale/logout"
+	}
+	return "/account/logout"
+}
+
+// isWholesale reports whether the header should offer the switch-account
+// shortcut: only wholesale buyers hold more than one account, and only they
+// have a sign-in page that accepts ?switch=1.
+func isWholesale(c *domain.Customer) bool {
+	return c != nil && c.AccountType == domain.AccountTypeWholesale
+}
+
 type StorefrontProps struct {
 	Title        string
 	Description  string
@@ -276,11 +293,37 @@ templ Storefront(props StorefrontProps) {
 						<div class="flex items-center gap-x-3">
 							<!-- Account link (desktop only) — icon when signed in, text when not -->
 							if c, ok := auth.CustomerFromContext(ctx); ok {
-								<a href={ templ.SafeURL(accountHref(c)) } title="Account" aria-label="Account" class="hidden sm:inline-flex items-center text-paper hover:text-candle transition-colors">
-									<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
-									</svg>
-								</a>
+								<!-- Signed in: account menu. Sign out used to live only inside the
+								     account pages, which left buyers with two accounts no way out
+								     of the one they were in — so it belongs on every page. -->
+								<div class="relative hidden sm:block" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+									<button
+										type="button"
+										@click="open = !open"
+										:aria-expanded="open ? 'true' : 'false'"
+										aria-haspopup="true"
+										aria-label="Account menu"
+										class="inline-flex items-center text-paper hover:text-candle transition-colors"
+									>
+										<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+										</svg>
+									</button>
+									<div
+										x-show="open"
+										x-transition.opacity.duration.200ms
+										style="display:none;"
+										class="absolute right-0 z-50 mt-2 w-48 border-2 border-ink bg-cream-hi shadow-stamp"
+									>
+										<a href={ templ.SafeURL(accountHref(c)) } class="block px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors" style="letter-spacing:0.14em; text-transform:uppercase;">Account</a>
+										if isWholesale(c) {
+											<a href="/wholesale/login?switch=1" class="block px-4 py-2.5 font-oswald font-bold text-xs text-ink border-t-2 border-ink hover:bg-paper hover:text-rust transition-colors" style="letter-spacing:0.14em; text-transform:uppercase;">Switch account</a>
+										}
+										<form method="POST" action={ templ.SafeURL(logoutHref(c)) } class="border-t-2 border-ink">
+											<button type="submit" class="block w-full text-left px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors" style="letter-spacing:0.14em; text-transform:uppercase;">Sign out</button>
+										</form>
+									</div>
+								</div>
 							} else {
 								<a href="/account/login" class="hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
 									Log In
@@ -322,6 +365,12 @@ templ Storefront(props StorefrontProps) {
 						<div class="border-t border-ink-soft mt-2 pt-2">
 							if c, ok := auth.CustomerFromContext(ctx); ok {
 								<a href={ templ.SafeURL(accountHref(c)) } class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Account</a>
+								if isWholesale(c) {
+									<a href="/wholesale/login?switch=1" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Switch account</a>
+								}
+								<form method="POST" action={ templ.SafeURL(logoutHref(c)) }>
+									<button type="submit" class="block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Sign out</button>
+								</form>
 							} else {
 								<a href="/account/login" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log In</a>
 							}

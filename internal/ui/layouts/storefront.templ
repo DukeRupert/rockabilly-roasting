@@ -296,7 +296,7 @@ templ Storefront(props StorefrontProps) {
 								<!-- Signed in: account menu. Sign out used to live only inside the
 								     account pages, which left buyers with two accounts no way out
 								     of the one they were in — so it belongs on every page. -->
-								<div class="relative hidden sm:block" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+								<div class="relative hidden sm:block" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false" @htmx:before-swap.window="open = false">
 									<button
 										type="button"
 										@click="open = !open"
@@ -357,7 +357,12 @@ templ Storefront(props StorefrontProps) {
 					</div>
 				</nav>
 				<!-- Mobile menu -->
-				<div id="sf-mobile-menu" class="hidden sm:hidden border-t border-ink-soft">
+				<!-- Collapsed by max-height rather than `hidden`, so the open and close
+				     can animate. `invisible` is applied once the collapse finishes, so a
+				     closed drawer is out of the tab order rather than a 0px-tall strip of
+				     focusable links. The transition is motion-safe: with reduced motion
+				     the drawer snaps. -->
+				<div id="sf-mobile-menu" class="sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear" style="max-height:0;" aria-hidden="true">
 					<div class="space-y-1 px-4 py-3 bg-ink">
 						<a href="/catalog" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Coffee</a>
 						<a href="/subscriptions" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Daily Grind</a>
@@ -546,13 +551,69 @@ templ Storefront(props StorefrontProps) {
 					var iconOpen = document.getElementById('sf-menu-icon-open');
 					var iconClose = document.getElementById('sf-menu-icon-close');
 					if (btn && menu) {
-						btn.addEventListener('click', function() {
-							var expanded = menu.classList.toggle('hidden') === false;
-							btn.setAttribute('aria-expanded', String(expanded));
-							if (iconOpen && iconClose) {
-								iconOpen.classList.toggle('hidden', expanded);
-								iconClose.classList.toggle('hidden', !expanded);
+						var menuOpen = false;
+						var settleTimer;
+
+						// Applied once the drawer has finished moving, and safe to run
+						// more than once: it only ever asserts the resting state of
+						// whichever direction we are in. An open drawer releases its
+						// measured height so it can still grow if its contents change; a
+						// closed one goes `invisible`, which takes its links out of the
+						// tab order — a 0px-tall strip of focusable links is worse than
+						// no drawer at all.
+						function settle() {
+							if (menuOpen) {
+								menu.style.maxHeight = 'none';
+							} else {
+								menu.classList.add('invisible');
 							}
+						}
+
+						// transitionend alone would not do. It never fires when the
+						// transition has no duration, which is exactly the case under
+						// prefers-reduced-motion (the motion-safe: classes drop out) and
+						// on the instant close below — so the timer is the one that
+						// settles those, and whichever arrives first wins.
+						menu.addEventListener('transitionend', function(evt) {
+							if (evt.propertyName === 'max-height') settle();
+						});
+
+						function setMenu(open, animate) {
+							menuOpen = open;
+							menu.style.transitionDuration = animate ? '' : '0s';
+							if (open) {
+								menu.classList.remove('invisible', 'opacity-0');
+								// max-height cannot transition to `auto`, so it animates to
+								// the drawer's own height; settle() releases it afterwards.
+								menu.style.maxHeight = menu.scrollHeight + 'px';
+							} else {
+								// There is nothing to transition from once the height has
+								// been released, so pin the current one for a frame first.
+								menu.style.maxHeight = menu.scrollHeight + 'px';
+								void menu.offsetHeight;
+								menu.style.maxHeight = '0';
+								menu.classList.add('opacity-0');
+							}
+							menu.setAttribute('aria-hidden', String(!open));
+							btn.setAttribute('aria-expanded', String(open));
+							if (iconOpen && iconClose) {
+								iconOpen.classList.toggle('hidden', open);
+								iconClose.classList.toggle('hidden', !open);
+							}
+							clearTimeout(settleTimer);
+							settleTimer = setTimeout(settle, animate ? 260 : 0);
+						}
+
+						btn.addEventListener('click', function() {
+							setMenu(!menuOpen, true);
+						});
+
+						// hx-boost swaps #main-content and leaves the header standing, so
+						// without this the drawer stays open over the page it just
+						// navigated to. Closed without animation: it should already be
+						// gone by the time the new content lands.
+						document.body.addEventListener('htmx:beforeSwap', function() {
+							if (menuOpen) setMenu(false, false);
 						});
 					}
 

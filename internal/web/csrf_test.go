@@ -52,6 +52,20 @@ func TestCrossOriginProtection(t *testing.T) {
 		}
 	})
 
+	t.Run("RFC 8058 one-click unsubscribe is allowed", func(t *testing.T) {
+		// Gmail and Apple Mail POST the List-Unsubscribe URL directly from
+		// their own infrastructure, with no Origin and no Sec-Fetch-Site —
+		// which is why these handlers read the token from the query string and
+		// expect no form. This is the weakest of the four allowances (mail
+		// provider behaviour, not a documented API contract) and the highest
+		// blast radius: Gmail requires working one-click unsubscribe from bulk
+		// senders, and a 403 here costs sending reputation rather than failing
+		// where anyone would see it.
+		for _, path := range []string{"/unsubscribe?token=x", "/wholesale/unsubscribe?token=x"} {
+			assert.Equal(t, http.StatusOK, call("POST", path, nil), path)
+		}
+	})
+
 	t.Run("safe methods are never checked", func(t *testing.T) {
 		// The QuickBooks OAuth callback is a cross-site GET by design — it is
 		// the return from Intuit's consent screen. It carries its own signed

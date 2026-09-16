@@ -884,7 +884,10 @@ func NewRouter(deps *Deps) http.Handler {
 // Intuit's security review tests for CSRF explicitly. This adds a second,
 // independent check: net/http's CrossOriginProtection reads Sec-Fetch-Site and
 // falls back to comparing Origin against Host, refusing anything a browser
-// labels cross-site.
+// labels cross-site — and also same-site, which means a sibling subdomain
+// (rockabilly-roasting.angmar.dev) posting to an absolute URL here would be
+// refused. Nothing does: every non-safe target in this app is a relative path,
+// so forms post same-origin wherever they are served from.
 //
 // It deliberately does NOT break the server-to-server callers. A request
 // carrying neither Sec-Fetch-Site nor Origin cannot have been made by a

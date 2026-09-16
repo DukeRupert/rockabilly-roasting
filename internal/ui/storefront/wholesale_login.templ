@@ -12,6 +12,11 @@ type WholesaleLoginProps struct {
 	// Redirect is the page the customer was trying to reach before being sent
 	// to log in. Carried on the form action so it survives the POST.
 	Redirect string
+	// SignedInAs names the account the browser is currently signed in to, set
+	// only when the buyer asked for this form on purpose (?switch=1). Buyers
+	// who run two companies land here to swap between them, and signing in as
+	// the second while still holding the first is the mistake to head off.
+	SignedInAs string
 }
 
 // loginAction appends the return destination to the form target when there is
@@ -44,6 +49,19 @@ templ WholesaleLoginContent(props WholesaleLoginProps) {
 			</div>
 			<!-- Card -->
 			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
+				if props.SignedInAs != "" {
+					<div class="mb-5 border-2 border-ink bg-paper p-4">
+						<p class="font-oswald text-ink text-sm leading-relaxed">
+							You're signed in as <span class="font-bold">{ props.SignedInAs }</span>. Sign out first, then sign in to the other account.
+						</p>
+						<form method="POST" action="/wholesale/logout" class="mt-3">
+							<input type="hidden" name="redirect" value="/wholesale/login"/>
+							<button type="submit" class="btn w-full border-2 border-ink bg-ink px-4 py-2 font-oswald font-bold text-xs text-paper hover:bg-rust transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
+								Sign out
+							</button>
+						</form>
+					</div>
+				}
 				if props.Error != "" {
 					<div class="mb-5 border-2 border-rust bg-paper p-3 text-center">
 						<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>

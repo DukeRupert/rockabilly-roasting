@@ -176,10 +176,12 @@ The "Default" badge will move to the selected address.
 
 ## Signing Out
 
-To sign out of your account:
+You can sign out from any page on the site:
 
-- **On desktop:** Click **Sign Out** at the bottom of the account sidebar.
-- **On mobile:** Scroll down to the bottom of any account page. The Sign Out option appears after the navigation pills (you may need to access it from the sidebar menu).
+- **On desktop:** Click the account icon in the top right, then **Sign Out**.
+- **On mobile:** Tap the menu (three lines, top right), then **Sign Out** at the bottom of the menu.
+
+**Sign Out** also still sits at the bottom of the account sidebar.
 
 After signing out, you are returned to the home page. You will need to request a new magic link the next time you want to sign in.
 
@@ -198,4 +200,4 @@ After signing out, you are returned to the home page. You will need to request a
 | Cancel a subscription | Account > Subscriptions > Cancel |
 | Add a shipping address | Account > Addresses > + Add address |
 | Change your default address | Account > Addresses > Set default |
-| Sign out | Account sidebar > Sign Out |
+| Sign out | Account menu (top right) > Sign Out |

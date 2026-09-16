@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -81,7 +82,15 @@ func customerContext(r *http.Request, customer *domain.Customer, user *domain.Cu
 }
 
 // clearCustomerCookie expires a stale or unusable session cookie so we do not
-// re-validate it on every subsequent request.
+// re-validate it on every subsequent request, and takes the wholesale cart
+// cookie with it.
+//
+// The cart is device-scoped rather than session-scoped, so on its own it
+// outlives whoever built it. Everything that ends a session goes through here
+// — both logouts, the self-revoke, and the three stale-cookie clears in the
+// middleware — which makes this the one place that has to remember. The other
+// half of the rule lives at the sign-in handlers, which drop the cart cookie
+// before writing a new session: see newCustomerSessionCookie.
 func clearCustomerCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     customerCookieName,
@@ -89,6 +98,30 @@ func clearCustomerCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+	})
+	clearWholesaleCartCookie(w)
+}
+
+// newCustomerSessionCookie writes the session cookie for a customer who has
+// just authenticated, first discarding any wholesale cart left on the device.
+//
+// The discard is the point. A buyer who runs two companies signs in as the
+// second one straight from the switch-account form, and without this the first
+// company's cart cookie rides along into the new session: their half-built
+// order turns up in the other company's portal, priced for a customer who is no
+// longer the one signed in. Carts are not re-authorized at checkout — only
+// re-priced — so a line one account can see and another cannot would otherwise
+// cross with it.
+func newCustomerSessionCookie(w http.ResponseWriter, secure bool, token string, maxAge time.Duration, sameSite http.SameSite) {
+	clearWholesaleCartCookie(w)
+	http.SetCookie(w, &http.Cookie{
+		Name:     customerCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(maxAge.Seconds()),
+		HttpOnly: true,
+		SameSite: sameSite,
+		Secure:   secure,
 	})
 }
 
@@ -308,15 +341,7 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
 
 		// SameSite=Strict for password logins (not a cross-site redirect from email).
-		http.SetCookie(w, &http.Cookie{
-			Name:     customerCookieName,
-			Value:    rawToken,
-			Path:     "/",
-			MaxAge:   int(sessions.CustomerSessionDuration.Seconds()),
-			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
-			Secure:   d.SecureCookies,
-		})
+		newCustomerSessionCookie(w, d.SecureCookies, rawToken, sessions.CustomerSessionDuration, http.SameSiteStrictMode)
 
 		redirectTo := safeNextOr(next, "/account")
 		if IsHTMX(r) {
@@ -612,18 +637,10 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     customerCookieName,
-		Value:    sessionToken,
-		Path:     "/",
-		MaxAge:   int(app.MagicLinkSessionDuration.Seconds()),
-		HttpOnly: true,
-		// Lax (not Strict) so the cookie attaches on the redirect that follows
-		// the cross-site click from the email — Strict would drop the cookie on
-		// the immediate hop to /account and bounce the user back to login.
-		SameSite: http.SameSiteLaxMode,
-		Secure:   d.SecureCookies,
-	})
+	// Lax (not Strict) so the cookie attaches on the redirect that follows the
+	// cross-site click from the email — Strict would drop the cookie on the
+	// immediate hop to /account and bounce the user back to login.
+	newCustomerSessionCookie(w, d.SecureCookies, sessionToken, app.MagicLinkSessionDuration, http.SameSiteLaxMode)
 
 	redirectTo := safeNextOr(r.URL.Query().Get("next"), "/account")
 
@@ -648,13 +665,7 @@ func (d *Deps) handleAccountLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     customerCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
+	clearCustomerCookie(w)
 
 	if IsHTMX(r) {
 		w.Header().Set("HX-Redirect", "/")
@@ -739,15 +750,51 @@ func (d *Deps) handleAccountPasswordSetup(w http.ResponseWriter, r *http.Request
 
 // --- Wholesale Login / Logout handlers ---
 
-func (d *Deps) handleWholesaleLoginPage(w http.ResponseWriter, r *http.Request) {
-	// If already logged in, redirect to portal.
-	cookie, err := r.Cookie(customerCookieName)
-	if err == nil && cookie.Value != "" {
-		http.Redirect(w, r, safeNextOr(r.URL.Query().Get("redirect"), "/wholesale/portal"), http.StatusSeeOther)
-		return
+// wholesaleAccountLabel is how a buyer recognizes which of their accounts a
+// session belongs to: the company name, falling back to the contact's name and
+// then the email. Kept here rather than on domain.Customer because it exists
+// for one line of copy on the sign-in page.
+func wholesaleAccountLabel(c *domain.Customer) string {
+	if c == nil {
+		return ""
 	}
+	if c.CompanyName != nil && strings.TrimSpace(*c.CompanyName) != "" {
+		return strings.TrimSpace(*c.CompanyName)
+	}
+	if name := strings.TrimSpace(c.FirstName + " " + c.LastName); name != "" {
+		return name
+	}
+	return c.Email
+}
+
+// handleWholesaleLoginPage renders the wholesale sign-in form. A customer who
+// already has a working session is sent on to the portal instead — except when
+// they arrive with ?switch=1, which is how somebody who runs two businesses
+// asks for the form on purpose. That escape hatch matters: buyers with an
+// account per company have no other way to reach this page, and a blind
+// redirect drops them back into the account they were trying to leave.
+//
+// The cookie is validated rather than merely sniffed. A stale or unusable one
+// used to bounce the buyer to the portal, which then cleared it and sent them
+// back here — a lap through two redirects to arrive where they started.
+func (d *Deps) handleWholesaleLoginPage(w http.ResponseWriter, r *http.Request) {
+	var signedInAs string
+	if cookie, err := r.Cookie(customerCookieName); err == nil && cookie.Value != "" {
+		customer, _, ok := d.resolveCustomerSession(r, cookie.Value)
+		switch {
+		case !ok:
+			clearCustomerCookie(w)
+		case r.URL.Query().Get("switch") != "1":
+			http.Redirect(w, r, safeNextOr(r.URL.Query().Get("redirect"), "/wholesale/portal"), http.StatusSeeOther)
+			return
+		default:
+			signedInAs = wholesaleAccountLabel(customer)
+		}
+	}
+
 	props := storefront.WholesaleLoginProps{
-		Redirect: safeNextOr(r.URL.Query().Get("redirect"), ""),
+		Redirect:   safeNextOr(r.URL.Query().Get("redirect"), ""),
+		SignedInAs: signedInAs,
 	}
 	if IsHTMX(r) {
 		storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -808,15 +855,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		duration = sessions.CustomerRememberMeDuration
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     customerCookieName,
-		Value:    rawToken,
-		Path:     "/",
-		MaxAge:   int(duration.Seconds()),
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-		Secure:   d.SecureCookies,
-	})
+	newCustomerSessionCookie(w, d.SecureCookies, rawToken, duration, http.SameSiteStrictMode)
 
 	redirect := safeNextOr(r.URL.Query().Get("redirect"), "/wholesale/portal")
 	if IsHTMX(r) {
@@ -840,17 +879,19 @@ func (d *Deps) handleWholesaleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     customerCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
+	// clearCustomerCookie drops the wholesale cart along with the session.
+	clearCustomerCookie(w)
+
+	// Signing out is usually the end of a visit, so the storefront home page is
+	// the right landing. The exception is the switch-account flow, which posts
+	// redirect=/wholesale/login: there the buyer is halfway through swapping
+	// companies, and dropping them on the home page makes them go hunt for the
+	// sign-in form they were just looking at.
+	dest := safeNextOr(r.FormValue("redirect"), "/")
 
 	if IsHTMX(r) {
-		w.Header().Set("HX-Redirect", "/")
+		w.Header().Set("HX-Redirect", dest)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }

@@ -342,7 +342,11 @@ templ LoadListTotals(props LoadListProps) {
 				<p class="mt-1 text-xs text-rr-muted">No delivery orders are checked, or none are waiting in this queue.</p>
 			</div>
 		} else {
-			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<!-- Stays a table at every width: this is the sheet the driver reads
+			     against what is actually on the van, and coffee/bags/pounds only
+			     works read across. overflow-x-auto so a long product name
+			     scrolls rather than being clipped away. -->
+			<div class="overflow-x-auto border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -413,8 +417,26 @@ templ loadListRoster(props LoadListProps) {
 				<p class="text-sm text-rr-body">No local delivery orders are waiting.</p>
 			</div>
 		} else {
-			<div class="overflow-hidden border border-rr-border bg-rr-surface">
-				<table class="min-w-full divide-y divide-rr-border">
+			<!-- One table at every width, restacked into rows on a phone by
+			     .stack-roster (see the admin layout's style block for why it is
+			     restyled rather than re-rendered as cards). -->
+			<div class="overflow-x-auto border border-rr-border bg-rr-surface">
+				<!-- thead is hidden below sm, so the select-all needs a home of its
+				     own there. It carries no name, so unlike the row checkboxes it
+				     is never submitted and a second copy costs nothing. -->
+				<div class="sm:hidden flex items-center border-b border-rr-border bg-rr-raised">
+					<label class="flex min-w-11 cursor-pointer items-center justify-center px-3 py-2">
+						<input
+							type="checkbox"
+							aria-label="Select all delivery orders"
+							class="size-5 cursor-pointer accent-rr-red"
+							checked?={ loadListSelectedCount(props.Orders) == len(props.Orders) }
+							@change="$el.closest('section').querySelectorAll('tbody input[type=checkbox]').forEach(c => c.checked = $el.checked); $el.closest('form').dispatchEvent(new Event('change', {bubbles: true}))"
+						/>
+					</label>
+					<span class="label-font text-xs text-rr-muted">Select all</span>
+				</div>
+				<table class="stack-roster min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
@@ -428,6 +450,9 @@ templ loadListRoster(props LoadListProps) {
 							</th>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
+							<!-- Placed stays md+. The rust leading-edge flag already says
+							     "this has been sitting" without a column, and on a phone the
+							     roster needs its width for the order and its state. -->
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
 						</tr>
 					</thead>
@@ -440,6 +465,15 @@ templ loadListRoster(props LoadListProps) {
 			</div>
 		}
 	</section>
+}
+
+// loadListRosterBadges is the roster's State cell, shared by the desktop row
+// and the phone card.
+templ loadListRosterBadges(row LoadListOrder) {
+	@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+	if row.AccountPastDue {
+		<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+	}
 }
 
 // loadListChannelBadge marks which queue a stop came out of. Teal for
@@ -456,20 +490,22 @@ templ loadListChannelBadge(channel domain.OrderChannel) {
 templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 	{{ stale := orderIsStale(row.Order, props.MerchantTZ, props.Now) }}
 	<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
-		<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
+		<td data-cell="select" class="relative z-10 w-12 p-0 sm:pl-2" @click.stop>
+			<label class="flex min-w-11 cursor-pointer items-center justify-center px-3 py-4">
 			<input
 				type="checkbox"
 				name="ids"
 				aria-label={ fmt.Sprintf("Include order %s in the load", row.Order.Number) }
-				class="size-4 cursor-pointer accent-rr-red"
+				class="size-5 cursor-pointer accent-rr-red"
 				value={ row.Order.ID.String() }
 				checked?={ row.Selected }
 				@click.stop
 			/>
+			</label>
 		</td>
-		<td class="py-4 pl-4 pr-3 text-sm">
+		<td data-cell="order" class="py-4 pl-4 pr-3 text-sm">
 			<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
-				<div class="flex items-baseline gap-2 leading-none">
+				<div class="flex flex-wrap items-baseline gap-2 leading-none">
 					<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
 					<!-- On a combined run the channel is load-out information —
 					     a driver stacking the van needs to know which drops are
@@ -485,12 +521,9 @@ templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 				<div class="mt-1.5 text-sm text-rr-body">{ row.CustomerName }</div>
 			</a>
 		</td>
-		<td class="whitespace-nowrap px-3 py-4 text-sm">
+		<td data-cell="state" class="px-3 py-4 text-sm">
 			<div class="flex flex-wrap items-center gap-1.5">
-				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
-				if row.AccountPastDue {
-					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
-				}
+				@loadListRosterBadges(row)
 			</div>
 		</td>
 		<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>

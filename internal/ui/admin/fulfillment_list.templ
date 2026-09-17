@@ -302,7 +302,10 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<!-- View tabs — stamped active tab + rust count chip, matching the
 	     orders list. -->
 	<section class="mt-5" aria-label="Filter fulfillment queue">
-		<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Fulfillment views">
+		<!-- Six tabs with counts wrap to three rows at 390px. Below sm they
+		     become one edge-to-edge scrolling strip, bled past the container's
+		     px-4 so the cut-off last chip reads as scrollable. -->
+		<nav class="scroll-chips -mx-4 flex items-center gap-2 overflow-x-auto px-4 label-font [&>a]:shrink-0 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" aria-label="Fulfillment views">
 			for _, tab := range props.tabs() {
 				<a href={ templ.SafeURL(fulfillmentTabHref(props.BasePath, tab)) } class={ adminTabClass(props.View == tab.Key) }>
 					<span>{ tab.Label }</span>
@@ -337,10 +340,10 @@ templ fulfillmentActionView(props FulfillmentListProps) {
 }
 
 templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps) {
-	<section id={ fulfillmentGroupAnchor(group.Method) } x-data={ fulfillmentGroupAlpineState(group) }>
-		<!-- Section header: method badge + row count, paired with the bulk
-		     action bar that animates in once any row in the group is selected. -->
-		<header class="flex flex-wrap items-end justify-between gap-3 mb-2">
+	<section id={ fulfillmentGroupAnchor(group.Method) } class="flex flex-col" x-data={ fulfillmentGroupAlpineState(group) }>
+		<!-- Section header: method badge + row count, plus the hint that the
+		     action bar replaces once any row in the group is selected. -->
+		<header class="flex flex-wrap items-end justify-between gap-3 mb-2 sm:order-1">
 			<div class="flex items-baseline gap-3">
 				<h2 class="text-rr-heading font-semibold tracking-wide uppercase text-sm">
 					{ fulfillmentGroupTitle(group.Method) }
@@ -354,175 +357,206 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 			     pack-and-ship workhorse and appears on every group; the
 			     state-changing verb (Buy labels / Mark picked up / Out for
 			     delivery) is method-specific. -->
-			<div
-				x-show="selected.length > 0"
-				x-cloak
-				x-transition:enter="transition ease-out duration-200"
-				x-transition:enter-start="opacity-0 -translate-y-1"
-				x-transition:enter-end="opacity-100 translate-y-0"
-				x-transition:leave="transition ease-in duration-150"
-				x-transition:leave-start="opacity-100"
-				x-transition:leave-end="opacity-0"
-				class="flex flex-wrap items-center gap-2"
-			>
+		</header>
+		<!-- Cards and table share one ordered slot so the action bar can sit
+		     between the heading and the rows on desktop while living last in
+		     the DOM — see the bar below for why it has to be last. -->
+		<div class="sm:order-3">
+			@fulfillmentGroupCards(group, props)
+			<!-- Table from sm up. overflow-x-auto rather than overflow-hidden: the
+			     clipped columns used to be unreachable rather than scrollable. -->
+			<div class="hidden sm:block overflow-x-auto border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
+								<input
+									type="checkbox"
+									aria-label={ "Select all " + fulfillmentGroupTitle(group.Method) + " orders" }
+									class="size-4 cursor-pointer accent-rr-red"
+									:checked="selected.length === allIds.length && allIds.length > 0"
+									:indeterminate="selected.length > 0 && selected.length < allIds.length"
+									@change="selected = $event.target.checked ? [...allIds] : []"
+								/>
+							</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, row := range group.Rows {
+							@fulfillmentRow(row, props)
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<!-- Bulk action bar — per-method verbs. Print packing slips is the
+		     pack-and-ship workhorse and appears on every group; the
+		     state-changing verb (Buy labels / Mark picked up / Out for delivery)
+		     is method-specific.
+		
+		     Last in the DOM on purpose. On a phone this docks to the bottom of
+		     the viewport with `sticky`, and a sticky box keeps its space in
+		     normal flow — placed between the heading and the rows it would leave
+		     a bar-shaped hole there as well as floating at the bottom. Last in
+		     flow, the space it keeps is the space it already occupies.
+		
+		     `sticky` rather than `fixed` because a sticky box is clamped to its
+		     parent's box: each group's bar rides only its own section, so two
+		     groups with selections can never stack on top of each other the way
+		     two fixed bars would. Desktop puts it back between the heading and
+		     the rows with order-2. -->
+		<div
+			x-show="selected.length > 0"
+			x-cloak
+			x-transition:enter="transition ease-out duration-200"
+			x-transition:enter-start="opacity-0 translate-y-1"
+			x-transition:enter-end="opacity-100 translate-y-0"
+			x-transition:leave="transition ease-in duration-150"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			class="sticky bottom-0 z-20 -mx-4 flex flex-col gap-2 border-t border-rr-border bg-rr-surface px-4 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.10)] sm:static sm:order-2 sm:mx-0 sm:mb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
+		>
+			<!-- sm:contents dissolves this row on desktop so the count and Clear
+			     rejoin the single flex line the bar has always been. On a phone
+			     they share one line instead of costing two. -->
+			<div class="flex items-center justify-between gap-2 sm:contents">
 				<span class="text-sm text-rr-heading">
 					<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
 				</span>
 				<button
 					type="button"
-					title="Open print-ready packing slips for each selected order in a new tab."
-					@click="window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')"
-					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-				>
-					Print packing slips
-				</button>
-				if group.Method != nil && *group.Method == domain.ShippingMethodShipped {
-					<button
-						type="button"
-						title="Open a print-ready invoice for each selected order in a new tab."
-						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
-						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-					>
-						Print invoices
-					</button>
-					<form method="post" action="/admin/orders/labels" class="contents">
-						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
-						<label for={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) } class="sr-only">Shipping service</label>
-						<select
-							id={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) }
-							name="service_code"
-							title="Carrier service used when buying labels in bulk."
-							class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
-						>
-							for _, opt := range ShippoServiceOptions {
-								<option value={ opt.Token }>{ opt.Label }</option>
-							}
-						</select>
-						<button
-							type="submit"
-							title="Buy a Shippo label for each selected order. Charges your Shippo account."
-							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
-							{ ConfirmJSAttrs(`{
-								title: 'Buy ' + selected.length + ' shipping label' + (selected.length === 1 ? '' : 's') + '?',
-								lead: 'Buys one label per selected order from Shippo, using the service picked to the left.',
-								points: [
-									'Your Shippo account is charged for every label bought.',
-									'Refunding a label afterwards is a request to the carrier, and only unused labels qualify.',
-									'The customer is not emailed — that happens when you mark the order shipped.',
-								],
-								confirm: 'Buy ' + selected.length + ' label' + (selected.length === 1 ? '' : 's'),
-								danger: true,
-							}`)... }
-						>
-							Buy labels
-						</button>
-					</form>
-				} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
-					<form method="post" action="/admin/orders/batch/ready-for-pickup" class="contents">
-						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
-						<input type="hidden" name="return_to" value={ props.BasePath }/>
-						<button
-							type="submit"
-							title="Mark each selected order ready for pickup and email the customer."
-							class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-							{ ConfirmJSAttrs(`{
-								title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' ready for pickup?',
-								lead: 'Tells each customer their order is waiting at the shop.',
-								points: [
-									'Every selected customer is emailed straight away.',
-									'There is no undo on the email — only mark orders that are actually on the shelf.',
-								],
-								confirm: 'Mark ready and email',
-							}`)... }
-						>
-							Mark ready for pickup
-						</button>
-					</form>
-					<form method="post" action="/admin/orders/batch/picked-up" class="contents">
-						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
-						<input type="hidden" name="return_to" value={ props.BasePath }/>
-						<button
-							type="submit"
-							title="Mark each selected order as picked up by the customer."
-							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
-							{ ConfirmJSAttrs(`{
-								title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' picked up?',
-								lead: 'Closes each selected order as collected.',
-								points: [
-									'No email is sent to the customer.',
-								],
-								confirm: 'Mark picked up',
-							}`)... }
-						>
-							Mark picked up
-						</button>
-					</form>
-				} else if group.Method != nil && *group.Method == domain.ShippingMethodLocalDelivery {
-					<form method="post" action="/admin/orders/batch/out-for-delivery" class="contents">
-						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
-						<input type="hidden" name="return_to" value={ props.BasePath }/>
-						<button
-							type="submit"
-							title="Email a delivery notification to each customer and mark the orders out for delivery."
-							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
-							{ ConfirmJSAttrs(`{
-								title: 'Send ' + selected.length + ' delivery notification' + (selected.length === 1 ? '' : 's') + '?',
-								lead: 'Emails each customer that their order is on the van, and marks the orders out for delivery.',
-								points: [
-									'Every selected customer is emailed straight away.',
-									'Send these as the van leaves, not while you are still loading it.',
-								],
-								confirm: 'Notify and mark out',
-							}`)... }
-						>
-							Out for delivery
-						</button>
-					</form>
-				} else {
-					<button
-						type="button"
-						title="Open a print-ready invoice for each selected order in a new tab."
-						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
-						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-					>
-						Print invoices
-					</button>
-				}
-				<button
-					type="button"
 					title="Deselect all rows."
 					@click="selected = []"
-					class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
+					class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised sm:order-last"
 				>
 					Clear
 				</button>
 			</div>
-		</header>
-		<div class="overflow-hidden border border-rr-border bg-rr-surface">
-			<table class="min-w-full divide-y divide-rr-border">
-				<thead class="bg-rr-raised">
-					<tr>
-						<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
-							<input
-								type="checkbox"
-								aria-label={ "Select all " + fulfillmentGroupTitle(group.Method) + " orders" }
-								class="size-4 cursor-pointer accent-rr-red"
-								:checked="selected.length === allIds.length && allIds.length > 0"
-								:indeterminate="selected.length > 0 && selected.length < allIds.length"
-								@change="selected = $event.target.checked ? [...allIds] : []"
-							/>
-						</th>
-						<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
-						<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
-						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-rr-border bg-rr-surface">
-					for _, row := range group.Rows {
-						@fulfillmentRow(row, props)
-					}
-				</tbody>
-			</table>
+			<div class="flex flex-wrap items-center gap-2 sm:contents">
+			<button
+				type="button"
+				title="Open print-ready packing slips for each selected order in a new tab."
+				@click="window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')"
+				class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+			>
+				Print packing slips
+			</button>
+			if group.Method != nil && *group.Method == domain.ShippingMethodShipped {
+				<button
+					type="button"
+					title="Open a print-ready invoice for each selected order in a new tab."
+					@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+				>
+					Print invoices
+				</button>
+				<form method="post" action="/admin/orders/labels" class="contents">
+					<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+					<label for={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) } class="sr-only">Shipping service</label>
+					<select
+						id={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) }
+						name="service_code"
+						title="Carrier service used when buying labels in bulk."
+						class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						for _, opt := range ShippoServiceOptions {
+							<option value={ opt.Token }>{ opt.Label }</option>
+						}
+					</select>
+					<button
+						type="submit"
+						title="Buy a Shippo label for each selected order. Charges your Shippo account."
+						class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						{ ConfirmJSAttrs(`{
+							title: 'Buy ' + selected.length + ' shipping label' + (selected.length === 1 ? '' : 's') + '?',
+							lead: 'Buys one label per selected order from Shippo, using the service picked to the left.',
+							points: [
+								'Your Shippo account is charged for every label bought.',
+								'Refunding a label afterwards is a request to the carrier, and only unused labels qualify.',
+								'The customer is not emailed — that happens when you mark the order shipped.',
+							],
+							confirm: 'Buy ' + selected.length + ' label' + (selected.length === 1 ? '' : 's'),
+							danger: true,
+						}`)... }
+					>
+						Buy labels
+					</button>
+				</form>
+			} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
+				<form method="post" action="/admin/orders/batch/ready-for-pickup" class="contents">
+					<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+					<input type="hidden" name="return_to" value={ props.BasePath }/>
+					<button
+						type="submit"
+						title="Mark each selected order ready for pickup and email the customer."
+						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+						{ ConfirmJSAttrs(`{
+							title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' ready for pickup?',
+							lead: 'Tells each customer their order is waiting at the shop.',
+							points: [
+								'Every selected customer is emailed straight away.',
+								'There is no undo on the email — only mark orders that are actually on the shelf.',
+							],
+							confirm: 'Mark ready and email',
+						}`)... }
+					>
+						Mark ready for pickup
+					</button>
+				</form>
+				<form method="post" action="/admin/orders/batch/picked-up" class="contents">
+					<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+					<input type="hidden" name="return_to" value={ props.BasePath }/>
+					<button
+						type="submit"
+						title="Mark each selected order as picked up by the customer."
+						class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						{ ConfirmJSAttrs(`{
+							title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' picked up?',
+							lead: 'Closes each selected order as collected.',
+							points: [
+								'No email is sent to the customer.',
+							],
+							confirm: 'Mark picked up',
+						}`)... }
+					>
+						Mark picked up
+					</button>
+				</form>
+			} else if group.Method != nil && *group.Method == domain.ShippingMethodLocalDelivery {
+				<form method="post" action="/admin/orders/batch/out-for-delivery" class="contents">
+					<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+					<input type="hidden" name="return_to" value={ props.BasePath }/>
+					<button
+						type="submit"
+						title="Email a delivery notification to each customer and mark the orders out for delivery."
+						class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						{ ConfirmJSAttrs(`{
+							title: 'Send ' + selected.length + ' delivery notification' + (selected.length === 1 ? '' : 's') + '?',
+							lead: 'Emails each customer that their order is on the van, and marks the orders out for delivery.',
+							points: [
+								'Every selected customer is emailed straight away.',
+								'Send these as the van leaves, not while you are still loading it.',
+							],
+							confirm: 'Notify and mark out',
+						}`)... }
+					>
+						Out for delivery
+					</button>
+				</form>
+			} else {
+				<button
+					type="button"
+					title="Open a print-ready invoice for each selected order in a new tab."
+					@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+				>
+					Print invoices
+				</button>
+			}
+			</div>
 		</div>
 	</section>
 }
@@ -534,7 +568,8 @@ templ fulfillmentFlatView(props FulfillmentListProps) {
 	if len(props.Rows) == 0 {
 		@fulfillmentEmptyState(props)
 	} else {
-		<div class="overflow-hidden border border-rr-border bg-rr-surface">
+		@fulfillmentFlatCards(props)
+		<div class="hidden sm:block overflow-x-auto border border-rr-border bg-rr-surface">
 			<table class="min-w-full divide-y divide-rr-border">
 				<thead class="bg-rr-raised">
 					<tr>
@@ -587,13 +622,7 @@ templ fulfillmentRow(row OrderRow, props FulfillmentListProps) {
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm">
 			<div class="flex flex-wrap items-center gap-1.5">
-				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
-				if row.LabelFailed {
-					<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
-				}
-				if row.AccountPastDue {
-					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
-				}
+				@fulfillmentRowBadges(row)
 			</div>
 		</td>
 		<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
@@ -623,10 +652,7 @@ templ fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) {
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm">
 			<div class="flex flex-wrap items-center gap-1.5">
-				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
-				if row.AccountPastDue {
-					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
-				}
+				@fulfillmentFlatRowBadges(row)
 			</div>
 		</td>
 		<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
@@ -640,6 +666,127 @@ templ fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) {
 			{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
 		</td>
 	</tr>
+}
+
+// fulfillmentRowBadges is the State cell's badge cluster for the action views.
+// Shared by the desktop row and the phone card so the two cannot drift.
+templ fulfillmentRowBadges(row OrderRow) {
+	@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+	if row.LabelFailed {
+		<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
+	}
+	if row.AccountPastDue {
+		<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+	}
+}
+
+// fulfillmentFlatRowBadges is the same for post-handoff views, which carry no
+// label-failure state — the label is already bought and the order has shipped.
+templ fulfillmentFlatRowBadges(row OrderRow) {
+	@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+	if row.AccountPastDue {
+		<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+	}
+}
+
+// fulfillmentCardBody is the phone rendering of one queue row: everything the
+// desktop columns carry, stacked. showShipVia is set on the post-handoff views,
+// which have no per-method grouping to answer "how is this going out?".
+//
+// "Shipped" is a shipping *method* there, not a fulfillment state; the table's
+// "Ship via" header says so and a card has no header, so the card carries the
+// word instead.
+templ fulfillmentCardBody(row OrderRow, tz *time.Location, now time.Time, showShipVia bool) {
+	{{ stale := orderIsStale(row.Order, tz, now) }}
+	<div class="flex items-baseline justify-between gap-2">
+		<div class="flex min-w-0 items-baseline gap-2">
+			<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
+			if row.AccountType == domain.AccountTypeWholesale {
+				<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
+			}
+		</div>
+		<span class={ "shrink-0 text-xs tabular-nums", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
+			{ relativeOrderDate(row.Order.PlacedAt, tz, now) }
+		</span>
+	</div>
+	<div class="mt-1 truncate text-sm text-rr-body">{ row.CustomerName }</div>
+	if row.CustomerEmail != "" {
+		<div class="truncate text-xs text-rr-muted">{ row.CustomerEmail }</div>
+	}
+	<div class="mt-2 flex flex-wrap items-center gap-1.5">
+		if showShipVia {
+			@fulfillmentFlatRowBadges(row)
+			if row.Order.ShippingMethod != "" {
+				<span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+					<span class="label-font text-[0.65rem] text-rr-muted">Via</span>
+					@ShippingMethodBadge(row.Order.ShippingMethod)
+				</span>
+			}
+		} else {
+			@fulfillmentRowBadges(row)
+		}
+	</div>
+}
+
+// fulfillmentGroupCards is the phone form of one method group's table.
+//
+// Unlike the orders list, selection stays on the phone here. These queues are
+// the one place in admin where the bulk verbs are phone-shaped work — marking a
+// shelf of orders ready for pickup, or sending the van out as it leaves — so
+// the checkboxes come along. They get a full-height 44px hit column rather than
+// the table's bare 16px box, which is not a target you can hit standing up.
+templ fulfillmentGroupCards(group FulfillmentGroup, props FulfillmentListProps) {
+	<div class="sm:hidden border border-rr-border bg-rr-surface">
+		<div class="flex items-center border-b border-rr-border bg-rr-raised">
+			<label class="flex min-w-11 cursor-pointer items-center justify-center self-stretch px-3 py-2">
+				<input
+					type="checkbox"
+					aria-label={ "Select all " + fulfillmentGroupTitle(group.Method) + " orders" }
+					class="size-5 cursor-pointer accent-rr-red"
+					:checked="selected.length === allIds.length && allIds.length > 0"
+					:indeterminate="selected.length > 0 && selected.length < allIds.length"
+					@change="selected = $event.target.checked ? [...allIds] : []"
+				/>
+			</label>
+			<span class="label-font text-xs text-rr-muted">Select all</span>
+		</div>
+		<ul class="divide-y divide-rr-border">
+			for _, row := range group.Rows {
+				{{ stale := orderIsStale(row.Order, props.MerchantTZ, props.Now) }}
+				<li class={ "row-link flex items-stretch", templ.KV("row-link-stale", stale) }>
+					<label class="relative z-10 flex min-w-11 shrink-0 cursor-pointer items-start justify-center px-3 py-3" @click.stop>
+						<input
+							type="checkbox"
+							aria-label={ fmt.Sprintf("Select order %s", row.Order.Number) }
+							class="size-5 cursor-pointer accent-rr-red"
+							value={ row.Order.ID.String() }
+							x-model="selected"
+							@click.stop
+						/>
+					</label>
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block min-w-0 flex-1 py-3 pr-3">
+						@fulfillmentCardBody(row, props.MerchantTZ, props.Now, false)
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+// fulfillmentFlatCards is the phone form of the post-handoff queues. No
+// selection: nothing on Shipped/Delivered/All has a bulk verb.
+templ fulfillmentFlatCards(props FulfillmentListProps) {
+	<div class="sm:hidden border border-rr-border bg-rr-surface">
+		<ul class="divide-y divide-rr-border">
+			for _, row := range props.Rows {
+				<li class="row-link">
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block px-3 py-3">
+						@fulfillmentCardBody(row, props.MerchantTZ, props.Now, true)
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
 }
 
 // batchActionResultBanner renders the staff-facing summary of a just-completed

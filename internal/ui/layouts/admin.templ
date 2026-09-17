@@ -538,13 +538,19 @@ templ Admin(props AdminProps) {
 				}
 				.action-hint {
 					position: absolute;
-					/* Below the trigger, not above it. Action rows sit near the top
-					   of the content and the mobile top bar is z-40, so anything
-					   opening upward got painted over. There is always room below.
-					   (This used to be two problems: #main-content-wrapper was also
-					   a scroll container that clipped an upward hint outright. It is
-					   overflow-x-clip since v1.123.0 and no longer clips — see the
-					   note on <body>. The z-40 top bar is reason enough on its own.) */
+					/* Below the trigger, not above it: action rows sit near the top of
+					   the content, so an upward hint runs off the top of the viewport.
+					   There is always room below. That is the whole of the live reason.
+
+					   Two other reasons are spent, and are recorded only because both
+					   have been re-asserted after they stopped being true.
+					   #main-content-wrapper was a scroll container that clipped an
+					   upward hint outright; it is overflow-x-clip since v1.123.0 and
+					   clips nothing — see the note on <body>. And the z-40 mobile top
+					   bar used to paint over the hint, back when ab1807b found it at
+					   z-index: 30; that same commit raised it to the z-index: 50 set
+					   below, which is why the line under it reads "above the ... top
+					   bar (z-40)". Neither is a constraint on this rule any more. */
 					top: calc(100% + 6px);
 					left: 0;
 					/* Above the sticky mobile top bar (z-40). */

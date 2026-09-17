@@ -43,3 +43,6 @@ jobs:
             docker compose pull
             docker compose down || true
             docker compose up -d
+            # Each build is tagged dev-<sha>, so stale images pile up *tagged* and
+            # a dangling-only prune never catches them; -a is required here.
+            docker image prune -af --filter "until=168h"

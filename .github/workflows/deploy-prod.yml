@@ -43,3 +43,7 @@ jobs:
             cd ${{ secrets.PROD_VPS_DEPLOY_PATH }}
             docker compose pull
             docker compose up -d
+            # Each deploy orphans the previous :latest as an untagged image.
+            # Keep a week of them for a fast local rollback; every release is
+            # also on Docker Hub by tag, so older ones are just disk.
+            docker image prune -af --filter "until=168h"

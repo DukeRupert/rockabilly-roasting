@@ -104,16 +104,43 @@ func buyBarScript(t *testing.T, html string) string {
 	require.NotEqual(t, -1, i, "expected the mobile buy bar script")
 	end := strings.Index(html[i:], "</script>")
 	require.NotEqual(t, -1, end, "expected the buy bar script to be closed")
-	script := html[i : i+end]
-	// Strip line comments so prose cannot stand in for behaviour.
-	var code []string
-	for _, line := range strings.Split(script, "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
-			continue
+	return stripJSComments(html[i : i+end])
+}
+
+// stripJSComments removes // comments, including trailing ones on a line of
+// code, leaving anything inside a string literal alone. Comments are stripped
+// because templ emits them verbatim: an assertion that a behaviour is present
+// would otherwise be satisfied by the sentence explaining that behaviour, which
+// is how the first version of these tests passed against a bar with the code
+// deleted and the comment left in place.
+func stripJSComments(script string) string {
+	var out strings.Builder
+	var quote rune
+	runes := []rune(script)
+	for i := 0; i < len(runes); i++ {
+		c := runes[i]
+		switch {
+		case quote != 0:
+			out.WriteRune(c)
+			if c == '\\' && i+1 < len(runes) {
+				i++
+				out.WriteRune(runes[i])
+			} else if c == quote {
+				quote = 0
+			}
+		case c == '\'' || c == '"' || c == '`':
+			quote = c
+			out.WriteRune(c)
+		case c == '/' && i+1 < len(runes) && runes[i+1] == '/':
+			for i < len(runes) && runes[i] != '\n' {
+				i++
+			}
+			out.WriteRune('\n')
+		default:
+			out.WriteRune(c)
 		}
-		code = append(code, line)
 	}
-	return strings.Join(code, "\n")
+	return out.String()
 }
 
 // The sticky bar is the only buy control a phone customer sees once the real buy
@@ -127,9 +154,14 @@ func TestMobileBuyBarDrivesTheRealForm(t *testing.T) {
 	assert.Contains(t, script, `querySelector('#onetime-form form')`,
 		"the bar should submit the real add-to-cart form rather than post on its own")
 
-	barTag := html[strings.Index(html, `<button id="mobile-buy-action"`):]
-	barTag = barTag[:strings.Index(barTag, ">")]
-	assert.NotContains(t, barTag, "hx-post",
+	// Located by id alone, so attribute order is not part of the contract, and
+	// required before slicing so a miss fails rather than panics.
+	btn := strings.Index(html, `id="mobile-buy-action"`)
+	require.NotEqual(t, -1, btn, "expected the bar's action button")
+	tagStart := strings.LastIndex(html[:btn], "<button")
+	require.NotEqual(t, -1, tagStart, "expected an opening button tag")
+	tagEnd := strings.Index(html[btn:], ">") + btn
+	assert.NotContains(t, html[tagStart:tagEnd], "hx-post",
 		"the bar's button must not carry its own cart endpoint")
 
 	assert.Contains(t, script, `classList.toggle('invisible'`,

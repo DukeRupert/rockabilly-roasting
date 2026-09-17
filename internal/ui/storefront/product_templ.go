@@ -767,7 +767,7 @@ func mobileBuyBar(props ProductDetailProps) templ.Component {
 			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div id=\"mobile-buy-bar\" class=\"sm:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-[transform,visibility] motion-safe:duration-200 motion-safe:ease-linear\" style=\"padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));\" aria-hidden=\"true\"><div class=\"flex items-center gap-3\"><div class=\"min-w-0 flex-shrink-0\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div id=\"mobile-buy-bar\" class=\"sm:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-[translate,visibility] motion-safe:duration-200 motion-safe:ease-linear\" style=\"padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));\" aria-hidden=\"true\"><div class=\"flex items-center gap-3\"><div class=\"min-w-0 flex-shrink-0\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,0 +1,75 @@
+name: CI
+
+# The gate that was missing. `mage check` existed and was only ever run by
+# whoever remembered to; nothing verified a branch before it merged, and the
+# deploy workflows build straight from a tag. This runs the same gate on every
+# pull request and on the branches that get deployed from.
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+# A force-push supersedes the run it interrupted — no point finishing a check
+# on a commit nobody will merge.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/checkout/package-lock.json
+
+      # Derived from go.mod rather than pinned here, because the version has to
+      # match the one that generated the committed files or CheckTemplSync
+      # rewrites every artifact with a different version header and fails on a
+      # clean tree. Deriving it also means this cannot drift the way the
+      # Dockerfile's hardcoded pin has (it currently installs an older CLI than
+      # go.mod requires, despite a comment saying they are kept in step).
+      - name: Install templ (version from go.mod)
+        run: |
+          TEMPL_VERSION="$(go list -m -f '{{.Version}}' github.com/a-h/templ)"
+          echo "templ $TEMPL_VERSION"
+          go install "github.com/a-h/templ/cmd/templ@${TEMPL_VERSION}"
+
+      - name: Install node dependencies
+        run: |
+          npm ci
+          npm ci --prefix ui/checkout
+
+      - name: Install mage
+        run: go install github.com/magefile/mage@latest
+
+      # Runs vet, the scoping check, the admin-UI lint, both generated-artifact
+      # sync checks, and the full test suite. The testcontainer-backed packages
+      # need a Docker daemon, which the ubuntu runner provides.
+      - name: mage check
+        run: mage check
+
+      # The sync checks rebuild in place, so anything still dirty here is drift
+      # they corrected. `mage check` already fails in that case; this catches a
+      # generator whose output is not reproducible, which would otherwise show
+      # up as a mysteriously dirty tree on someone's machine instead.
+      - name: Fail on an unexpectedly dirty tree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree is dirty after mage check:"
+            git status --porcelain
+            git diff --stat
+            exit 1
+          fi

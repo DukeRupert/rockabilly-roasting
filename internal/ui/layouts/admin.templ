@@ -539,10 +539,12 @@ templ Admin(props AdminProps) {
 				.action-hint {
 					position: absolute;
 					/* Below the trigger, not above it. Action rows sit near the top
-					   of the content, #main-content-wrapper is a scroll container
-					   (overflow-x:hidden computes overflow-y to auto, which clips),
-					   and the mobile top bar is z-40 — so anything opening upward
-					   got cut off or painted over. There is always room below. */
+					   of the content and the mobile top bar is z-40, so anything
+					   opening upward got painted over. There is always room below.
+					   (This used to be two problems: #main-content-wrapper was also
+					   a scroll container that clipped an upward hint outright. It is
+					   overflow-x-clip since v1.123.0 and no longer clips — see the
+					   note on <body>. The z-40 top bar is reason enough on its own.) */
 					top: calc(100% + 6px);
 					left: 0;
 					/* Above the sticky mobile top bar (z-40). */

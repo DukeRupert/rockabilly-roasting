@@ -520,6 +520,16 @@ templ OrderListContent(props OrderListProps) {
 					}
 					<span class="text-rr-muted" aria-hidden="true" x-text="open ? '\u2212' : '+'"></span>
 				</button>
+				<!-- "Clear all" clears search and sort too, and those are narrowing
+				     the list from controls outside this strip — so it cannot live
+				     inside it. A sort applied from a column header left the link
+				     rendered at height 0 in a collapsed strip whose Filters button
+				     showed no badge, with no way to get back to an unfiltered list
+				     on a phone. Mobile gets its own copy out here; the desktop copy
+				     stays beside Apply, where the strip is always open anyway. -->
+				if anyOrderFilterActive(props) {
+					<a href={ templ.SafeURL(props.BasePath) } class="sm:hidden mt-3 ml-3 inline-flex items-center text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
+				}
 				<div id="orders-filter-strip" class="hidden sm:block" :style="open ? 'display:block' : ''">
 			<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
 				@orderPillRow(props, "Payment", "payment", props.Payment, orderPaymentPills)
@@ -551,7 +561,7 @@ templ OrderListContent(props OrderListProps) {
 				</div>
 				<button type="submit" class="btn-secondary">Apply</button>
 				if anyOrderFilterActive(props) {
-					<a href={ templ.SafeURL(props.BasePath) } class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
+					<a href={ templ.SafeURL(props.BasePath) } class="hidden pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt sm:inline">Clear all</a>
 				}
 			</div>
 				</div>
@@ -963,12 +973,16 @@ func orderSortIndicator(col, current string) string {
 	return ""
 }
 
-// anyOrderFilterActive reports whether anything beyond the default view is
-// narrowing the list — drives the "Clear all" escape hatch.
 // orderSecondaryFilterCount counts the narrowing filters that live in the
 // collapsible strip below the tabs. Drives the count on the mobile "Filters"
 // button, so a collapsed strip can still say it is doing something — a hidden
 // filter the operator forgot about is how a list comes to look broken.
+//
+// Deliberately narrower than anyOrderFilterActive: search and sort narrow the
+// list too, but they have their own controls outside this strip, so counting
+// them here would badge the strip for something it does not contain. That
+// difference is why "Clear all" cannot live inside the strip — see its comment
+// at the use site.
 func orderSecondaryFilterCount(p OrderListProps) int {
 	n := 0
 	for _, v := range []string{p.Payment, p.Fulfillment, p.Range, p.Min, p.Max} {
@@ -979,6 +993,9 @@ func orderSecondaryFilterCount(p OrderListProps) int {
 	return n
 }
 
+// anyOrderFilterActive reports whether anything beyond the default view is
+// narrowing the list — drives the "Clear all" escape hatch. Wider than
+// orderSecondaryFilterCount: it counts search and sort as well.
 func anyOrderFilterActive(p OrderListProps) bool {
 	return p.Search != "" || p.Payment != "" || p.Fulfillment != "" ||
 		p.Range != "" || p.Min != "" || p.Max != "" || p.Sort != "" && p.Sort != "placed_desc"

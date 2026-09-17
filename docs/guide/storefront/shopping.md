@@ -116,6 +116,13 @@ Click the red "Add to Cart" button to add the selected variant to your cart. You
 - For subscriptions, you choose quantity with the +/- controls before clicking "Subscribe & Save"
 - After adding, the cart badge in the header updates to show your new item count
 
+**On a phone**, once the buy box scrolls out of view a bar sticks to the bottom of
+the screen carrying the current price and one button -- "Add to Cart", or
+"Subscribe & Save" when you have switched to Subscribe. It drives the same
+controls further up the page, so the variant and quantity you picked still apply.
+After a successful add it confirms with "Added" and offers a "View cart" link,
+since the cart badge at the top of the page is off screen at that point.
+
 An "In stock and ready to ship" indicator appears below the buy button.
 
 ## Your Cart
@@ -124,25 +131,38 @@ Click the cart icon in the top-right corner of any page to go to your cart at `/
 
 ### Cart Contents
 
-If your cart has items, you will see a table with:
+If your cart has items, each one shows:
 
-| Column | Description |
+| Part | Description |
 |--------|-------------|
-| Product | Product name and SKU code |
-| Price | Unit price for this variant |
-| Quantity | A number input with an "Update" button |
-| Total | Line total (unit price times quantity) |
-| Remove | A "Remove" link to delete the item |
+| Product | Product name, linking back to the product page |
+| Variant | The options chosen, e.g. "12oz - whole bean" |
+| Price | Unit price for this variant, shown as "price - ea" |
+| Quantity | Minus and plus buttons around the current quantity |
+| Total | Line total (unit price times quantity), shown beside the name |
+| Remove | A "Remove" button to delete the item |
 
 ### Updating Quantities
 
-Change the number in the quantity field and click "Update" to recalculate the line total and subtotal. The minimum quantity is 1.
+Tap the minus or plus button beside the quantity. The line total and subtotal
+recalculate on their own -- there is no separate "Update" button to press. Several
+quick taps are grouped into a single update, so tapping plus three times costs one
+recalculation rather than three.
+
+The minimum quantity is 1 (the minus button is disabled there) and the maximum is
+99. To remove an item entirely, use "Remove" rather than lowering the quantity.
+
+You can also type directly into the quantity box; the update applies when you
+leave the field or press Enter.
 
 ### Removing Items
 
 Click "Remove" next to any item to take it out of your cart. The cart updates immediately.
 
 ### Subtotal and Next Steps
+
+On a phone, a bar sticks to the bottom of the screen with the running total and a
+Checkout button whenever the summary card itself is scrolled out of view.
 
 Below the item list you will see:
 

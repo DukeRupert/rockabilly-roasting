@@ -53,6 +53,10 @@
   let couponBusy = $state(false);
   let pricingVersion = $state(0);
 
+  // Mobile-only: the collapsed order summary above the steps. Collapsed by
+  // default so the first form field stays near the top of a phone screen.
+  let summaryOpen = $state(false);
+
   const steps: { key: Step; label: string }[] = [
     { key: 'information', label: 'Information' },
     { key: 'payment', label: 'Payment' },
@@ -337,40 +341,7 @@
         </a>
       </div>
     {:else if cart}
-      <div class="lg:grid lg:grid-cols-5 lg:gap-x-10">
-        <!-- Main content -->
-        <div class="lg:col-span-3">
-          {#if step === 'information'}
-            <Information {cart} onComplete={handleAddressComplete} />
-          {:else if step === 'payment'}
-            <Payment
-              {cart}
-              {stripeKey}
-              {customerId}
-              {addressId}
-              {eligibleLocalMethods}
-              {localPickupInstructions}
-              {localDeliveryDays}
-              {localDeliveryDate}
-              {localDeliveryCutoff}
-              shippingMethod={chosenShippingMethod}
-              {pricingVersion}
-              onShippingMethodChange={handleShippingMethodChange}
-              totalsLoaded={handleTotalsLoaded}
-              onBack={() => (step = 'information')}
-            />
-          {/if}
-        </div>
-
-        <!-- Order summary sidebar -->
-        <aside class="mt-10 lg:mt-0 lg:col-span-2">
-          <div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-7 lg:sticky lg:top-24">
-            <p
-              class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink"
-              style="letter-spacing:0.24em; text-transform:uppercase;"
-            >
-              Order summary
-            </p>
+        {#snippet orderSummary(scope: string)}
             <ul class="divide-y-2 divide-ink/30">
               {#each cart.items as item}
                 <li class="py-3 flex items-start gap-3">
@@ -432,9 +403,9 @@
                 </div>
               {:else}
                 <form onsubmit={handleApplyCoupon} class="flex gap-2">
-                  <label for="coupon-code" class="sr-only">Coupon code</label>
+                  <label for={`${scope}-coupon-code`} class="sr-only">Coupon code</label>
                   <input
-                    id="coupon-code"
+                    id={`${scope}-coupon-code`}
                     type="text"
                     bind:value={couponInput}
                     placeholder="Coupon code"
@@ -511,6 +482,91 @@
                 {formatCents(totals ? totals.amount : cart.subtotal)}
               </span>
             </div>
+        {/snippet}
+
+        <!-- Mobile order summary. The sidebar only sticks at lg; on a phone it
+             sits below the form, so the total the customer is about to pay is
+             two screens away from the pay button. Collapsed by default so it
+             doesn't push the first field down. -->
+        <div class="lg:hidden mb-6 border-2 border-ink bg-cream-hi shadow-stamp">
+          <button
+            type="button"
+            onclick={() => (summaryOpen = !summaryOpen)}
+            aria-expanded={summaryOpen}
+            aria-controls="mobile-order-summary"
+            class="flex w-full items-center justify-between gap-3 px-5 py-4 min-h-12 text-left"
+          >
+            <span
+              class="font-oswald font-bold text-candle text-[11px]"
+              style="letter-spacing:0.24em; text-transform:uppercase;"
+            >
+              Order summary
+            </span>
+            <span class="flex items-center gap-2">
+              <span class="font-special text-ink text-base"
+                >{formatCents(totals ? totals.amount : cart.subtotal)}</span
+              >
+              <svg
+                class="size-4 text-ink motion-safe:transition-transform"
+                class:rotate-180={summaryOpen}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2.5"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </span>
+          </button>
+          <!-- Rendered whether or not it is open, so the button's aria-controls
+               reference resolves; hidden collapses it and takes its contents out
+               of the tab order. The mobile and desktop copies scope their input
+               ids so the two summaries never collide. -->
+          <div
+            id="mobile-order-summary"
+            hidden={!summaryOpen}
+            class="px-5 pb-5 pt-4 border-t-2 border-ink"
+          >
+            {@render orderSummary('mobile')}
+          </div>
+        </div>
+
+      <div class="lg:grid lg:grid-cols-5 lg:gap-x-10">
+        <!-- Main content -->
+        <div class="lg:col-span-3">
+          {#if step === 'information'}
+            <Information {cart} onComplete={handleAddressComplete} />
+          {:else if step === 'payment'}
+            <Payment
+              {cart}
+              {stripeKey}
+              {customerId}
+              {addressId}
+              {eligibleLocalMethods}
+              {localPickupInstructions}
+              {localDeliveryDays}
+              {localDeliveryDate}
+              {localDeliveryCutoff}
+              shippingMethod={chosenShippingMethod}
+              {pricingVersion}
+              onShippingMethodChange={handleShippingMethodChange}
+              totalsLoaded={handleTotalsLoaded}
+              onBack={() => (step = 'information')}
+            />
+          {/if}
+        </div>
+
+        <!-- Order summary sidebar (desktop) -->
+        <aside class="hidden lg:block lg:mt-0 lg:col-span-2">
+          <div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-7 lg:sticky lg:top-24">
+            <p
+              class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink"
+              style="letter-spacing:0.24em; text-transform:uppercase;"
+            >
+              Order summary
+            </p>
+            {@render orderSummary('desktop')}
           </div>
         </aside>
       </div>

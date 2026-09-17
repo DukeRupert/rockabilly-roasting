@@ -190,8 +190,8 @@
       />
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
-      <div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div class="col-span-2 sm:col-span-1">
         <label for="city" class={labelClasses} style={labelStyle}>City</label>
         <input
           id="city"

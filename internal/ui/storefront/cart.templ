@@ -75,6 +75,32 @@ func cartAnalyticsScript(props CartPageProps) string {
 	return `<script id="ga-cart-data" type="application/json">` + string(b) + `</script>`
 }
 
+// cartQtyState returns the Alpine component backing a cart line's quantity
+// stepper. The minus/plus buttons submit the form themselves after a short
+// debounce, so rapid taps collapse into one request instead of one swap each.
+func cartQtyState(qty int) string {
+	return fmt.Sprintf(`{
+		qty: %d,
+		timer: null,
+		clamp() {
+			let v = parseInt(this.qty, 10);
+			if (isNaN(v) || v < 1) v = 1;
+			else if (v > 99) v = 99;
+			this.qty = v;
+		},
+		bump(delta) {
+			const next = Math.max(1, Math.min(99, this.qty + delta));
+			if (next === this.qty) return;
+			this.qty = next;
+			this.queue();
+		},
+		queue() {
+			clearTimeout(this.timer);
+			this.timer = setTimeout(() => this.$root.requestSubmit(), 400);
+		}
+	}`, qty)
+}
+
 templ CartContent(props CartPageProps) {
 	<!-- Full-bleed paper surface -->
 	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
@@ -119,7 +145,12 @@ templ CartContent(props CartPageProps) {
 						</div>
 						<ul class="divide-y-2 divide-ink">
 							for _, item := range props.Items {
-								<li class="py-5 flex flex-col sm:flex-row sm:items-start gap-4">
+								<!-- One row at every width: thumbnail, then details with the
+								     line total pinned right and the controls underneath. The
+								     old stacked-on-mobile version ran ~320px per line, which
+								     pushed the checkout button off a phone screen after a
+								     single item. -->
+								<li class="py-5 flex items-start gap-4">
 									<!-- Thumbnail -->
 									<a
 										href={ templ.SafeURL("/catalog/" + item.ProductSlug) }
@@ -142,80 +173,100 @@ templ CartContent(props CartPageProps) {
 											</span>
 										}
 									</a>
-									<!-- Title + variant -->
+									<!-- Details: title, variant, unit price, line total, controls -->
 									<div class="flex-1 min-w-0">
-										<h3 class="font-slab text-ink uppercase leading-[0.95] text-lg sm:text-xl" style="letter-spacing:-0.005em;">
-											<a href={ templ.SafeURL("/catalog/" + item.ProductSlug) } class="hover:text-rust transition-colors">
-												{ item.ProductTitle }
-											</a>
-										</h3>
+										<div class="flex items-start justify-between gap-3">
+											<h3 class="font-slab text-ink uppercase leading-[0.95] text-lg sm:text-xl min-w-0" style="letter-spacing:-0.005em;">
+												<a href={ templ.SafeURL("/catalog/" + item.ProductSlug) } class="hover:text-rust transition-colors">
+													{ item.ProductTitle }
+												</a>
+											</h3>
+											<p class="font-special text-ink text-base shrink-0">{ formatCents(item.LineTotal) }</p>
+										</div>
 										if item.VariantLabel != "" {
 											<p class="font-special text-ink-soft text-sm mt-1">{ item.VariantLabel }</p>
 										}
-										<p class="font-special text-ink-soft text-sm mt-1 sm:hidden">
+										<p class="font-special text-ink-soft text-sm mt-1">
 											{ formatCents(item.UnitPrice) } &middot; ea
 										</p>
+										<div class="mt-3 flex items-center justify-between sm:justify-start gap-3 sm:gap-6">
+											<!-- Quantity stepper. The minus/plus buttons submit the form
+											     themselves (debounced, so a double tap is one request) —
+											     typing into a number field and hunting for a 15px "Update"
+											     link is not a thing you can do one-handed on a phone. The
+											     submit button stays as the no-JS path. -->
+											<form
+												method="post"
+												action="/cart/update"
+												hx-post="/cart/update"
+												hx-target="#main-content"
+												hx-swap="innerHTML"
+												class="inline-flex items-stretch border-2 border-ink"
+												x-data={ cartQtyState(item.Quantity) }
+											>
+												<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
+												<button
+													type="button"
+													@click="bump(-1)"
+													:disabled="qty <= 1"
+													aria-label={ "Decrease quantity for " + item.ProductTitle }
+													class="min-h-11 min-w-11 bg-paper-warm text-ink font-oswald font-bold text-lg leading-none border-r-2 border-ink hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+												>
+													&minus;
+												</button>
+												<input
+													type="number"
+													name="quantity"
+													x-model.number="qty"
+													@change="clamp(); queue()"
+													value={ fmt.Sprintf("%d", item.Quantity) }
+													min="1"
+													max="99"
+													aria-label={ "Quantity for " + item.ProductTitle }
+													class="paper-input w-12 min-h-11 bg-cream-hi px-1 font-special text-center text-ink text-base focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+												/>
+												<button
+													type="button"
+													@click="bump(1)"
+													:disabled="qty >= 99"
+													aria-label={ "Increase quantity for " + item.ProductTitle }
+													class="min-h-11 min-w-11 bg-paper-warm text-ink font-oswald font-bold text-lg leading-none border-l-2 border-ink hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+												>
+													+
+												</button>
+												<button
+													type="submit"
+													class="sr-only"
+													aria-label={ "Update quantity for " + item.ProductTitle }
+												>
+													Update
+												</button>
+											</form>
+											<!-- Remove -->
+											<form
+												method="post"
+												action="/cart/remove"
+												hx-post="/cart/remove"
+												hx-target="#main-content"
+												hx-swap="innerHTML"
+												data-rr-cart-remove
+												data-rr-cart-item-id={ item.ItemID.String() }
+											>
+												<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
+												<button
+													type="submit"
+													class="font-oswald font-bold text-[10px] text-chrome-deep hover:text-rust transition-colors inline-flex items-center gap-1 min-h-11 px-2 -mr-2"
+													style="letter-spacing:0.18em; text-transform:uppercase;"
+													aria-label={ "Remove " + item.ProductTitle + " from cart" }
+												>
+													<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+													</svg>
+													Remove
+												</button>
+											</form>
+										</div>
 									</div>
-									<!-- Price (desktop only) -->
-									<div class="hidden sm:block w-20 text-right font-special text-ink-soft text-sm pt-0.5">
-										{ formatCents(item.UnitPrice) }
-									</div>
-									<!-- Quantity stepper -->
-									<form
-										method="post"
-										action="/cart/update"
-										hx-post="/cart/update"
-										hx-target="#main-content"
-										hx-swap="innerHTML"
-										class="flex items-center gap-2"
-									>
-										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
-										<input
-											type="number"
-											name="quantity"
-											value={ fmt.Sprintf("%d", item.Quantity) }
-											min="1"
-											aria-label={ "Quantity for " + item.ProductTitle }
-											class="paper-input w-16 border-2 border-ink bg-cream-hi py-1.5 px-2 font-special text-center text-ink text-sm focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-										/>
-										<button
-											type="submit"
-											class="font-oswald font-bold text-[10px] text-rust hover:text-rust-deep transition-colors"
-											style="letter-spacing:0.18em; text-transform:uppercase;"
-											aria-label={ "Update quantity for " + item.ProductTitle }
-										>
-											Update
-										</button>
-									</form>
-									<!-- Line total -->
-									<div class="sm:w-24 sm:text-right flex items-center justify-between sm:block">
-										<p class="sm:hidden font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Total</p>
-										<p class="font-special text-ink text-base">{ formatCents(item.LineTotal) }</p>
-									</div>
-									<!-- Remove -->
-									<form
-										method="post"
-										action="/cart/remove"
-										hx-post="/cart/remove"
-										hx-target="#main-content"
-										hx-swap="innerHTML"
-										class="sm:pt-0.5"
-										data-rr-cart-remove
-										data-rr-cart-item-id={ item.ItemID.String() }
-									>
-										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
-										<button
-											type="submit"
-											class="font-oswald font-bold text-[10px] text-chrome-deep hover:text-rust transition-colors inline-flex items-center gap-1"
-											style="letter-spacing:0.18em; text-transform:uppercase;"
-											aria-label={ "Remove " + item.ProductTitle + " from cart" }
-										>
-											<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
-											</svg>
-											Remove
-										</button>
-									</form>
 								</li>
 							}
 						</ul>
@@ -267,6 +318,9 @@ templ CartContent(props CartPageProps) {
 						</div>
 					</aside>
 				</div>
+				<!-- Clearance for the sticky mobile checkout bar -->
+				<div class="lg:hidden h-20" aria-hidden="true"></div>
+				@cartMobileBar(props.Subtotal)
 			}
 		</div>
 	</section>
@@ -316,6 +370,82 @@ templ CartContent(props CartPageProps) {
 			})();
 		</script>
 	}
+}
+
+// cartMobileBar is the phone/tablet sticky checkout bar. The summary card only
+// becomes a sticky sidebar at lg; below that it sits under the line items, so
+// on a phone the total and the checkout button scroll away entirely. The bar
+// reveals itself once the real checkout button leaves the viewport.
+templ cartMobileBar(subtotal int) {
+	<div
+		id="cart-mobile-bar"
+		class="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-linear"
+		style="padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));"
+		aria-hidden="true"
+	>
+		<div class="flex items-center gap-3">
+			<div class="min-w-0 flex-shrink-0">
+				<p class="font-oswald font-bold text-chrome-deep text-[10px] leading-none" style="letter-spacing:0.14em; text-transform:uppercase;">Total</p>
+				<p class="font-special text-ink text-lg leading-none mt-1">{ formatCents(subtotal) }</p>
+			</div>
+			<a
+				href="/checkout"
+				hx-boost="false"
+				class="btn-stamp flex-1 inline-flex items-center justify-center gap-2 min-h-12 bg-rust text-paper border-2 border-ink px-4 py-3 font-oswald font-bold text-xs"
+				style="letter-spacing:0.16em; text-transform:uppercase;"
+			>
+				Checkout
+				<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+				</svg>
+			</a>
+		</div>
+	</div>
+	<script>
+		(function() {
+			// Every /cart/update and /cart/remove swaps #main-content and re-runs this
+			// script, replacing the bar and the anchor. Elements are therefore
+			// resolved per call, and the window listeners are registered once.
+			function el(id) { return document.getElementById(id); }
+			function anchorEl() { return document.querySelector('aside a[href="/checkout"]'); }
+			if (!el('cart-mobile-bar')) return;
+
+			var state = window.__rrCartBar;
+			if (!state) state = window.__rrCartBar = { ticking: false };
+
+			function reveal(visible) {
+				var bar = el('cart-mobile-bar');
+				if (!bar) return;
+				// invisible as well as translated, so an off-screen bar does not put a
+				// second Checkout link in the tab order.
+				bar.classList.toggle('translate-y-full', !visible);
+				bar.classList.toggle('invisible', !visible);
+				bar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+			}
+
+			function sync() {
+				state.ticking = false;
+				var anchor = anchorEl();
+				if (!anchor) { reveal(true); return; }
+				var rect = anchor.getBoundingClientRect();
+				reveal(rect.bottom < 0 || rect.top > (window.innerHeight || 0));
+			}
+
+			function schedule() {
+				if (state.ticking) return;
+				state.ticking = true;
+				window.requestAnimationFrame(sync);
+			}
+
+			if (!state.bound) {
+				state.bound = true;
+				window.addEventListener('scroll', schedule, { passive: true });
+				window.addEventListener('resize', schedule);
+			}
+
+			sync();
+		})();
+	</script>
 }
 
 templ CartPage(props CartPageProps) {

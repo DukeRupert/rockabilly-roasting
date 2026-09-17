@@ -486,6 +486,46 @@ templ Admin(props AdminProps) {
 				.row-link button,
 				.row-link form { position: relative; z-index: 1; }
 
+				/* ── Load-list roster: stacked rows on a phone ──
+				   The fulfillment queues get a separate card rendering below sm,
+				   but this table cannot: its checkboxes are real form controls
+				   named "ids" inside #load-list-form, and a CSS-hidden control is
+				   still submitted, so a second rendering would put every order in
+				   the form twice — and an order the driver unchecked on the card
+				   would still be checked in the hidden copy, leaving the totals
+				   and the printed load sheet disagreeing with the van.
+
+				   So the one table restacks instead. Single DOM, single set of
+				   inputs, and desktop is untouched by construction: every rule
+				   here lives inside the phone media query. */
+				@media (max-width: 639px) {
+					.stack-roster thead { display: none; }
+					.stack-roster,
+					.stack-roster tbody { display: block; }
+					.stack-roster tr {
+						display: flex;
+						flex-wrap: wrap;
+						align-items: flex-start;
+					}
+					/* Only cells that opt in restack. Placed carries no data-cell,
+					   so it stays governed by its own `hidden md:table-cell` and
+					   never reappears here. */
+					.stack-roster td[data-cell] { display: block; }
+					.stack-roster td[data-cell="select"] {
+						flex: 0 0 2.75rem;
+						padding: 0;
+					}
+					.stack-roster td[data-cell="order"] {
+						flex: 1 1 0;
+						min-width: 0;
+						padding: 1rem 0.75rem 0 0;
+					}
+					.stack-roster td[data-cell="state"] {
+						flex: 0 0 100%;
+						padding: 0.25rem 0.75rem 1rem 2.75rem;
+					}
+				}
+
 				/* ── Action hints ──
 				   A one-line explanation of what a button does, shown before the
 				   click rather than after it. Hover AND focus-within, so keyboard
@@ -541,7 +581,14 @@ templ Admin(props AdminProps) {
 				}
 			</style>
 		</head>
-		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML show:window:top">
+		<!-- overflow-x-*clip*, not hidden, on both this and #main-content-wrapper.
+		     Both stop the same thing — a stray horizontal scrollbar from a
+		     negative-margin gutter bleed — but `hidden` on one axis forces the
+		     other axis to compute to `auto`, which makes the element a scroll
+		     container, and a scroll container silently kills `position: sticky`
+		     for everything inside it. `clip` creates no scroll container, so the
+		     bulk action bars stick. -->
+		<body class="h-full overflow-x-clip" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML show:window:top">
 			<!-- Mobile sidebar overlay -->
 			<div id="mobile-sidebar" class="relative z-50 lg:hidden hidden" role="dialog" aria-modal="true">
 				<!-- Backdrop -->
@@ -591,7 +638,7 @@ templ Admin(props AdminProps) {
 				</div>
 			</div>
 			<!-- Main content area -->
-			<div id="main-content-wrapper" class="lg:pl-72 overflow-x-hidden">
+			<div id="main-content-wrapper" class="lg:pl-72 overflow-x-clip">
 				<!-- Mobile top bar — drawer trigger + brand. Hidden on desktop, where
 				     the sidebar is always visible and carries the user menu itself,
 				     so the whole bar disappears and the content reclaims the height. -->

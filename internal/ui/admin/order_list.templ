@@ -68,6 +68,15 @@ func orderListAlpineState(rows []OrderRow) string {
 	}`
 }
 
+// orderFilterStripState seeds the mobile filter disclosure. Open on load when
+// something in the strip is already narrowing the list.
+func orderFilterStripState(p OrderListProps) string {
+	if orderSecondaryFilterCount(p) > 0 {
+		return "{ open: true }"
+	}
+	return "{ open: false }"
+}
+
 func formatCents(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }
@@ -322,15 +331,106 @@ func orderEmptyBucketCopy(view string) string {
 	return "No orders match this view."
 }
 
+// orderRowStateBadges renders the State cell's badge cluster. Shared by the
+// desktop table row and the mobile card so the two can never drift into
+// disagreeing about what an order's state is.
+templ orderRowStateBadges(row OrderRow) {
+	if showOrderStatusOverFulfillment(row.Order.Status) {
+		@OrderStatusBadge(row.Order.Status)
+	} else {
+		@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+	}
+	if row.LabelFailed {
+		<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
+	}
+}
+
+// orderCardList is the phone rendering of the same rows the table carries.
+//
+// A six-column table does not survive 390px. min-w-full on the table plus
+// overflow-hidden on its wrapper meant the columns did not scroll, they were
+// *clipped*: the total and the payment chip fell off the right edge entirely
+// and the state badge was sliced mid-word, so a phone row showed an order
+// number, a name, a truncated email and half a badge. Shipping and Placed were
+// already display:none below lg/md, which also took the staleness signal — the
+// rust date — away from exactly the screen where staff are most likely to be
+// checking whether something has been sitting.
+//
+// So below sm each order becomes a card that carries every field the desktop
+// table does, stacked instead of columned. The table is unchanged from sm up.
+//
+// The cards carry no selection checkboxes, deliberately. The only bulk action
+// on this page opens one print-ready invoice tab per selected order — a desktop
+// printing job. Porting it to the phone cost a select-all header row, a hint
+// line, and a 16px tap target in the left gutter of every card, all to enable
+// something nobody does standing up with a phone in one hand. Selection lives
+// in the table; the cards spend that space on the orders instead.
+templ orderCardList(props OrderListProps) {
+	<div class="sm:hidden border border-rr-border bg-rr-surface">
+		<ul class="divide-y divide-rr-border">
+			for _, row := range props.Rows {
+				{{ stale := orderIsStale(row.Order, props.MerchantTZ, props.Now) }}
+				<li class={ "row-link", templ.KV("row-link-stale", stale) }>
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block px-3 py-3">
+						<div class="flex items-baseline justify-between gap-2">
+							<div class="flex min-w-0 items-baseline gap-2">
+								<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
+								if row.AccountType == domain.AccountTypeWholesale {
+									<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
+								}
+							</div>
+							<span class={ "shrink-0 text-xs tabular-nums", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
+								{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
+							</span>
+						</div>
+						<div class="mt-1 truncate text-sm text-rr-body">{ row.CustomerName }</div>
+						if row.CustomerEmail != "" {
+							<div class="truncate text-xs text-rr-muted">{ row.CustomerEmail }</div>
+						}
+						<div class="mt-2 flex flex-wrap items-center gap-1.5">
+							@orderRowStateBadges(row)
+							if row.Order.ShippingMethod != "" {
+								<!-- "Shipped" is a shipping *method* here, not a
+								     fulfillment state. In the table the "Shipping"
+								     column header says so; a card has no header, and
+								     "Unfulfilled · Shipped" side by side reads as a
+								     contradiction — so the card carries the word. -->
+								<span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+									<span class="label-font text-[0.65rem] text-rr-muted">Via</span>
+									@ShippingMethodBadge(row.Order.ShippingMethod)
+								</span>
+							}
+						</div>
+						<div class="mt-2 flex items-baseline gap-2">
+							<span class="font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</span>
+							<span class="text-rr-muted" aria-hidden="true">·</span>
+							@PaymentChip(row.Order.PaymentStatus)
+						</div>
+					</a>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
 templ OrderListContent(props OrderListProps) {
 	@adminChannelToggle("/admin/orders", "/admin/orders/wholesale", props.BasePath)
 	<!-- Page header -->
+	<!-- Page header. On a phone this band is pure overhead on a screen whose
+	     whole job is "show me the orders": the subtitle restates what the nav
+	     already said, and a full-width red CTA makes creating an order the
+	     loudest thing on a screen used for reading. So below sm the subtitle
+	     goes and the CTA shrinks to a chip beside the title; from sm up the
+	     band is unchanged. -->
 	<div class="sm:flex sm:items-end sm:justify-between">
-		<div>
-			<h1 class="admin-page-title">{ props.Title }</h1>
-			<p class="mt-1 text-sm text-rr-muted">{ props.Subtitle }</p>
+		<div class="flex items-center justify-between gap-3">
+			<div>
+				<h1 class="admin-page-title">{ props.Title }</h1>
+				<p class="mt-1 hidden text-sm text-rr-muted sm:block">{ props.Subtitle }</p>
+			</div>
+			<a href="/admin/orders/new" class="sm:hidden shrink-0 inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New order</a>
 		</div>
-		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+		<div class="mt-4 hidden sm:mt-0 sm:flex sm:items-center sm:gap-2">
 			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
@@ -361,7 +461,11 @@ templ OrderListContent(props OrderListProps) {
 			<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
 				<!-- View tabs — workflow-led buckets with counts. Active tab is stamped
 			     (ink border + hard offset shadow) so the current bucket is unmissable. -->
-				<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Order views">
+				<!-- Five tabs with counts wrap to three rows at 390px — ~110px of
+				     chrome above the data. Below sm they become one edge-to-edge
+				     scrolling row (bled past the container's px-4 so the cut-off
+				     last chip reads as scrollable); from sm up they wrap as before. -->
+				<nav class="scroll-chips -mx-4 flex items-center gap-2 overflow-x-auto px-4 label-font [&>a]:shrink-0 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" aria-label="Order views">
 					for _, tab := range props.tabs() {
 						<a href={ templ.SafeURL(orderListURL(props, 1, tab.Key, props.Sort, props.Payment, props.Fulfillment, props.Range, props.From, props.To, props.Min, props.Max, props.Search)) } class={ adminTabClass(props.View == tab.Key) }>
 							<span>{ tab.Label }</span>
@@ -389,7 +493,34 @@ templ OrderListContent(props OrderListProps) {
 				</div>
 			</div>
 			<!-- Secondary filter rows. Kept visually quieter than the view tabs:
-		     the tabs are the primary workflow split, these narrow within it. -->
+		     the tabs are the primary workflow split, these narrow within it.
+		     On a phone they are also *long* — fifteen pills plus two amount
+		     fields wrap into roughly half a screen of chrome, which pushed the
+		     first order below the fold. So below sm they collapse behind a
+		     toggle and the list starts near the top; from sm up they are always
+		     open, exactly as before.
+
+		     The strip is hidden with a class and revealed with an inline style
+		     so the closed state is what the server renders: no flash of open
+		     filters while Alpine boots, and no !important needed to beat
+		     sm:block. It starts open when a filter is already narrowing the
+		     list — a hidden filter nobody remembers setting is how a list comes
+		     to look broken. -->
+			<div x-data={ orderFilterStripState(props) }>
+				<button
+					type="button"
+					class="sm:hidden mt-3 inline-flex items-center gap-2 rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
+					:aria-expanded="open ? 'true' : 'false'"
+					aria-controls="orders-filter-strip"
+					@click="open = !open"
+				>
+					<span>Filters</span>
+					if n := orderSecondaryFilterCount(props); n > 0 {
+						<span class="badge badge-amber">{ fmt.Sprintf("%d", n) }</span>
+					}
+					<span class="text-rr-muted" aria-hidden="true" x-text="open ? '\u2212' : '+'"></span>
+				</button>
+				<div id="orders-filter-strip" class="hidden sm:block" :style="open ? 'display:block' : ''">
 			<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
 				@orderPillRow(props, "Payment", "payment", props.Payment, orderPaymentPills)
 				@orderPillRow(props, "Fulfillment", "fulfillment", props.Fulfillment, orderFulfillmentPillsFor(props.PickupEnabled))
@@ -422,6 +553,8 @@ templ OrderListContent(props OrderListProps) {
 				if anyOrderFilterActive(props) {
 					<a href={ templ.SafeURL(props.BasePath) } class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
 				}
+			</div>
+				</div>
 			</div>
 		</form>
 	</section>
@@ -516,11 +649,16 @@ templ OrderListContent(props OrderListProps) {
 				     is selected; the action bar takes over the same vertical slot. -->
 				<p
 					x-show="selected.length === 0"
-					class="mb-3 text-xs text-rr-muted"
+					class="mb-3 hidden text-xs text-rr-muted sm:block"
 				>
 					Select orders to print invoices in bulk. Buying labels lives in Fulfillment.
 				</p>
-				<!-- Bulk action bar — slides in when rows are selected. -->
+				<!-- Bulk action bar — slides in when rows are selected.
+				     top-16 clears the mobile topbar; from lg that bar is hidden and
+				     the offset would leave a strip of rows scrolling past above this
+				     one. The stickiness itself only started working when the admin
+				     layout swapped overflow-x-hidden for overflow-x-clip — a
+				     scroll-container ancestor had been disabling it. -->
 				<div
 					x-show="selected.length > 0"
 					x-cloak
@@ -530,7 +668,7 @@ templ OrderListContent(props OrderListProps) {
 					x-transition:leave="transition ease-in duration-150"
 					x-transition:leave-start="opacity-100"
 					x-transition:leave-end="opacity-0"
-					class="sticky top-16 z-20 mb-4"
+					class="sticky top-16 lg:top-0 z-20 mb-4 hidden sm:block"
 				>
 					<div class="flex items-center justify-between gap-3 border border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-sm">
 						<span class="text-rr-heading">
@@ -556,7 +694,11 @@ templ OrderListContent(props OrderListProps) {
 						</div>
 					</div>
 				</div>
-				<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				@orderCardList(props)
+				<!-- Table from sm up. overflow-x-auto rather than overflow-hidden:
+				     a long customer name or a wide badge cluster at tablet widths
+				     used to be clipped away with no way to reach it. -->
+				<div class="hidden sm:block overflow-x-auto border border-rr-border bg-rr-surface">
 					<table class="min-w-full divide-y divide-rr-border">
 						<thead class="bg-rr-raised">
 							<tr>
@@ -613,14 +755,7 @@ templ OrderListContent(props OrderListProps) {
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm">
 										<div class="flex flex-wrap items-center gap-1.5">
-											if showOrderStatusOverFulfillment(row.Order.Status) {
-												@OrderStatusBadge(row.Order.Status)
-											} else {
-												@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
-											}
-											if row.LabelFailed {
-												<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
-											}
+											@orderRowStateBadges(row)
 										</div>
 									</td>
 									<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
@@ -830,6 +965,20 @@ func orderSortIndicator(col, current string) string {
 
 // anyOrderFilterActive reports whether anything beyond the default view is
 // narrowing the list — drives the "Clear all" escape hatch.
+// orderSecondaryFilterCount counts the narrowing filters that live in the
+// collapsible strip below the tabs. Drives the count on the mobile "Filters"
+// button, so a collapsed strip can still say it is doing something — a hidden
+// filter the operator forgot about is how a list comes to look broken.
+func orderSecondaryFilterCount(p OrderListProps) int {
+	n := 0
+	for _, v := range []string{p.Payment, p.Fulfillment, p.Range, p.Min, p.Max} {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
 func anyOrderFilterActive(p OrderListProps) bool {
 	return p.Search != "" || p.Payment != "" || p.Fulfillment != "" ||
 		p.Range != "" || p.Min != "" || p.Max != "" || p.Sort != "" && p.Sort != "placed_desc"

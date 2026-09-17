@@ -98,6 +98,18 @@ html {
 	scrollbar-gutter: stable;
 }
 
+/* Horizontal chip strips (the orders view tabs on a phone) scroll, but a
+   classic scrollbar under them reads as a UI artifact rather than an
+   affordance. Phones draw overlay scrollbars that fade anyway; the cut-off
+   last chip at the edge is what says "there is more this way". */
+.scroll-chips {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+.scroll-chips::-webkit-scrollbar {
+	display: none;
+}
+
 :root {
 	/* templui semantic tokens mapped to Rockabilly Roasting palette */
 	--background: var(--color-rr-bg);

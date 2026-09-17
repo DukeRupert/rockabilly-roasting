@@ -250,6 +250,28 @@ The middleware resolves the staff from the context, checks `auth.HasPermission(r
 
 ---
 
+## Logging format
+
+Logs are shipped by Grafana Alloy to a shared Loki instance and queried alongside every other service in the fleet, so the format is a cross-service contract, not a local preference. `~/logging-standard.md` is the authoritative version; what follows is what it means here.
+
+**One JSON object per line on stdout, and nothing else on stdout.** `internal/platform/logging` builds the handler; `logging.HandlerOptions` is shared by every sink so stdout and the Sentry fanout agree on the envelope. Timestamps are forced to UTC — slog would otherwise write the host's offset.
+
+**Anything that logs gets routed through that handler or is silenced.** Two things in this process log on their own by default and both are wired explicitly in `cmd/server/main.go`: River (`river.Config.Logger`) builds a *text* handler on stdout if you leave it nil, and `http.Server.ErrorLog` writes plain text to stderr. Either one alone produces a container emitting two formats interleaved, which is the failure mode the standard exists to prevent. Never use `log.Printf`.
+
+**`msg` is the event identifier, not a sentence.** Lowercase, present tense, stable forever once shipped — it is grouped and alerted on, and renaming it breaks saved queries. Never interpolate a value into it: `logger.Warn("feature disabled", "feature", "turnstile verification", "reason", ...)`, not `logger.Warn("turnstile disabled (no secret)")`. Levels are uppercase (slog does this natively); `level` is promoted to a Loki label, so a lowercase one silently drops out of `{level="ERROR"}`.
+
+**Every request produces exactly one line.** `loggingMiddleware` owns it. A handler that fails should not log its own error line *and* return an error — it calls `recordRequestError(r.Context(), err, status)`, and the error lands on the request line as `msg":"request failed"` at ERROR with an `error` field. The recorded status is what picks the level, because an htmx request that hits a server error is answered `200` with a toast: without the recorded status that request would log as ordinary traffic.
+
+**If you hand-roll an error toast for a server failure, call `recordRequestError` yourself.** `respond.Error` does it for you; a bare `toast.Toast(toast.VariantError, …)` followed by a `200` does not, and that request logs as ordinary INFO traffic no matter what went wrong underneath. Only do this for genuine server failures — a validation toast ("enter a valid price") is a normal 200 and must stay INFO. Roughly a dozen existing toast sites under `internal/web/admin_*.go` predate this rule and have not been audited one by one; they are a known gap, not a pattern to copy.
+
+**`remote_ip` comes from `ratelimit.ClientIP`, which reads the *right-most* X-Forwarded-For entry.** Everything to the left of our proxy's entry was supplied by the caller. This value keys the rate limiter, so taking the left-most entry would let a visitor pin abuse on an arbitrary address or evade a limiter by rotating a header. See `trustedHops` in `platform/ratelimit/limiter.go` before putting a CDN in front of Caddy.
+
+**`TRUSTED_PROXIES` has no default, and getting it wrong is silent.** The header is only honoured when the peer is a configured trusted proxy, so a value that does not contain the Docker gateway makes every request resolve to that gateway — per-IP limits keep "working", just globally. That shipped to production once and went unnoticed for months (`docs/security/rate-limiting-TODO.md`). The list must not be widened past the real proxy to make the problem go away; that is how spoofing gets reintroduced. `ClientIP` now reports a peer that forwards but is not trusted, once per process at ERROR, naming the address the setting needs to contain. **Whoever recreates the compose network owns re-checking this value** — the subnet moves with it.
+
+**Never log secrets** — no tokens, cookies, `Authorization` headers or full request bodies. The Shippo webhook carries its auth secret in the URL path, so `loggingMiddleware` redacts that path and its query.
+
+---
+
 ## Naming conventions
 
 **Files:** `snake_case.go`. One domain area per file within a package. Don't create `utils.go` or `helpers.go` — if something needs a home, find the right package.

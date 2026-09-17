@@ -1568,6 +1568,7 @@ func (d *Deps) handleAdminVariantSearch(w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		logging.FromContext(ctx).Error("variant search", "err", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		http.Error(w, "search failed", http.StatusInternalServerError)
 		return
 	}

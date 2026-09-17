@@ -12,33 +12,51 @@ const loggerKey contextKey = "logger"
 
 // Standard log field names.
 const (
-	FieldRequestID   = "request_id"
-	FieldActorID     = "actor_id"
-	FieldActorType   = "actor_type"
-	FieldMethod      = "method"
-	FieldPath        = "path"
-	FieldQuery       = "query"
-	FieldStatus      = "status"
-	FieldDurationMS  = "duration_ms"
-	FieldRemoteIP    = "remote_ip"
-	FieldUserAgent   = "user_agent"
-	FieldReferer     = "referer"
-	FieldService     = "service"
-	FieldEnv         = "env"
-	FieldEvent       = "event"
+	FieldRequestID    = "request_id"
+	FieldActorID      = "actor_id"
+	FieldActorType    = "actor_type"
+	FieldMethod       = "method"
+	FieldPath         = "path"
+	FieldQuery        = "query"
+	FieldStatus       = "status"
+	FieldDurationMS   = "duration_ms"
+	FieldRemoteIP     = "remote_ip"
+	FieldUserAgent    = "user_agent"
+	FieldReferer      = "referer"
+	FieldError        = "error"
+	FieldService      = "service"
+	FieldEnv          = "env"
+	FieldEvent        = "event"
 	FieldResourceType = "resource_type"
-	FieldResourceID  = "resource_id"
-	FieldOrderID     = "order_id"
-	FieldCustomerID  = "customer_id"
-	FieldAmount      = "amount"
-	FieldCurrency    = "currency"
+	FieldResourceID   = "resource_id"
+	FieldOrderID      = "order_id"
+	FieldCustomerID   = "customer_id"
+	FieldAmount       = "amount"
+	FieldCurrency     = "currency"
 )
+
+// HandlerOptions returns the JSON handler options every sink in this service
+// shares, so stdout and any additional handler agree on the envelope.
+//
+// slog's JSON handler already emits `time`, uppercase `level` and `msg` in the
+// shape the fleet logging standard requires. The one thing it gets wrong is the
+// zone: it writes wall-clock time with the host offset, and the standard calls
+// for UTC so lines from hosts in different zones sort and correlate.
+func HandlerOptions(level slog.Level) *slog.HandlerOptions {
+	return &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if len(groups) == 0 && a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+				a.Value = slog.TimeValue(a.Value.Time().UTC())
+			}
+			return a
+		},
+	}
+}
 
 // New creates a new JSON logger for production use.
 func New(level slog.Level) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: level,
-	}))
+	return slog.New(slog.NewJSONHandler(os.Stdout, HandlerOptions(level)))
 }
 
 // NewWithHandlers returns a logger that fans each record out to every handler.

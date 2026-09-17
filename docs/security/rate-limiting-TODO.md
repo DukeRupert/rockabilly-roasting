@@ -1,7 +1,9 @@
 # Rate limiting — findings & TODO
 
-**Status:** one confirmed production defect, unfixed.
+**Status:** the production defect (item 1) is **still unfixed** — it is an
+operator action on the prod box, not a code change. Items 2 and 3 are done.
 **Found:** 2026-07-27, while tracing a customer login failure through the app logs.
+**Updated:** 2026-09-17, alongside the fleet logging-standard branch.
 
 Per-IP auth rate limiting is not working in production. Every request resolves to
 the same client IP, so all per-IP limits share a single global bucket. Items
@@ -64,11 +66,26 @@ ordered by impact; check off as completed.
   `/opt/rockabilly-roasting/.env` and restart the app. Verify by tailing the
   logs and confirming `remote_ip` shows real client addresses.
 
+  **Re-confirm the subnet before applying this** — `172.19.0.0/16` was observed
+  on 2026-07-27 and moves whenever the compose network is recreated. Since item
+  2, the app itself names the correct address: on the first forwarded request
+  from an untrusted peer it logs, once, `msg":"untrusted proxy forwarding"` at
+  ERROR with the `peer` field set to the address `TRUSTED_PROXIES` must contain.
+
+  Note that the app-side changes on the logging-standard branch do **not** fix
+  this. A configured-but-wrong value takes precedence over any default, so the
+  bucket stays global until this value is corrected on the box.
+
   Do not simply widen the range to all of `172.16.0.0/12` to make the problem go
   away — a trusted-proxy list that covers more than the actual proxy is how IP
   spoofing gets reintroduced.
 
-- [ ] **2. Nothing detects the misconfiguration recurring.** The subnet will move
+- [x] **2. Nothing detects the misconfiguration recurring.** *(done 2026-09-17 —
+  `reportUntrustedForwarder` in `platform/ratelimit/limiter.go`: one ERROR line
+  per process when a peer forwards but is not trusted, naming the peer address.
+  Chosen over pinning the subnet because the prod compose file is not in this
+  repo. Pinning it is still worth doing and would remove the drift rather than
+  reporting it.)* The subnet will move
   again the next time the compose network is recreated, and the symptom is
   silent: limits keep "working", just globally. Options, cheapest first:
 
@@ -83,7 +100,10 @@ ordered by impact; check off as completed.
 
 ## Worth considering
 
-- [ ] **3. There is no test covering the trusted-proxy path.** `ClientIP` has the
+- [x] **3. There is no test covering the trusted-proxy path.** *(was already
+  false when written — `clientip_test.go` has covered both directions since
+  before this doc. Extended 2026-09-17 with the forged-prefix, port-stripping,
+  IPv6 and untrusted-forwarder-report cases.)* `ClientIP` has the
   subtle branch here and this defect would have been caught by a table test
   asserting that an untrusted peer's `X-Forwarded-For` is ignored *and* that a
   trusted peer's is honored. Cheap to add, no database needed.

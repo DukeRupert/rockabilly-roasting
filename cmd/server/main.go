@@ -48,8 +48,21 @@ import (
 )
 
 func main() {
+	// Before the logger, so LOG_LEVEL from a .env file applies to the bootstrap
+	// logger too. godotenv never overrides a real environment variable, so the
+	// second call inside run() is a no-op.
+	_ = godotenv.Load()
+
+	// A JSON default from the first instruction, so nothing — not a config
+	// failure, not a library logging through slog.Default() during wiring —
+	// escapes as plain text before buildLogger runs.
+	slog.SetDefault(logging.New(logLevel()))
+
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		// Startup failures are logged like every other event: one JSON line on
+		// stdout. Plain text on stderr would be the one line in the container's
+		// output the shipping agent could not parse.
+		slog.Error("server startup failed", "error", err.Error())
 		os.Exit(1)
 	}
 }
@@ -111,7 +124,7 @@ func run() error {
 	if turnstileVerifier.Enabled() {
 		logger.Info("turnstile verification enabled")
 	} else {
-		logger.Info("turnstile verification disabled (no secret configured)")
+		logger.Info("feature disabled", "feature", "turnstile verification", "reason", "TURNSTILE_SECRET_KEY is not set")
 	}
 
 	// Newsletter (Broadwave). The footer form posts here rather than to
@@ -124,12 +137,36 @@ func run() error {
 	if newsletterClient.Enabled() {
 		logger.Info("newsletter signup enabled", "list", newsletterClient.List)
 	} else {
-		logger.Warn("newsletter signup disabled (BROADWAVE_API_KEY/BROADWAVE_LIST not set) — footer form will silently accept without subscribing")
+		logger.Warn("feature disabled",
+			"feature", "newsletter signup",
+			"reason", "BROADWAVE_API_KEY/BROADWAVE_LIST are not set",
+			"effect", "the footer form accepts addresses without subscribing them")
 	}
 
 	// Configure trusted reverse proxy CIDRs for accurate client IP extraction.
 	// Comma-separated list of CIDRs, e.g. "10.0.0.0/8,172.16.0.1/32".
-	if proxyCIDRs := os.Getenv("TRUSTED_PROXIES"); proxyCIDRs != "" {
+	//
+	// Deliberately no default. The correct value is the Docker network's actual
+	// gateway, which drifts when the compose network is recreated — and a
+	// trusted-proxy list broader than the real proxy is how IP spoofing gets
+	// reintroduced (docs/security/rate-limiting-TODO.md item 1). A wrong or
+	// missing value is instead made loud at request time: see
+	// ratelimit.ClientIP, which reports a peer that forwards but is not
+	// trusted.
+	//
+	// Set TRUSTED_PROXIES=none on a deployment that faces the internet
+	// directly, where a caller could write the header itself. That silences
+	// the report, because falling back to the socket address is correct there.
+	proxyCIDRs := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES"))
+	switch {
+	case strings.EqualFold(proxyCIDRs, "none"):
+		ratelimit.SetDirectlyExposed()
+		logger.Info("trusted proxies disabled", "reason", "TRUSTED_PROXIES=none")
+	case proxyCIDRs == "":
+		logger.Warn("config incomplete",
+			"setting", "TRUSTED_PROXIES",
+			"effect", "the visitor's IP cannot be resolved behind a proxy, so every per-IP rate limit shares one bucket")
+	default:
 		cidrs := strings.Split(proxyCIDRs, ",")
 		for i := range cidrs {
 			cidrs[i] = strings.TrimSpace(cidrs[i])
@@ -157,13 +194,19 @@ func run() error {
 			labelFormat = "PNG"
 		}
 		if !shipping.ValidLabelFileType(labelFormat) {
-			logger.Warn("SHIPPO_LABEL_FORMAT is invalid; falling back to PNG", "value", labelFormat, "allowed", shipping.AllowedLabelFileTypes)
+			logger.Warn("config invalid",
+				"setting", "SHIPPO_LABEL_FORMAT",
+				"value", labelFormat,
+				"allowed", shipping.AllowedLabelFileTypes,
+				"fallback", "PNG")
 			labelFormat = "PNG"
 		}
 		labelProvider = shipping.NewShippoProvider(key).WithDefaultLabelFileType(labelFormat)
 		logger.Info("shippo label provider configured", "label_format", labelFormat)
 		if os.Getenv("SHIPPO_WEBHOOK_SECRET") == "" {
-			logger.Warn("SHIPPO_WEBHOOK_SECRET is not set; the inbound tracking webhook endpoint is disabled")
+			logger.Warn("feature disabled",
+				"feature", "shippo tracking webhook",
+				"reason", "SHIPPO_WEBHOOK_SECRET is not set")
 		}
 	} else {
 		// Fall back to EasyPost for envs that haven't migrated yet. Once
@@ -274,7 +317,10 @@ func run() error {
 	}
 	unsubscribeSigner := auth.NewUnsubscribeSigner(unsubscribeSecret)
 	if !unsubscribeSigner.Enabled() {
-		logger.Warn("neither UNSUBSCRIBE_SECRET nor APP_SECRET is set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
+		logger.Warn("feature disabled",
+			"feature", "reminder email opt-out link",
+			"reason", "neither UNSUBSCRIBE_SECRET nor APP_SECRET is set",
+			"effect", "reminder emails ask customers to reply instead")
 	}
 
 	// Signs the one-click links in transactional email — "switch to pickup" in
@@ -302,7 +348,10 @@ func run() error {
 	}
 	orderActionSigner := auth.NewOrderActionSigner(orderActionSecret)
 	if !orderActionSigner.Enabled() {
-		logger.Warn("none of ORDER_ACTION_SECRET, UNSUBSCRIBE_SECRET or APP_SECRET is set; order confirmations will omit the switch-to-pickup link and subscription skip notices the undo link, asking customers to reply instead")
+		logger.Warn("feature disabled",
+			"feature", "one-click order action links",
+			"reason", "none of ORDER_ACTION_SECRET, UNSUBSCRIBE_SECRET or APP_SECRET is set",
+			"effect", "order confirmations omit the switch-to-pickup link and skip notices omit the undo link")
 	}
 
 	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
@@ -402,7 +451,9 @@ func run() error {
 		// naming the setting, which is visible in the admin instead of in a
 		// crash loop.
 		if qbEnvSalesItemID == "" {
-			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
+			logger.Warn("config incomplete",
+				"setting", "QB_SALES_ITEM_ID",
+				"effect", "wholesale invoicing cannot bill until an item is chosen under Settings > Integrations")
 		}
 		logger.Info("quickbooks configured from the environment", "environment", qbEnvConfig.Environment)
 	}
@@ -552,7 +603,7 @@ func run() error {
 		WithOrderService(orderSvc).
 		WithMetrics(metricsReg)
 	if !osrmClient.Enabled() {
-		logger.Warn("OSRM_BASE_URL is empty — delivery route planning is disabled")
+		logger.Warn("feature disabled", "feature", "delivery route planning", "reason", "OSRM_BASE_URL is empty")
 	}
 
 	auditQuerySvc := app.NewAuditQueryService(auditStore)
@@ -701,7 +752,7 @@ func run() error {
 		logger.Info("wholesale order reminder scheduled",
 			"weekday", reminderWeekday.String(), "hour", reminderHour, "tz", reminderTZName)
 	} else {
-		logger.Warn("wholesale order reminders disabled via DISABLE_ORDER_REMINDERS")
+		logger.Warn("feature disabled", "feature", "wholesale order reminders", "reason", "DISABLE_ORDER_REMINDERS is set")
 	}
 	// Subscription renewal scheduler — scans for due subscriptions every minute
 	// and enqueues renewal charges (which call Stripe). Defaults on so staging
@@ -720,7 +771,7 @@ func run() error {
 			&river.PeriodicJobOpts{RunOnStart: true},
 		))
 	} else {
-		logger.Warn("subscription renewal scheduler disabled via DISABLE_RENEWAL_SCHEDULER")
+		logger.Warn("feature disabled", "feature", "subscription renewal scheduler", "reason", "DISABLE_RENEWAL_SCHEDULER is set")
 	}
 	{
 		// Reconcile open wholesale QB invoices daily. This is the safety net for
@@ -784,6 +835,10 @@ func run() error {
 		},
 		Workers:      workers,
 		PeriodicJobs: periodicJobs,
+		// Without this River builds its own slog text handler on stdout, so the
+		// container emitted two formats interleaved — the exact mixed-output
+		// failure the logging standard's §5.2 forbids.
+		Logger: logger,
 		// Job failures alert engineering rather than surfacing to staff — see
 		// jobs.ErrorHandler.
 		ErrorHandler: jobs.NewErrorHandler(logger),
@@ -921,9 +976,19 @@ func run() error {
 		addr = ":8080"
 	}
 
+	// net/http's own errors (a repanicked handler, a malformed request line, a
+	// TLS handshake failure) otherwise go through the stdlib logger as plain
+	// text on stderr. Route them through the same JSON handler.
+	//
+	// WARN rather than ERROR: net/http has already handled these by closing the
+	// connection, and most of them are scanners sending garbage. At ERROR every
+	// one would become a Sentry event.
+	httpErrorLog := slog.NewLogLogger(logger.Handler(), slog.LevelWarn)
+
 	srv := &http.Server{
 		Addr:           addr,
 		Handler:        handler,
+		ErrorLog:       httpErrorLog,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   30 * time.Second,
 		IdleTimeout:    60 * time.Second,
@@ -938,6 +1003,7 @@ func run() error {
 	metricsSrv := &http.Server{
 		Addr:         metricsAddr,
 		Handler:      web.MetricsMux(metricsReg),
+		ErrorLog:     httpErrorLog,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	}
@@ -1001,15 +1067,31 @@ func base64DecodeKey(encoded string) ([]byte, error) {
 	return key, nil
 }
 
+// logLevel reads LOG_LEVEL, defaulting to INFO. DEBUG is for local work and
+// one-off production debugging; it is not the production default.
+func logLevel() slog.Level {
+	switch strings.ToUpper(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "WARN":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
 // buildLogger assembles the slog logger. Always writes JSON to stdout; when
 // Sentry is enabled, also forwards records to Sentry via the fanout handler.
 func buildLogger(sentryEnabled bool) *slog.Logger {
-	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
+	level := logLevel()
+	jsonHandler := slog.NewJSONHandler(os.Stdout, logging.HandlerOptions(level))
 	if !sentryEnabled {
 		return slog.New(jsonHandler)
 	}
+	// Sentry stays at Info regardless of LOG_LEVEL: turning on debug logging
+	// should not start shipping debug records to Sentry.
 	return logging.NewWithHandlers(jsonHandler, hiresentry.NewSlogHandler(slog.LevelInfo))
 }
 

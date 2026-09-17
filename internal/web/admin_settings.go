@@ -890,6 +890,7 @@ func (d *Deps) qbOAuth(w http.ResponseWriter, r *http.Request) (*quickbooks.OAut
 		return nil, false
 	case err != nil:
 		slog.Error("qb oauth: resolve manager", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return nil, false
 	}
@@ -906,6 +907,7 @@ func (d *Deps) handleAdminQBConnect(w http.ResponseWriter, r *http.Request) {
 	authURL, err := oauth.StartAuth(w)
 	if err != nil {
 		slog.Error("qb oauth: start auth", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

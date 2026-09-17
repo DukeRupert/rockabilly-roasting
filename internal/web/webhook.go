@@ -58,6 +58,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.Error("webhook: persist event", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

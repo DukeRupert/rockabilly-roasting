@@ -557,7 +557,7 @@ templ ProductContent(props ProductDetailProps) {
 templ mobileBuyBar(props ProductDetailProps) {
 	<div
 		id="mobile-buy-bar"
-		class="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-linear"
+		class="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-[transform,visibility] motion-safe:duration-200 motion-safe:ease-linear"
 		style="padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));"
 		aria-hidden="true"
 	>

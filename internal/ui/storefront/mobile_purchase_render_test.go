@@ -93,17 +93,46 @@ func TestProductPriceHasASingleWriter(t *testing.T) {
 	}
 }
 
+// buyBarScript returns just the sticky bar's own script. Asserting against the
+// whole document is how the first version of these checks ended up inert: the
+// page also carries a GA4 script that mentions the add-to-cart form, and templ
+// emits JS comments verbatim, so a comment can satisfy an assertion about code.
+func buyBarScript(t *testing.T, html string) string {
+	t.Helper()
+	marker := "var state = window.__rrBuyBar;"
+	i := strings.Index(html, marker)
+	require.NotEqual(t, -1, i, "expected the mobile buy bar script")
+	end := strings.Index(html[i:], "</script>")
+	require.NotEqual(t, -1, end, "expected the buy bar script to be closed")
+	script := html[i : i+end]
+	// Strip line comments so prose cannot stand in for behaviour.
+	var code []string
+	for _, line := range strings.Split(script, "\n") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		code = append(code, line)
+	}
+	return strings.Join(code, "\n")
+}
+
 // The sticky bar is the only buy control a phone customer sees once the real buy
 // box scrolls away, so it has to reach the real form rather than post on its own.
 func TestMobileBuyBarDrivesTheRealForm(t *testing.T) {
 	html := renderProduct(t, productFixture())
-
 	require.Contains(t, html, `id="mobile-buy-bar"`)
-	assert.Contains(t, html, "#onetime-form form",
-		"the bar should submit the real add-to-cart form")
-	assert.NotContains(t, html, `hx-post="/cart/add"`+"\n\t\t\t\tid=\"mobile-buy-action\"",
-		"the bar must not carry its own cart endpoint")
-	assert.Contains(t, html, "invisible",
+
+	script := buyBarScript(t, html)
+
+	assert.Contains(t, script, `querySelector('#onetime-form form')`,
+		"the bar should submit the real add-to-cart form rather than post on its own")
+
+	barTag := html[strings.Index(html, `<button id="mobile-buy-action"`):]
+	barTag = barTag[:strings.Index(barTag, ">")]
+	assert.NotContains(t, barTag, "hx-post",
+		"the bar's button must not carry its own cart endpoint")
+
+	assert.Contains(t, script, `classList.toggle('invisible'`,
 		"a hidden bar should be visibility:hidden so its button leaves the tab order")
 }
 

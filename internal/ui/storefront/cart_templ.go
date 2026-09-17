@@ -536,7 +536,7 @@ func cartMobileBar(subtotal int) templ.Component {
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div id=\"cart-mobile-bar\" class=\"lg:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-linear\" style=\"padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));\" aria-hidden=\"true\"><div class=\"flex items-center gap-3\"><div class=\"min-w-0 flex-shrink-0\"><p class=\"font-oswald font-bold text-chrome-deep text-[10px] leading-none\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Total</p><p class=\"font-special text-ink text-lg leading-none mt-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div id=\"cart-mobile-bar\" class=\"lg:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-[transform,visibility] motion-safe:duration-200 motion-safe:ease-linear\" style=\"padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));\" aria-hidden=\"true\"><div class=\"flex items-center gap-3\"><div class=\"min-w-0 flex-shrink-0\"><p class=\"font-oswald font-bold text-chrome-deep text-[10px] leading-none\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Total</p><p class=\"font-special text-ink text-lg leading-none mt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

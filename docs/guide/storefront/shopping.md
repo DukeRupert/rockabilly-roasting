@@ -116,8 +116,9 @@ Click the red "Add to Cart" button to add the selected variant to your cart. You
 - For subscriptions, you choose quantity with the +/- controls before clicking "Subscribe & Save"
 - After adding, the cart badge in the header updates to show your new item count
 
-**On a phone**, once the buy box scrolls out of view a bar sticks to the bottom of
-the screen carrying the current price and one button -- "Add to Cart", or
+**On a phone**, a bar sticks to the bottom of the screen whenever the buy box
+itself is not in view -- including before you have scrolled down to it -- carrying
+the current price and one button -- "Add to Cart", or
 "Subscribe & Save" when you have switched to Subscribe. It drives the same
 controls further up the page, so the variant and quantity you picked still apply.
 After a successful add it confirms with "Added" and offers a "View cart" link,

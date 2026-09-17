@@ -332,7 +332,7 @@ templ Storefront(props StorefrontProps) {
 							<!-- Cart — amber chip with paper double-rule on ink -->
 							<a
 								href={ templ.SafeURL(props.cartURL()) }
-								class="btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors"
+								class="btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-3 sm:py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors"
 								style="letter-spacing:0.14em; text-transform:uppercase;"
 							>
 								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor" aria-hidden="true">
@@ -364,20 +364,20 @@ templ Storefront(props StorefrontProps) {
 				     the drawer snaps. -->
 				<div id="sf-mobile-menu" class="sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear" style="max-height:0;" aria-hidden="true">
 					<div class="space-y-1 px-4 py-3 bg-ink">
-						<a href="/catalog" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Coffee</a>
-						<a href="/subscriptions" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Daily Grind</a>
-						<a href="/about" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Story</a>
+						<a href="/catalog" class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Coffee</a>
+						<a href="/subscriptions" class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Daily Grind</a>
+						<a href="/about" class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Story</a>
 						<div class="border-t border-ink-soft mt-2 pt-2">
 							if c, ok := auth.CustomerFromContext(ctx); ok {
-								<a href={ templ.SafeURL(accountHref(c)) } class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Account</a>
+								<a href={ templ.SafeURL(accountHref(c)) } class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Account</a>
 								if isWholesale(c) {
-									<a href="/wholesale/login?switch=1" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Switch account</a>
+									<a href="/wholesale/login?switch=1" class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Switch account</a>
 								}
 								<form method="POST" action={ templ.SafeURL(logoutHref(c)) }>
-									<button type="submit" class="block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Sign out</button>
+									<button type="submit" class="flex items-center w-full min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Sign out</button>
 								</form>
 							} else {
-								<a href="/account/login" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log In</a>
+								<a href="/account/login" class="flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log In</a>
 							}
 						</div>
 					</div>

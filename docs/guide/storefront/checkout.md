@@ -18,6 +18,10 @@ Checkout is handled by a step-by-step interface. Here is what to expect:
 
 The checkout page loads your current cart and displays each item with its name, SKU, quantity, unit price, and line total, along with your cart subtotal. This is your last chance to confirm what you are ordering before entering your details.
 
+On a wide screen the order summary sits beside the form throughout. On a phone it
+is a collapsed "Order summary" bar above the form showing the running total; tap
+it to expand the full item list, coupon field and totals.
+
 ### Step 2: Shipping Address
 
 You will be asked to fill in:

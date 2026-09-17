@@ -394,7 +394,7 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-3 sm:py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -402,7 +402,7 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><!-- Collapsed by max-height rather than `hidden`, so the open and close\n\t\t\t\t     can animate. `invisible` is applied once the collapse finishes, so a\n\t\t\t\t     closed drawer is out of the tab order rather than a 0px-tall strip of\n\t\t\t\t     focusable links. The transition is motion-safe: with reduced motion\n\t\t\t\t     the drawer snaps. --><div id=\"sf-mobile-menu\" class=\"sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear\" style=\"max-height:0;\" aria-hidden=\"true\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><!-- Collapsed by max-height rather than `hidden`, so the open and close\n\t\t\t\t     can animate. `invisible` is applied once the collapse finishes, so a\n\t\t\t\t     closed drawer is out of the tab order rather than a 0px-tall strip of\n\t\t\t\t     focusable links. The transition is motion-safe: with reduced motion\n\t\t\t\t     the drawer snaps. --><div id=\"sf-mobile-menu\" class=\"sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear\" style=\"max-height:0;\" aria-hidden=\"true\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -420,12 +420,12 @@ func Storefront(props StorefrontProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if isWholesale(c) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<a href=\"/wholesale/login?switch=1\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<a href=\"/wholesale/login?switch=1\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -443,12 +443,12 @@ func Storefront(props StorefrontProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\"><button type=\"submit\" class=\"block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\"><button type=\"submit\" class=\"flex items-center w-full min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<a href=\"/account/login\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<a href=\"/account/login\" class=\"flex items-center min-h-11 px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

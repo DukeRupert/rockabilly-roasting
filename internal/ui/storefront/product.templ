@@ -186,8 +186,14 @@ templ ProductContent(props ProductDetailProps) {
 					}
 					<!-- Price tag — ink-bordered, Special Elite typewriter -->
 					if props.DefaultPrice != nil {
-						<div class="mt-6 inline-flex items-center gap-3 border-2 border-ink bg-paper-warm px-5 py-3" id="price-display" aria-live="polite" aria-atomic="true">
-							<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+						<div
+							class="mt-6 inline-flex items-center gap-3 border-2 border-ink bg-paper-warm px-5 py-3"
+							id="price-display"
+							aria-live="polite"
+							aria-atomic="true"
+							data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }
+						>
+							<span class="font-special text-ink text-2xl sm:text-3xl leading-none">{ formatCents(*props.DefaultPrice) }</span>
 						</div>
 					}
 					<!-- Tasting notes -->
@@ -466,8 +472,19 @@ templ ProductContent(props ProductDetailProps) {
 			if props.PrevProduct != nil && props.NextProduct != nil {
 				@productNavPair(props.PrevProduct, props.NextProduct, props.RoastBased)
 			}
+			if len(props.Variants) > 0 {
+				<!-- Clearance for the sticky mobile buy bar, so the last element on the
+				     page isn't sitting underneath it. -->
+				<div class="sm:hidden h-20" aria-hidden="true"></div>
+			}
 		</div>
 	</section>
+	if len(props.Variants) > 0 {
+		@mobileBuyBar(props)
+	}
+	if props.DefaultPrice != nil {
+		@priceControllerScript()
+	}
 	if len(props.Options) > 0 && len(props.VariantMap) > 0 {
 		@optionSelectionScript(props.VariantMap)
 	}
@@ -527,6 +544,245 @@ templ ProductContent(props ProductDetailProps) {
 				});
 				pending = null;
 			});
+		})();
+	</script>
+}
+
+// mobileBuyBar renders the phone-only sticky purchase bar. The real buy box
+// sits roughly two screens down a product page on a phone (title, image,
+// tasting notes and description all come first), so once it scrolls out of
+// view the bar keeps the price and one primary action within thumb reach.
+// It drives the real form rather than duplicating it — one source of truth
+// for variant, quantity and mode.
+templ mobileBuyBar(props ProductDetailProps) {
+	<div
+		id="mobile-buy-bar"
+		class="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper translate-y-full motion-safe:transition-[translate,visibility] motion-safe:duration-200 motion-safe:ease-linear"
+		style="padding:0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));"
+		aria-hidden="true"
+	>
+		<div class="flex items-center gap-3">
+			<div class="min-w-0 flex-shrink-0">
+				if props.DefaultPrice != nil {
+					<p id="mobile-buy-price" class="font-special text-ink text-lg leading-none">{ formatCents(*props.DefaultPrice) }</p>
+				}
+				<p
+					id="mobile-buy-note"
+					class="font-oswald font-bold text-chrome-deep text-[10px] leading-none mt-1"
+					style="letter-spacing:0.14em; text-transform:uppercase;"
+				>
+					One-time
+				</p>
+				<a
+					id="mobile-buy-cart-link"
+					href="/cart"
+					class="hidden font-oswald font-bold text-[10px] text-rust leading-none mt-1"
+					style="letter-spacing:0.14em; text-transform:uppercase;"
+				>
+					View cart →
+				</a>
+			</div>
+			<button
+				id="mobile-buy-action"
+				type="button"
+				class="btn-stamp flex-1 min-h-12 bg-rust text-paper border-2 border-ink px-4 py-3 font-oswald font-bold text-xs"
+				style="letter-spacing:0.16em; text-transform:uppercase;"
+			>
+				Add to cart
+			</button>
+		</div>
+	</div>
+	<script>
+		(function() {
+			// Elements are resolved per call rather than captured once: hx-boost swaps
+			// #main-content, which replaces every one of these nodes while the
+			// window-level listeners registered below survive a swap. A captured node
+			// would leave those listeners driving a detached bar.
+			function el(id) { return document.getElementById(id); }
+			if (!el('mobile-buy-bar') || !el('mobile-buy-action')) return;
+
+			var state = window.__rrBuyBar;
+			if (!state) {
+				state = window.__rrBuyBar = { mode: 'onetime', revertTimer: null, ticking: false };
+			}
+
+			function reveal(visible) {
+				var bar = el('mobile-buy-bar');
+				if (!bar) return;
+				// invisible (not merely translated) so an off-screen bar is out of the
+				// tab order too — same treatment as the mobile nav drawer.
+				bar.classList.toggle('translate-y-full', !visible);
+				bar.classList.toggle('invisible', !visible);
+				bar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+			}
+
+			// The bar carries the price and the action whenever the real buy box is
+			// not on screen — which includes before it has been scrolled to, since on
+			// a phone the buy box starts well below the fold. Driven by scroll rather
+			// than an IntersectionObserver: this is the only buy button a phone
+			// customer sees, and scroll state can be recomputed on demand.
+			function sync() {
+				state.ticking = false;
+				var section = el('purchase-section');
+				if (!section) { reveal(true); return; }
+				var rect = section.getBoundingClientRect();
+				reveal(rect.bottom < 0 || rect.top > (window.innerHeight || 0));
+			}
+
+			function schedule() {
+				if (state.ticking) return;
+				state.ticking = true;
+				window.requestAnimationFrame(sync);
+			}
+
+			// setLabels puts the bar back into its resting state for the current mode.
+			// The note and the "View cart" link are a pair and move together: reverting
+			// the button alone would leave a subscribe price with no "per delivery"
+			// qualifier beside it.
+			function setLabels() {
+				var action = el('mobile-buy-action');
+				var noteEl = el('mobile-buy-note');
+				var cartLink = el('mobile-buy-cart-link');
+				if (action) action.textContent = state.mode === 'subscribe' ? 'Subscribe & save' : 'Add to cart';
+				if (noteEl) {
+					noteEl.textContent = state.mode === 'subscribe' ? 'Per delivery' : 'One-time';
+					noteEl.classList.remove('hidden');
+				}
+				if (cartLink) cartLink.classList.add('hidden');
+			}
+
+			function applyPrice(detail) {
+				if (!detail) return;
+				state.mode = detail.mode;
+				var priceEl = el('mobile-buy-price');
+				if (priceEl) priceEl.textContent = detail.formatted;
+				if (state.revertTimer) return; // don't stomp the "Added" confirmation
+				setLabels();
+			}
+
+			function handleAction() {
+				if (state.mode === 'subscribe') {
+					var subscribeBtn = el('subscribe-action');
+					if (subscribeBtn) subscribeBtn.click();
+					return;
+				}
+				var form = document.querySelector('#onetime-form form');
+				if (!form) return;
+				if (form.requestSubmit) form.requestSubmit();
+				else form.submit();
+			}
+
+			// Confirm the add in the bar itself — on a phone the cart chip in the
+			// header is off screen when the bar is what the customer just tapped.
+			function confirmAdd() {
+				var action = el('mobile-buy-action');
+				var noteEl = el('mobile-buy-note');
+				var cartLink = el('mobile-buy-cart-link');
+				if (!action) return;
+				action.textContent = 'Added ✓';
+				action.classList.remove('bg-rust', 'text-paper');
+				action.classList.add('bg-candle', 'text-ink');
+				if (noteEl) noteEl.classList.add('hidden');
+				if (cartLink) cartLink.classList.remove('hidden');
+				clearTimeout(state.revertTimer);
+				state.revertTimer = setTimeout(function() {
+					state.revertTimer = null;
+					var btn = el('mobile-buy-action');
+					if (btn) {
+						btn.classList.add('bg-rust', 'text-paper');
+						btn.classList.remove('bg-candle', 'text-ink');
+					}
+					setLabels();
+				}, 2000);
+			}
+
+			// Registered once per document. Every handler resolves its elements at
+			// call time, so they keep working against whatever bar is currently in
+			// the DOM after an hx-boost swap.
+			if (!state.bound) {
+				state.bound = true;
+				window.addEventListener('scroll', schedule, { passive: true });
+				window.addEventListener('resize', schedule);
+				document.addEventListener('rr:price', function(evt) { applyPrice(evt.detail); });
+				document.body.addEventListener('click', function(evt) {
+					if (!evt.target.closest || !evt.target.closest('#mobile-buy-action')) return;
+					handleAction();
+				});
+				document.body.addEventListener('htmx:afterRequest', function(evt) {
+					var target = evt.target;
+					if (!target || !target.closest || !target.closest('#onetime-form')) return;
+					if (!evt.detail || !evt.detail.successful) return;
+					confirmAdd();
+				});
+			}
+
+			if (window.rrPrice) applyPrice(window.rrPrice.get());
+			sync();
+		})();
+	</script>
+}
+
+// priceControllerScript owns the price tag. Both the variant pills and the
+// subscribe frequency options move the price, and they used to each rewrite
+// #price-display directly — which lost the other's contribution (picking a
+// variant wiped the subscription discount) and dropped the data-base-price
+// attribute the next update read back, freezing the price after one change.
+// One controller holds base/discount/quantity and renders from that.
+templ priceControllerScript() {
+	<script>
+		(function() {
+			var display = document.getElementById('price-display');
+			if (!display) return;
+
+			var state = {
+				base: parseInt(display.dataset.basePrice, 10) || 0,
+				discount: 0,
+				qty: 1,
+				mode: 'onetime'
+			};
+
+			function formatCents(cents) { return '$' + (cents / 100).toFixed(2); }
+			function unitCents() { return Math.round(state.base * (100 - state.discount) / 100); }
+
+			function render() {
+				var unit = unitCents();
+				// Per-unit price with an explicit "× N" multiplier rather than the
+				// qty-multiplied total — "2 × $18.00", never "2 × $36.00".
+				var qtySuffix = state.qty > 1
+					? ' <span class="font-oswald text-ink-soft text-base">× ' + state.qty + '</span>'
+					: '';
+				if (state.discount > 0) {
+					display.innerHTML = '<span class="font-special text-chrome-deep text-lg line-through">' + formatCents(state.base) + '</span>' +
+						' <span class="font-special text-rust text-2xl sm:text-3xl leading-none">' + formatCents(unit) + '</span>' + qtySuffix;
+				} else {
+					display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none">' + formatCents(unit) + '</span>' + qtySuffix;
+				}
+				display.dataset.basePrice = String(state.base);
+				document.dispatchEvent(new CustomEvent('rr:price', { detail: window.rrPrice.get() }));
+			}
+
+			window.rrPrice = {
+				setBase: function(cents) {
+					if (typeof cents !== 'number' || isNaN(cents)) return;
+					state.base = cents;
+					render();
+				},
+				setDiscount: function(pct) { state.discount = pct || 0; render(); },
+				setQuantity: function(qty) { state.qty = qty || 1; render(); },
+				setMode: function(mode) { state.mode = mode; render(); },
+				get: function() {
+					return {
+						base: state.base,
+						discount: state.discount,
+						qty: state.qty,
+						mode: state.mode,
+						unit: unitCents(),
+						formatted: formatCents(unitCents())
+					};
+				}
+			};
+
+			render();
 		})();
 	</script>
 }
@@ -814,9 +1070,9 @@ func variantMapJSON(m map[string]VariantOptionEntry) string {
 
 func optionPillClasses(selected bool) string {
 	if selected {
-		return "font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors"
+		return "inline-flex items-center min-h-11 font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors"
 	}
-	return "font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors"
+	return "inline-flex items-center min-h-11 font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors"
 }
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -845,9 +1101,9 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 		(function() {
 			var scriptEl = document.querySelector('script[data-variant-map]');
 			var variantMap = JSON.parse(scriptEl.dataset.variantMap);
-			var activeCls = 'option-pill font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors';
-			var inactiveCls = 'option-pill font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors';
-			var disabledCls = 'option-pill font-oswald font-bold text-[11px] text-ink/40 bg-cream-hi border-2 border-ink/30 px-4 py-2 line-through cursor-not-allowed';
+			var activeCls = 'option-pill inline-flex items-center min-h-11 font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors';
+			var inactiveCls = 'option-pill inline-flex items-center min-h-11 font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors';
+			var disabledCls = 'option-pill inline-flex items-center min-h-11 font-oswald font-bold text-[11px] text-ink/40 bg-cream-hi border-2 border-ink/30 px-4 py-2 line-through cursor-not-allowed';
 
 			document.querySelectorAll('.option-pill').forEach(function(btn) {
 				btn.addEventListener('click', function() {
@@ -945,19 +1201,14 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 					if (ids.length === selected.length && selected.every(function(s) { return ids.indexOf(s) !== -1; })) {
 						var input = document.getElementById('selected-variant-id');
 						if (input) input.value = vid;
-						if (entry.price !== null) {
-							var display = document.getElementById('price-display');
-							if (display) {
-								display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price="' + entry.price + '">' + formatCents(entry.price) + '</span>';
-							}
+						// Hand the new base price to the price controller so any
+						// subscription discount and quantity still apply.
+						if (entry.price !== null && window.rrPrice) {
+							window.rrPrice.setBase(entry.price);
 						}
 						break;
 					}
 				}
-			}
-
-			function formatCents(cents) {
-				return '$' + (cents / 100).toFixed(2);
 			}
 
 			refreshOptionStates();
@@ -994,6 +1245,7 @@ templ purchaseModeScript() {
 					var onetimeForm = document.getElementById('onetime-form');
 					var subscribeForm = document.getElementById('subscribe-form');
 					var subscribeOptions = document.getElementById('subscribe-options');
+					if (window.rrPrice) window.rrPrice.setMode(mode);
 					if (mode === 'subscribe') {
 						onetimeForm.classList.add('hidden');
 						subscribeForm.classList.remove('hidden');
@@ -1095,37 +1347,20 @@ templ purchaseModeScript() {
 			}
 
 			function updatePrice() {
-				var priceEl = document.querySelector('[data-base-price]');
-				if (!priceEl) return;
-				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
-				var qty = getQuantity();
+				if (!window.rrPrice) return;
 				var checked = document.querySelector('.subscribe-frequency-option input:checked');
-				if (!checked) return;
-				var label = checked.closest('.subscribe-frequency-option');
-				var discount = parseInt(label.dataset.discount, 10) || 0;
-				var unitCents = Math.round(baseCents * (100 - discount) / 100);
-				var display = document.getElementById('price-display');
-				// Show the per-unit price with an explicit "× N" multiplier rather
-				// than the qty-multiplied total — "2 × $18.00", never "2 × $36.00".
-				var qtySuffix = qty > 1 ? ' <span class="font-oswald text-ink-soft text-base">× ' + qty + '</span>' : '';
-				if (discount > 0) {
-					display.innerHTML = '<span class="font-special text-chrome-deep text-lg line-through">' + formatCents(baseCents) + '</span>' +
-						' <span class="font-special text-rust text-2xl sm:text-3xl leading-none">' + formatCents(unitCents) + '</span>' + qtySuffix;
-				} else {
-					display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none">' + formatCents(unitCents) + '</span>' + qtySuffix;
+				var discount = 0;
+				if (checked) {
+					discount = parseInt(checked.closest('.subscribe-frequency-option').dataset.discount, 10) || 0;
 				}
+				window.rrPrice.setQuantity(getQuantity());
+				window.rrPrice.setDiscount(discount);
 			}
 
 			function resetPrice() {
-				var priceEl = document.querySelector('[data-base-price]');
-				if (!priceEl) return;
-				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
-				var display = document.getElementById('price-display');
-				display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
-			}
-
-			function formatCents(cents) {
-				return '$' + (cents / 100).toFixed(2);
+				if (!window.rrPrice) return;
+				window.rrPrice.setQuantity(1);
+				window.rrPrice.setDiscount(0);
 			}
 
 			// Auto-activate subscribe mode if ?mode=subscribe is present

@@ -545,6 +545,22 @@ templ Storefront(props StorefrontProps) {
 						});
 					}
 
+					// A drawer should close when the page goes somewhere, and stay put
+					// otherwise. Targeting #main-content is not that test: the order page's
+					// label poller re-renders #main-content every 2s on its own, and the
+					// cart's quantity forms post into it without going anywhere. What
+					// actually means "navigation" is htmx's own `boosted` flag for boosted
+					// links and forms, and hx-push-url for the hand-rolled ones that change
+					// the address bar themselves.
+					function htmxSwapIsNavigation(evt) {
+						var detail = evt.detail || {};
+						if (detail.boosted) return true;
+						var elt = (detail.requestConfig && detail.requestConfig.elt) || evt.target;
+						if (!elt || !elt.closest) return false;
+						var pushes = elt.closest('[hx-push-url]');
+						return !!pushes && pushes.getAttribute('hx-push-url') !== 'false';
+					}
+
 					// Mobile menu toggle
 					var btn = document.getElementById('sf-mobile-menu-btn');
 					var menu = document.getElementById('sf-mobile-menu');
@@ -612,8 +628,15 @@ templ Storefront(props StorefrontProps) {
 						// without this the drawer stays open over the page it just
 						// navigated to. Closed without animation: it should already be
 						// gone by the time the new content lands.
-						document.body.addEventListener('htmx:beforeSwap', function() {
-							if (menuOpen) setMenu(false, false);
+						//
+						// Navigations only, by the same test the admin uses. This drawer is
+						// an in-flow accordion rather than a modal, so the page under it
+						// stays clickable: a cart quantity form posts into #main-content
+						// without going anywhere, and closing the menu for that would be
+						// closing it out from under the reader. Catalog filters do change
+						// the address bar, and do close it.
+						document.body.addEventListener('htmx:beforeSwap', function(evt) {
+							if (menuOpen && htmxSwapIsNavigation(evt)) setMenu(false, false);
 						});
 					}
 

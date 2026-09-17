@@ -381,6 +381,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			})
 		default:
 			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
+			recordRequestError(r.Context(), err, http.StatusInternalServerError)
 			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare payment"})
 		}
 		return
@@ -404,6 +405,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if stripeErr != nil {
 			logger.Error("subscribe create stripe customer", "error", stripeErr)
 			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
+			recordRequestError(r.Context(), stripeErr, http.StatusInternalServerError)
 			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment customer"})
 			return
 		}
@@ -435,6 +437,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		logger.Error("subscribe create PI", "error", err)
 		d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment"})
 		return
 	}
@@ -485,6 +488,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
 		d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare order"})
 		return
 	}
@@ -570,6 +574,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 	pi, err := d.PaymentProvider.GetPaymentIntent(ctx, req.PaymentIntentID)
 	if err != nil {
 		logger.Error("subscribe get PI", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to verify payment"})
 		return
 	}
@@ -644,6 +649,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to finalize subscription"})
 		return
 	}

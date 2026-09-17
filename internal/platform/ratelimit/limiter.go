@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -121,6 +123,39 @@ func SetTrustedProxies(cidrs []string) error {
 	return nil
 }
 
+// directlyExposed records that this deployment intends to see client sockets
+// directly, so falling back to RemoteAddr is correct and needs no report.
+var directlyExposed atomic.Bool
+
+// SetDirectlyExposed marks this service as internet-facing, silencing the
+// untrusted-forwarder report. Call only when no reverse proxy sits in front.
+func SetDirectlyExposed() { directlyExposed.Store(true) }
+
+// reportedUntrusted ensures the report below is emitted once per process. The
+// condition is a static misconfiguration, not an event: one line names the
+// address to fix, and repeating it per request would bury it.
+var reportedUntrusted atomic.Bool
+
+// reportUntrustedForwarder fires when a peer sends X-Forwarded-For but is not a
+// trusted proxy. That means a reverse proxy is in front of us and we are
+// discarding what it tells us, so every request resolves to the same peer
+// address and every per-IP rate limit collapses into a single global bucket.
+//
+// This has happened in production and went unnoticed for months, because the
+// limiter keeps "working" — just globally (docs/security/rate-limiting-TODO.md).
+// The subnet moves whenever the compose network is recreated, so the fix drifts
+// out of date on its own. The report names the peer address, which is exactly
+// the value TRUSTED_PROXIES needs to contain.
+func reportUntrustedForwarder(peer string) {
+	if directlyExposed.Load() || reportedUntrusted.Swap(true) {
+		return
+	}
+	slog.Error("untrusted proxy forwarding",
+		"peer", peer,
+		"effect", "per-IP rate limits share one bucket and logged client IPs are all this peer",
+		"fix", "set TRUSTED_PROXIES to a range containing "+peer)
+}
+
 // isTrustedProxy checks whether ip is within a configured trusted proxy CIDR.
 func isTrustedProxy(ip string) bool {
 	trustedMu.RLock()
@@ -143,33 +178,76 @@ func isTrustedProxy(ip string) bool {
 	return false
 }
 
-// ClientIP extracts the client IP from the request.
-// Forwarded headers (X-Forwarded-For, X-Real-IP) are only trusted when
-// RemoteAddr matches a configured trusted proxy CIDR. Otherwise RemoteAddr
-// is used directly, preventing attackers from spoofing their IP.
+// trustedHops is how many proxies of our own sit between the internet and this
+// process. Today that is one: the host-level Caddy. If a CDN (Cloudflare
+// proxying) is ever put in front of Caddy, Caddy needs `trusted_proxies` set
+// *and* this must become 2 — otherwise the right-most entry is Cloudflare's
+// edge address rather than the visitor's.
+const trustedHops = 1
+
+// ClientIP extracts the real client IP from the request.
+//
+// Forwarded headers are only honoured when the direct connection comes from a
+// configured trusted proxy CIDR; otherwise RemoteAddr is used, so a request
+// that reaches this process directly cannot name its own address.
+//
+// Within X-Forwarded-For we take the entry our own proxy wrote — counting
+// trustedHops in from the right — never the left-most one. The left-most entry
+// is whatever the caller claimed, and this value keys the rate limiter and
+// lands in audit-adjacent logs: trusting it would let a visitor pin abuse on an
+// arbitrary address, or evade a limiter by rotating the header.
+//
+// Caddy with `trusted_proxies` unset (the current fleet config) *replaces*
+// X-Forwarded-For with the immediate peer rather than appending, so there is
+// exactly one entry today and left and right agree. That is a property of the
+// proxy config, not a guarantee — counting from the right stays correct when it
+// changes.
 func ClientIP(r *http.Request) string {
-	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteHost = r.RemoteAddr
-	}
+	remoteHost := stripPort(r.RemoteAddr)
 
 	// Only read forwarded headers if the direct connection is from a trusted proxy.
 	if isTrustedProxy(remoteHost) {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			// Take the first IP (the original client).
-			for i := 0; i < len(xff); i++ {
-				if xff[i] == ',' {
-					return strings.TrimSpace(xff[:i])
-				}
+			parts := strings.Split(xff, ",")
+			// Count in from the right: the last entry was written by the proxy
+			// nearest us, the one before it by the proxy before that.
+			i := len(parts) - trustedHops
+			if i < 0 {
+				i = 0
 			}
-			return strings.TrimSpace(xff)
+			if ip := stripPort(strings.TrimSpace(parts[i])); ip != "" {
+				return ip
+			}
 		}
-		if xri := r.Header.Get("X-Real-IP"); xri != "" {
-			return xri
+		if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+			return stripPort(xri)
 		}
 	}
 
+	// Falling back to the socket address is correct when nothing is forwarding.
+	// If the peer *did* forward, it is a proxy we have not been told to trust,
+	// and this value is about to be the same for every visitor.
+	if !isTrustedProxy(remoteHost) &&
+		(r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != "") {
+		reportUntrustedForwarder(remoteHost)
+	}
+
 	return remoteHost
+}
+
+// stripPort removes a trailing :port from an address, leaving the bare IP.
+// Logged and rate-limited addresses must never carry a port — the same visitor
+// gets a new source port on every connection.
+func stripPort(addr string) string {
+	if addr == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	// Not host:port — either a bare IP, or a bare IPv6 address whose colons
+	// SplitHostPort chokes on. Both are already what we want.
+	return strings.Trim(addr, "[]")
 }
 
 // HashIdentifier returns a hex-encoded SHA-256 hash of an identifier (email).

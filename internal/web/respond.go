@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dukerupert/hiri/internal/app"
-	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/routing"
 	"github.com/dukerupert/hiri/internal/ui/components/toast"
 )
@@ -31,10 +30,11 @@ func JSON(w http.ResponseWriter, status int, v any) {
 // For non-htmx requests, it returns JSON as before.
 func Error(w http.ResponseWriter, r *http.Request, err error) {
 	status, msg := mapError(err)
-	logger := logging.FromContext(r.Context())
-	if status >= 500 {
-		logger.Error("internal error", "error", err)
-	}
+	// Hand the error to the request log line rather than logging a second
+	// record here. The status is passed alongside because an htmx request is
+	// answered 200 below even when the error is a 500 — without it the request
+	// line would read as ordinary traffic.
+	recordRequestError(r.Context(), err, status)
 	if IsHTMX(r) {
 		// The toast is a single root element carrying hx-swap-oob, and htmx
 		// lifts every top-level OOB element out of the response before the

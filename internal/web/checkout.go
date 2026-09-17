@@ -344,6 +344,7 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.Error("checkout cart", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load cart"})
 		return
 	}
@@ -532,6 +533,7 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.Error("checkout address", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save address"})
 		return
 	}
@@ -626,6 +628,7 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		logger.Error("apply coupon", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to apply coupon"})
 		return
 	}
@@ -656,6 +659,7 @@ func (d *Deps) handleCheckoutRemoveCoupon(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		logger.Error("remove coupon", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to remove coupon"})
 		return
 	}
@@ -848,6 +852,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			})
 		default:
 			d.Metrics.CheckoutFailed.WithLabelValues("retail", "internal_error").Inc()
+			recordRequestError(r.Context(), err, http.StatusInternalServerError)
 			JSON(w, http.StatusInternalServerError, map[string]string{
 				"error": "Something went wrong preparing your payment. Please try again — if it keeps happening, your cart is saved.",
 			})
@@ -878,6 +883,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		logger.Error("create payment intent", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment"})
 		return
 	}
@@ -931,6 +937,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			reason = "coupon_redeemed"
 			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "coupon was just used by another customer"})
 		} else {
+			recordRequestError(r.Context(), err, http.StatusInternalServerError)
 			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to place order"})
 		}
 		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
@@ -1059,6 +1066,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	pi, err := d.PaymentProvider.GetPaymentIntent(ctx, req.PaymentIntentID)
 	if err != nil {
 		logger.Error("get payment intent", "error", err)
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to verify payment"})
 		return
 	}
@@ -1112,6 +1120,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		reason := classifyCheckoutError(err)
 		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
 		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
+		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to confirm order"})
 		return
 	}
@@ -1188,11 +1197,14 @@ func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
 				MaxAge: -1,
 			})
 		} else {
-			logger.Warn("GA_DEBUG order confirmed: load analytics", "error", loadErr, "order_number", orderNumber)
+			logger.Warn("order analytics load failed", "error", loadErr, "order_number", orderNumber)
 		}
 	}
 
-	logger.Info("GA_DEBUG order confirmed: render",
+	// Tracing for the GA purchase event: which confirmations had a usable
+	// last-order cookie. Debug, not Info — it fires on every confirmation and
+	// repeats fields the request line already carries.
+	logger.Debug("order confirmation rendered",
 		"order_number", orderNumber,
 		"cookie_found", cookieFound,
 		"cookie_value", cookieValue,

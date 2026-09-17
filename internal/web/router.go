@@ -115,12 +115,16 @@ func MetricsMux(reg *metrics.Registry) http.Handler {
 	return mux
 }
 
+// healthPath is the liveness endpoint. Named because loggingMiddleware drops it
+// to DEBUG: it is polled every few seconds and would otherwise dominate the logs.
+const healthPath = "/health"
+
 // NewRouter creates a new HTTP router with all routes and middleware registered.
 func NewRouter(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	// Health check — pings the database to verify connectivity.
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		if err := deps.Pool.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte("db unhealthy")) //nolint:errcheck
@@ -861,9 +865,13 @@ func NewRouter(deps *Deps) http.Handler {
 	handler = deps.optionalCustomerSession(handler)
 	handler = crossOriginProtection(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/
-	handler = requestIDMiddleware(handler)
-	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
 	handler = ratelimit.GlobalLimit(deps.RateLimiter, ratelimit.GlobalIPLimit, ratelimit.GlobalWindow)(handler)
+	// Request logging sits outside the rate limiter so a rejected request is
+	// still logged — a 429 previously left no trace at all — and inside the
+	// request ID so that line carries request_id like every other line the
+	// request emits.
+	handler = loggingMiddleware(handler)
+	handler = requestIDMiddleware(handler)
 	handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
 	// Sentry wraps everything so it can recover panics from any middleware.
 	// No-op when SENTRY_DSN is unset (the hub is a dummy).

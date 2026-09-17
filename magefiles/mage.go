@@ -101,15 +101,15 @@ func Clean() error {
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
 //
-// CheckTemplSync goes first and alone. It is the one target here that *writes*
-// — it runs `templ generate` and compares the result — while Lint and Test both
-// compile the files it is rewriting. Under mg.Deps they run concurrently, so a
-// tree with real drift would have had the generator racing the compiler: the
-// failure mode arms itself in exactly the case the target exists to catch, and
-// stays invisible the rest of the time because a clean tree rewrites every file
-// with identical bytes.
+// The two sync checks go first and alone. They are the targets here that
+// *write* — they re-run the generators and compare the result — while Lint and
+// Test both compile the files they are rewriting. Under mg.Deps they run
+// concurrently, so a tree with real drift would have had the generator racing
+// the compiler: the failure mode arms itself in exactly the case the target
+// exists to catch, and stays invisible the rest of the time because a clean
+// tree rewrites every file with identical bytes.
 func Check() {
-	mg.SerialDeps(CheckTemplSync)
+	mg.SerialDeps(CheckTemplSync, CheckAssetSync)
 	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
 }
 
@@ -175,6 +175,109 @@ func templArtifactHashes() (map[string]string, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("hash templ artifacts: %w", err)
+	}
+	return sums, nil
+}
+
+// CheckAssetSync fails if the committed Tailwind CSS or Svelte checkout bundle
+// differs from what their sources build.
+//
+// Companion to CheckTemplSync, added after a stale output.css shipped a class
+// that existed in a template and in no stylesheet: the element simply rendered
+// unstyled, and `go build`, `go vet` and the whole test suite passed over it
+// without a word. The Tailwind build is the easiest of the three to forget,
+// because it is the only one that must re-run when a *template* changes rather
+// than when its own source does — adding a class to a .templ file is a change
+// to the CSS input, and it does not look like one.
+//
+// Note what this does *not* protect. The production image rebuilds all three
+// artifacts from source (see Dockerfile), so a stale committed file does not
+// reach a deployed site. What it reaches is everything else: a `go run
+// ./cmd/server` that skips the generators, a reviewer reading the diff, and
+// anyone trusting the committed tree to be what the source says. That is worth
+// a check on its own, but it is a correctness check on the repository, not a
+// release gate.
+//
+// Compared by content across a rebuild rather than against git, for the same
+// reason CheckTemplSync is: "this artifact does not match its source" rather
+// than "you have uncommitted work".
+func CheckAssetSync() error {
+	before, err := assetArtifactHashes()
+	if err != nil {
+		return err
+	}
+	if err := CSS(); err != nil {
+		return err
+	}
+	if err := Checkout(); err != nil {
+		return err
+	}
+	after, err := assetArtifactHashes()
+	if err != nil {
+		return err
+	}
+
+	// The checkout bundle emits content-hashed filenames, so drift shows up as
+	// files appearing and disappearing as well as changing in place.
+	stale := map[string]string{}
+	for path, sum := range after {
+		switch {
+		case before[path] == "":
+			stale[path] = "built, not committed"
+		case before[path] != sum:
+			stale[path] = "out of date"
+		}
+	}
+	for path := range before {
+		if after[path] == "" {
+			stale[path] = "committed, no longer built"
+		}
+	}
+
+	if len(stale) > 0 {
+		paths := make([]string, 0, len(stale))
+		for path := range stale {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		fmt.Fprintln(os.Stderr, "generated assets did not match their source:")
+		for _, path := range paths {
+			fmt.Fprintf(os.Stderr, "  %s (%s)\n", path, stale[path])
+		}
+		return fmt.Errorf("rebuilt %d asset(s) — commit the result", len(stale))
+	}
+	return nil
+}
+
+// assetArtifactHashes fingerprints the built CSS and every file in the checkout
+// bundle. Both are build output committed to the repo.
+func assetArtifactHashes() (map[string]string, error) {
+	sums := map[string]string{}
+
+	add := func(path string) error {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sums[path] = fmt.Sprintf("%x", sha256.Sum256(data))
+		return nil
+	}
+
+	if err := add("internal/ui/assets/css/output.css"); err != nil {
+		return nil, fmt.Errorf("hash built css: %w", err)
+	}
+
+	err := filepath.Walk("internal/ui/assets/checkout", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		return add(path)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("hash checkout bundle: %w", err)
 	}
 	return sums, nil
 }

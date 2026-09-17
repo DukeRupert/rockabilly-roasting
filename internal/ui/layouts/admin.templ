@@ -674,6 +674,37 @@ templ Admin(props AdminProps) {
 						if (e.key === 'Escape') closeSidebar();
 					});
 
+					// A drawer should close when the page goes somewhere, and stay put
+					// otherwise. Targeting #main-content is not that test: the order page's
+					// label poller re-renders #main-content every 2s on its own, and the
+					// cart's quantity forms post into it without going anywhere. What
+					// actually means "navigation" is htmx's own `boosted` flag for boosted
+					// links and forms, and hx-push-url for the hand-rolled ones that change
+					// the address bar themselves.
+					function htmxSwapIsNavigation(evt) {
+						var detail = evt.detail || {};
+						if (detail.boosted) return true;
+						var elt = (detail.requestConfig && detail.requestConfig.elt) || evt.target;
+						if (!elt || !elt.closest) return false;
+						var pushes = elt.closest('[hx-push-url]');
+						return !!pushes && pushes.getAttribute('hx-push-url') !== 'false';
+					}
+
+					// hx-boost swaps #main-content and leaves this drawer standing, so a
+					// nav link tapped inside it navigates the page underneath while the
+					// drawer stays open over the top — the sidebar is a modal dialog with
+					// a backdrop, so staff are left reading the old menu over a page they
+					// cannot see.
+					//
+					// Only navigations close it. htmx events bubble, and two things in the
+					// admin swap on their own: the catalog nav badge polls every 60s from
+					// *inside* this drawer, and the order page's label poller re-renders
+					// #main-content every 2s while a label is queued. A listener that closed
+					// on either would shut the menu under whoever was reading it.
+					document.body.addEventListener('htmx:beforeSwap', function(evt) {
+						if (htmxSwapIsNavigation(evt)) closeSidebar();
+					});
+
 					// Dropdown menus
 					document.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {
 						var trigger = dropdown.querySelector('[data-dropdown-trigger]');

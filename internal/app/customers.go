@@ -444,8 +444,51 @@ func (s *CustomerService) UpdatePreferredLocalFulfillment(ctx context.Context, t
 
 // --- Address methods ---
 
+// normalizeAddressParams returns a copy of p with State, PostalCode and
+// CountryCode reduced to their canonical spelling.
+//
+// Only those three fields are rewritten. Names, line1 and city are stored as
+// the customer typed them -- they appear on a shipping label, and lowercasing
+// or re-spacing them would damage user-visible output to serve a comparison.
+// The case- and space-insensitivity those fields need lives inside
+// domain.AddressKey, which folds for comparison without touching storage.
+func normalizeAddressParams(p store.CreateAddressParams) store.CreateAddressParams {
+	p.CountryCode = domain.NormalizeCountryCode(p.CountryCode)
+	p.State = domain.NormalizeState(p.State)
+	p.PostalCode = domain.NormalizePostalCode(p.PostalCode, p.CountryCode)
+	return p
+}
+
+// addressForKey projects create-params onto the domain.Address shape so they
+// can be keyed against stored rows. Only the fields domain.AddressKey reads are
+// carried across.
+func addressForKey(p store.CreateAddressParams) domain.Address {
+	return domain.Address{
+		FirstName:   p.FirstName,
+		LastName:    p.LastName,
+		Line1:       p.Line1,
+		Line2:       p.Line2,
+		City:        p.City,
+		State:       p.State,
+		PostalCode:  p.PostalCode,
+		CountryCode: p.CountryCode,
+	}
+}
+
 // CreateAddress creates a new address and records an audit entry.
+//
+// Always inserts. It normalizes but does not deduplicate, so the name stays
+// honest and the customer.address_added audit entry always corresponds to a row
+// that was in fact added. Callers writing an address as a side effect of
+// something else -- placing an order, siting a machine -- want
+// FindOrCreateAddress instead.
+//
+// Guarantees the stored row is canonical: State, PostalCode and CountryCode are
+// normalized here rather than at the call sites, so no caller can write a
+// non-canonical address and none has to remember to ask.
 func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
+	p = normalizeAddressParams(p)
+
 	addr, err := s.customers.CreateAddress(ctx, tx, p)
 	if err != nil {
 		return nil, fmt.Errorf("create address: %w", err)
@@ -464,6 +507,56 @@ func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.
 	}
 
 	return addr, nil
+}
+
+// FindOrCreateAddress returns the customer's existing row for this destination
+// if they already have one, and creates it otherwise.
+//
+// This is the call for every path where an address arrives as a side effect of
+// doing something else: checkout, wholesale checkout, subscribe, an admin
+// manual order, siting a machine. Those paths run once per order, so calling
+// CreateAddress from them fills a returning customer's address book with copies
+// of one house.
+//
+// Matching is by domain.AddressKey, which normalizes both sides. That is
+// load-bearing: rows written before canonicalization shipped are still in the
+// table spelled "Idaho / 83201-6529", and matching a fresh submission against
+// one of those legacy rows is the only reason this works without a backfill.
+//
+// On a match the existing address is returned UNMODIFIED and no audit entry is
+// recorded -- nothing changed. IsDefault especially is left alone: siting a
+// machine at an address the customer already has must never promote or demote
+// where their coffee gets sent. On no match it delegates to CreateAddress,
+// audit entry and all.
+//
+// Dedup is scoped to one customer. It never matches another customer's rows or
+// rows with a NULL customer_id.
+func (s *CustomerService) FindOrCreateAddress(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
+	if customerID == uuid.Nil {
+		return nil, fmt.Errorf("find or create address: customer id is required")
+	}
+	// A mismatch here would match against one customer's address book and then
+	// write the row onto another's, so it is a caller bug worth failing on
+	// rather than quietly resolving in either direction.
+	if p.CustomerID != nil && *p.CustomerID != customerID {
+		return nil, fmt.Errorf("find or create address: params customer %s does not match scope %s", *p.CustomerID, customerID)
+	}
+	p.CustomerID = &customerID
+
+	p = normalizeAddressParams(p)
+	key := domain.AddressKey(addressForKey(p))
+
+	existing, err := s.customers.ListAddresses(ctx, tx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("find or create address: list addresses: %w", err)
+	}
+	for i := range existing {
+		if domain.AddressKey(existing[i]) == key {
+			return &existing[i], nil
+		}
+	}
+
+	return s.CreateAddress(ctx, tx, p, actor)
 }
 
 // GetAddress returns an address by ID, scoped to a customer.
@@ -488,7 +581,13 @@ func (s *CustomerService) ListAddresses(ctx context.Context, tx pgx.Tx, customer
 }
 
 // UpdateAddress updates an address's fields, scoped to a customer, and records an audit entry.
+//
+// Normalizes before writing, for the same reason CreateAddress does: an edit
+// that reintroduced "Idaho" would put a row back outside the canonical set and
+// start a fresh duplicate lineage on the customer's next order.
 func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
+	p = normalizeAddressParams(p)
+
 	addr, err := s.customers.UpdateAddress(ctx, tx, id, customerID, p)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

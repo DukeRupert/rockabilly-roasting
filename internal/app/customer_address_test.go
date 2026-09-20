@@ -154,6 +154,41 @@ func TestFindOrCreateAddress_MatchesLegacyRow(t *testing.T) {
 	assert.Equal(t, "83201-6529", got.PostalCode)
 }
 
+// TestFindOrCreateAddress_MatchesLegacyRowWithUnit covers the apartment number
+// on the STORED side. The other legacy-row test has no line2, and every other
+// line2 case keys two freshly-created rows -- so without this, a projection
+// that dropped line2 would still match a stored unit against a different one
+// and ship to the wrong door in the same building.
+func TestFindOrCreateAddress_MatchesLegacyRowWithUnit(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+
+	customer := testutil.CreateCustomer(t, tx)
+	unit2 := testutil.CreateAddress(t, tx, customer.ID,
+		testutil.WithAddressName("Jahnavi", "Lewis"),
+		testutil.WithAddressLine1("724 S 3rd Ave"),
+		testutil.WithAddressLine2("Apt 2"),
+		testutil.WithAddressCity("Pocatello"),
+		testutil.WithAddressState("Idaho"),
+		testutil.WithAddressPostalCode("83201-6529"),
+	)
+
+	same := pocatello(customer.ID)
+	apt2 := "Apt 2"
+	same.Line2 = &apt2
+	got, err := svc.FindOrCreateAddress(ctx, tx, customer.ID, same, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.Equal(t, unit2.ID, got.ID, "same unit should match the stored legacy row")
+
+	other := pocatello(customer.ID)
+	apt3 := "Apt 3"
+	other.Line2 = &apt3
+	got3, err := svc.FindOrCreateAddress(ctx, tx, customer.ID, other, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.NotEqual(t, unit2.ID, got3.ID, "a different unit is a different door")
+}
+
 // TestFindOrCreateAddress_MatchRecordsNoAudit -- nothing changed, so nothing is
 // recorded. An address_added entry for a row that already existed would be a
 // lie in the audit log.
@@ -263,9 +298,13 @@ func TestFindOrCreateAddress_RejectsBadScope(t *testing.T) {
 	customer := testutil.CreateCustomer(t, tx)
 	other := testutil.CreateCustomer(t, tx)
 
+	// Both params must be nil-scoped, or the mismatch guard below fires first
+	// and this passes without ever reaching the nil guard it names.
 	t.Run("nil customer id", func(t *testing.T) {
-		_, err := svc.FindOrCreateAddress(ctx, tx, uuid.Nil, pocatello(customer.ID), testActor(customer.ID))
-		assert.Error(t, err)
+		p := pocatello(customer.ID)
+		p.CustomerID = nil
+		_, err := svc.FindOrCreateAddress(ctx, tx, uuid.Nil, p, testActor(customer.ID))
+		assert.ErrorContains(t, err, "customer id is required")
 	})
 
 	t.Run("params disagree with scope", func(t *testing.T) {

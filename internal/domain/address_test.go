@@ -236,10 +236,45 @@ func TestAddressKey_Distinguishes(t *testing.T) {
 		}
 	})
 
+	// Field boundaries cannot be forged, whatever a caller submits. The
+	// checkout endpoint takes JSON, so any byte -- including a delimiter --
+	// reaches these fields; a forged boundary would make two different
+	// addresses key equal and ship an order to the wrong one.
+	//
+	// Each pair below moves content across a boundary in the way that collides
+	// under a delimiter join. None uses a space: a space in one field is enough
+	// to keep a pair apart for the wrong reason, which is how the earlier
+	// version of this test passed against no separator at all.
 	t.Run("field boundaries cannot be forged", func(t *testing.T) {
-		a := addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")
-		b := addr("Jahnavi Lewis", "", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")
-		assert.NotEqual(t, AddressKey(a), AddressKey(b))
+		for _, tc := range []struct {
+			name string
+			a, b Address
+		}{
+			{
+				"content shifted between adjacent fields",
+				addr("ab", "c", "x", "", "y", "ID", "83201", "US"),
+				addr("a", "bc", "x", "", "y", "ID", "83201", "US"),
+			},
+			{
+				"unit separator embedded in a field",
+				addr("a", "b\x1fc", "d", "", "y", "ID", "83201", "US"),
+				addr("a", "b", "c\x1fd", "", "y", "ID", "83201", "US"),
+			},
+			{
+				"colon and digits mimicking a length prefix",
+				addr("a", "2:bc", "d", "", "y", "ID", "83201", "US"),
+				addr("a", "2", "bc", "", "y", "ID", "83201", "US"),
+			},
+			{
+				"empty field adjacent to populated one",
+				addr("", "ab", "x", "", "y", "ID", "83201", "US"),
+				addr("a", "b", "x", "", "y", "ID", "83201", "US"),
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				assert.NotEqual(t, AddressKey(tc.a), AddressKey(tc.b))
+			})
+		}
 	})
 }
 

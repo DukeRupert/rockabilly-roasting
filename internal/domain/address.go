@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // usStateCodes maps the unambiguous long form of every US state, the District
 // of Columbia, and the inhabited territories onto its USPS two-letter code.
@@ -101,11 +104,6 @@ func NormalizeCountryCode(s string) string {
 	return strings.ToUpper(foldSpace(s))
 }
 
-// addressKeySep separates fields inside an address key. The ASCII unit
-// separator cannot be typed into a web form, so no field value can forge a
-// boundary and make two different addresses collide.
-const addressKeySep = "\x1f"
-
 // AddressKey returns the canonical identity of a destination: two addresses
 // with equal keys are the same place, addressed to the same person.
 //
@@ -135,7 +133,7 @@ func AddressKey(a Address) string {
 		line2 = *a.Line2
 	}
 	country := NormalizeCountryCode(a.CountryCode)
-	return strings.Join([]string{
+	return joinKeyFields(
 		foldField(a.FirstName),
 		foldField(a.LastName),
 		foldField(a.Line1),
@@ -144,7 +142,31 @@ func AddressKey(a Address) string {
 		NormalizeState(a.State),
 		NormalizePostalCode(a.PostalCode, country),
 		country,
-	}, addressKeySep)
+	)
+}
+
+// joinKeyFields encodes fields length-prefixed ("5:jahnavi6:lewis...") rather
+// than joined by a delimiter.
+//
+// A delimiter is only safe while no field can contain it, and nothing here can
+// promise that: the checkout endpoint takes JSON, so any byte is submittable,
+// including whatever character the delimiter is. With a delimiter, content can
+// be shifted across a boundary to make two different addresses encode
+// identically — last name "b<sep>c" with line1 "d" collides with last name "b"
+// and line1 "c<sep>d". A collision makes FindOrCreateAddress return the wrong
+// address, and the order ships there.
+//
+// Length prefixes remove the possibility rather than narrowing it: the decoder
+// consumes exactly len bytes, so no field content can be mistaken for
+// structure, whatever a caller submits.
+func joinKeyFields(fields ...string) string {
+	var b strings.Builder
+	for _, f := range fields {
+		b.WriteString(strconv.Itoa(len(f)))
+		b.WriteByte(':')
+		b.WriteString(f)
+	}
+	return b.String()
 }
 
 // foldField reduces a free-text address field to its comparison form:

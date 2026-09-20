@@ -34,6 +34,12 @@ func TestShippingConfig_IsLocal(t *testing.T) {
 
 	assert.True(t, cfg.IsLocal("99336"))
 	assert.True(t, cfg.IsLocal("99352-1234"), "ZIP+4 should normalize to 5 digits")
+
+	// The configured side is normalized too. Without this, a merchant who types
+	// a ZIP+4 into settings silently loses the whole local zone, and no other
+	// fixture here configures anything but a bare 5-digit zip.
+	plus4Config := ShippingConfig{LocalZipCodes: []string{" 99336-1234 "}}
+	assert.True(t, plus4Config.IsLocal("99336"), "configured ZIP+4 should normalize to 5 digits")
 	assert.True(t, cfg.IsLocal(" 99337 "), "whitespace should be trimmed")
 	assert.False(t, cfg.IsLocal("90210"))
 	assert.False(t, cfg.IsLocal(""))

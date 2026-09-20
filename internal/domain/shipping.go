@@ -105,13 +105,18 @@ type ShippingConfig struct {
 
 // IsLocal reports whether a ship-to zip falls inside the local delivery zone.
 // Accepts either 5-digit or ZIP+4 formats and ignores surrounding whitespace.
+//
+// Both sides of the comparison go through NormalizePostalCode, which is the
+// one canonical postal rule in this package. It replaced a local normalizeZip
+// helper; the rules differ only for malformed input, where the shared one is
+// the more conservative of the two.
 func (c ShippingConfig) IsLocal(shipToZip string) bool {
-	z := normalizeZip(shipToZip)
+	z := NormalizePostalCode(shipToZip, "US")
 	if z == "" {
 		return false
 	}
 	for _, local := range c.LocalZipCodes {
-		if normalizeZip(local) == z {
+		if NormalizePostalCode(local, "US") == z {
 			return true
 		}
 	}
@@ -400,16 +405,6 @@ func (c ShippingConfig) CutoffLabel() string {
 // The year is omitted: a delivery date is always within the week.
 func DeliveryDateLabel(t time.Time) string {
 	return t.Format("Monday, January 2")
-}
-
-// normalizeZip trims whitespace and strips a ZIP+4 suffix so "99336-1234 "
-// compares equal to "99336".
-func normalizeZip(zip string) string {
-	z := strings.TrimSpace(zip)
-	if i := strings.Index(z, "-"); i >= 0 {
-		z = z[:i]
-	}
-	return z
 }
 
 // BoxPreset is a named carton size the merchant ships in. When a label is

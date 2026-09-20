@@ -635,7 +635,7 @@ func (d *Deps) handleAccountAddressCreate(w http.ResponseWriter, r *http.Request
 	}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CustomerService.CreateAddress(ctx, tx, p, customerActor(r))
+		_, txErr := d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, p, customerActor(r))
 		return txErr
 	})
 	if err != nil {

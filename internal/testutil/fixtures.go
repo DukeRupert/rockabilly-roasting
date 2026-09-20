@@ -193,6 +193,34 @@ func WithAddressLine1(line1 string) AddressOption {
 	return func(p *sqlcgen.CreateAddressParams) { p.Line1 = line1 }
 }
 
+func WithAddressLine2(line2 string) AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.Line2 = &line2 }
+}
+
+func WithAddressName(first, last string) AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.FirstName, p.LastName = first, last }
+}
+
+func WithAddressCity(city string) AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.City = city }
+}
+
+// WithAddressState and WithAddressPostalCode write the value verbatim. The
+// fixture inserts through sqlcgen rather than CustomerService, so these are how
+// a test stands up a row spelled the way rows were spelled before
+// canonicalization shipped -- "Idaho", "83201-6529".
+func WithAddressState(state string) AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.State = state }
+}
+
+func WithAddressPostalCode(zip string) AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.PostalCode = zip }
+}
+
+func WithAddressDefault() AddressOption {
+	return func(p *sqlcgen.CreateAddressParams) { p.IsDefault = true }
+}
+
 func CreateAddress(t *testing.T, tx pgx.Tx, customerID uuid.UUID, opts ...AddressOption) *domain.Address {
 	t.Helper()
 	p := sqlcgen.CreateAddressParams{

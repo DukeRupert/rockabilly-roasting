@@ -1175,7 +1175,7 @@ func (d *Deps) resolveWholesaleAddress(ctx context.Context, tx pgx.Tx, customer 
 		p.Company = &v
 	}
 
-	addr, err := d.CustomerService.CreateAddress(ctx, tx, p, actor)
+	addr, err := d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, p, actor)
 	if err != nil {
 		return uuid.Nil, err
 	}

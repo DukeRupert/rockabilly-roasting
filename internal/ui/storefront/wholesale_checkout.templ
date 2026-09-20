@@ -100,14 +100,13 @@ func moqHint(minQty, multiple *int) string {
 	return strings.Join(parts, " · ")
 }
 
-// normalizeZipJS mirrors domain.normalizeZip for building the client-side local
-// zone list: trims whitespace and strips a ZIP+4 suffix so comparisons match.
+// normalizeZipJS builds the client-side local zone list using the same postal
+// rule the server applies. It delegates to domain.NormalizePostalCode rather
+// than reimplementing it: this used to be a hand-copied mirror of an
+// unexported domain.normalizeZip, and a mirror is exactly what lets the
+// client and server disagree about who qualifies for local delivery.
 func normalizeZipJS(z string) string {
-	z = strings.TrimSpace(z)
-	if i := strings.Index(z, "-"); i >= 0 {
-		z = z[:i]
-	}
-	return z
+	return domain.NormalizePostalCode(z, "US")
 }
 
 // wholesaleAddrXData seeds the Alpine state for the checkout address step:

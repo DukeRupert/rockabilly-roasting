@@ -227,7 +227,10 @@ Stripe-customer/PI card-testing vector; confirm is intentionally left under the 
 (it only finalizes an already-succeeded PI and creates no Stripe resources). (d) Address dedup:
 `findOrCreateAddress` reuses a customer's existing address matching line1/line2/city/state/zip
 (case/space-insensitive) instead of minting a row on every blur. Tests: pure `addressMatches`
-unit coverage. Note: the stale-Stripe-customer-per-blur and orphaned-PI concerns were already
+unit coverage. *(Superseded: both helpers were deleted when address dedup moved out of the
+handler into `CustomerService.FindOrCreateAddress`, so every order path gets it rather than
+subscribe alone. The matching rule now lives in `domain.AddressKey`. This paragraph describes
+the state on 2026-06-12 and is left as written.)* Note: the stale-Stripe-customer-per-blur and orphaned-PI concerns were already
 resolved in P1 (Stripe customer reused across blurs; the abandoned PI is cancelled on recreate).
 Verified-and-dropped: the report's "responsive grids" claim doesn't hold against the code — the
 fixed checkout `Information.svelte` uses the same non-responsive `grid-cols-2`/`grid-cols-3` for

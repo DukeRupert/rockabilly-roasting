@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -328,7 +327,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		// Reuse an existing matching address rather than minting a new row on
 		// every PI (re)creation — this endpoint fires on each address-field
 		// blur, so without dedup a single signup litters the address book.
-		addr, txErr = d.findOrCreateAddress(ctx, tx, customer.ID, params, actor)
+		addr, txErr = d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, params, actor)
 		if txErr != nil {
 			return fmt.Errorf("create address: %w", txErr)
 		}
@@ -519,36 +518,6 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		ShippingTotal: shippingCents,
 		ShippingLabel: shippingLabel,
 	})
-}
-
-// findOrCreateAddress reuses a customer's existing address that matches the
-// submitted shipping fields (line1/line2/city/state/zip/country, case- and
-// space-insensitive) instead of creating a duplicate. The subscribe
-// payment-intent endpoint runs on every address-field blur, so creating a new
-// row each time would fill a returning subscriber's address book with copies.
-func (d *Deps) findOrCreateAddress(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, p store.CreateAddressParams, actor app.Actor) (*domain.Address, error) {
-	existing, err := d.CustomerService.ListAddresses(ctx, tx, customerID)
-	if err == nil {
-		for i := range existing {
-			a := existing[i]
-			if addressMatches(a, p) {
-				return &a, nil
-			}
-		}
-	}
-	return d.CustomerService.CreateAddress(ctx, tx, p, actor)
-}
-
-// addressMatches reports whether a saved address is the same shipping
-// destination as the submitted params, ignoring case and surrounding space.
-func addressMatches(a domain.Address, p store.CreateAddressParams) bool {
-	norm := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
-	return norm(a.Line1) == norm(p.Line1) &&
-		norm(ptrToString(a.Line2)) == norm(ptrToString(p.Line2)) &&
-		norm(a.City) == norm(p.City) &&
-		norm(a.State) == norm(p.State) &&
-		norm(a.PostalCode) == norm(p.PostalCode) &&
-		norm(a.CountryCode) == norm(p.CountryCode)
 }
 
 // handleSubscribeConfirm finalizes a subscription signup after payment. The

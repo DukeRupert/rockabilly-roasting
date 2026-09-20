@@ -405,6 +405,16 @@ func (s *CustomerStore) Delete(ctx context.Context, tx pgx.Tx, id uuid.UUID) err
 }
 
 // --- Address CRUD ---
+//
+// These methods store and return address fields byte-for-byte. Canonicalization
+// -- USPS state codes, ZIP+4 truncation -- belongs to CustomerService and must
+// NOT be duplicated here as an upper(), a regexp_replace, a trigger or a
+// generated column. Keeping the store literal is what makes the service's
+// guarantee verifiable: if normalization also happened in SQL, a bug in the
+// service layer would be invisible to every test that reads a row back.
+//
+// Nor do these filter or deduplicate. Two rows the service considers the same
+// destination are still two rows here.
 
 // CreateAddressParams holds the fields needed to create an address.
 type CreateAddressParams struct {

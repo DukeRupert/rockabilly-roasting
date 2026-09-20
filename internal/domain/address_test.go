@@ -215,6 +215,27 @@ func TestAddressKey_Distinguishes(t *testing.T) {
 		assert.NotEqual(t, AddressKey(base), AddressKey(other))
 	})
 
+	// Each component of the key on its own distinguishes two destinations.
+	// Ported from the addressMatches test that lived in internal/web before
+	// this rule moved into the domain.
+	t.Run("one differing field is enough", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			other Address
+		}{
+			{"line1", addr("Jahnavi", "Lewis", "725 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")},
+			{"city", addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Chubbuck", "ID", "83201", "US")},
+			{"state", addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Pocatello", "MT", "83201", "US")},
+			{"postal code", addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Pocatello", "ID", "83202", "US")},
+			{"country", addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "CA")},
+			{"last name", addr("Jahnavi", "Lewiss", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				assert.NotEqual(t, AddressKey(base), AddressKey(tc.other))
+			})
+		}
+	})
+
 	t.Run("field boundaries cannot be forged", func(t *testing.T) {
 		a := addr("Jahnavi", "Lewis", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")
 		b := addr("Jahnavi Lewis", "", "724 S 3rd Ave", "", "Pocatello", "ID", "83201", "US")

@@ -1779,7 +1779,7 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 			line2 = &v
 		}
 		actor := staffActor(r)
-		address, aErr := d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
+		address, aErr := d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, store.CreateAddressParams{
 			CustomerID:  &customer.ID,
 			FirstName:   form.ShippingFirstName,
 			LastName:    form.ShippingLastName,

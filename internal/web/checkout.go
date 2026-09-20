@@ -489,7 +489,10 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 			ID:   &customer.ID,
 			Name: customer.Email,
 		}
-		addr, txErr := d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
+		// Reuse the customer's existing row for this destination. Retail
+		// customers reorder, and a new row per order is what filled address
+		// books with copies of one house.
+		addr, txErr := d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, store.CreateAddressParams{
 			CustomerID:  &customer.ID,
 			FirstName:   req.FirstName,
 			LastName:    req.LastName,

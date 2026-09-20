@@ -257,7 +257,7 @@ func (d *Deps) handleWholesaleAccountAddressCreate(w http.ResponseWriter, r *htt
 	p.CustomerID = &customer.ID
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CustomerService.CreateAddress(ctx, tx, p, customerActor(r))
+		_, txErr := d.CustomerService.FindOrCreateAddress(ctx, tx, customer.ID, p, customerActor(r))
 		return txErr
 	})
 	if err != nil {

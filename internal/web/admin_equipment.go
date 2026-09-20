@@ -654,7 +654,7 @@ func (d *Deps) createEquipmentSite(
 		params.Line2 = &line2
 	}
 
-	addr, err := d.CustomerService.CreateAddress(ctx, tx, params, actor)
+	addr, err := d.CustomerService.FindOrCreateAddress(ctx, tx, customerID, params, actor)
 	if err != nil {
 		return nil, err
 	}

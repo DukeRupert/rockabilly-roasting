@@ -1082,6 +1082,15 @@ templ addressForm(action string, addr *domain.Address) {
 					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 		</div>
+		if addr != nil {
+			// Editing rewrites the row in place, and orders reference it rather than
+			// snapshotting it, so past orders re-render with the new address. Saying so
+			// is the interim measure until orders carry their own snapshot -- see
+			// issue #48. The add form (addr == nil) affects nothing and stays silent.
+			<p class="font-oswald text-ink-soft text-sm border-l-2 border-amber pl-3" style="letter-spacing:0.04em;">
+				Changing this updates where future orders ship. Your past orders will show the new address too.
+			</p>
+		}
 		<div class="pt-2">
 			<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]" style="letter-spacing:0.16em; text-transform:uppercase;">
 				Save

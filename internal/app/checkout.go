@@ -185,6 +185,46 @@ func (s *CheckoutService) CalculateShipping(ctx context.Context, tx pgx.Tx, subt
 	return cfg.Calculate(subtotalCents, shipToZip), cfg, nil
 }
 
+// shipsTogetherWindow bounds how far back OpenShipmentTo looks. An order that
+// has sat unpacked longer than this is held up on something, not waiting on
+// the next packing pass, so a new order should not assume it rides along.
+const shipsTogetherWindow = 72 * time.Hour
+
+// OpenShipmentTo returns the customer's most recent paid, unpacked, mailed
+// order to addressID — the box a new order to that address will be packed
+// into — or nil when there is none.
+//
+// The subscribe form takes one product per signup, so a customer who wants
+// three coffees on subscription places three orders in a row. Each priced its
+// own flat-rate shipping, and one box went out carrying three shipping
+// charges. A second order to the same address, placed while the first is still
+// on the shelf, is packed with it, and its shipping is already paid. Callers
+// use a non-nil result to waive the new order's shipping.
+//
+// Local delivery and pickup orders never count: they are free to begin with,
+// and a mailed order does not ride in a delivery van.
+func (s *CheckoutService) OpenShipmentTo(ctx context.Context, tx pgx.Tx, customerID, addressID uuid.UUID, now time.Time) (*domain.Order, error) {
+	shipped := domain.ShippingMethodShipped
+	since := now.Add(-shipsTogetherWindow)
+	orders, err := s.orders.ListOrders(ctx, tx, store.OrderFilter{
+		CustomerID:          &customerID,
+		ShippingAddressID:   &addressID,
+		Statuses:            []domain.OrderStatus{domain.OrderStatusConfirmed},
+		PaymentStatuses:     []domain.PaymentStatus{domain.PaymentStatusCaptured},
+		FulfillmentStatuses: []domain.FulfillmentStatus{domain.FulfillmentStatusUnfulfilled},
+		ShippingMethod:      &shipped,
+		PlacedFrom:          &since,
+		Limit:               1,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list open shipments: %w", err)
+	}
+	if len(orders) == 0 {
+		return nil, nil
+	}
+	return &orders[0], nil
+}
+
 // taxCalculatorForConfig returns the TaxCalculator for the store's configuration.
 //
 // Wholesale used to be short-circuited to NoneCalculator here regardless of

@@ -367,6 +367,7 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 ### Shipping
 
 - **Shipping rates at checkout are calculated internally** (flat rate + free threshold). No external API call on the hot path.
+- **A signup order packed with an open order ships free.** The subscribe form takes one product per signup, so a customer subscribing to three coffees places three orders in minutes; each priced its own flat rate and one box carried three charges. `CheckoutService.OpenShipmentTo` finds the customer's paid, unpacked, mailed order to the same address from the last 72h; when there is one the new order's shipping is 0, its internal note names the sibling, and `ships_with_order` is stamped in metadata. Retail cart checkout does not do this — a cart already holds every item.
 - **Label provider calls happen before the shipment record is persisted.** If the provider succeeds but the DB write fails, the label still exists in the provider's dashboard and the order number is in the Reference field for manual lookup.
 
 ### Authentication

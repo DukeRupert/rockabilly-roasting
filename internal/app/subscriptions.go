@@ -483,6 +483,11 @@ const (
 	orderMetaSubscriptionPlanID = "subscription_plan_id"
 )
 
+// OrderMetaShipsWithOrder holds the number of the open order a signup order
+// was packed with, when its shipping was waived for that reason. See
+// CheckoutService.OpenShipmentTo.
+const OrderMetaShipsWithOrder = "ships_with_order"
+
 // SubscriptionSignupOrderMetadata builds the order metadata that marks a
 // pre-created order as a subscription signup for the given plan.
 func SubscriptionSignupOrderMetadata(planID uuid.UUID, paymentIntentID string) map[string]any {

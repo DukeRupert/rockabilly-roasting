@@ -273,6 +273,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		shippingCents int
 		taxCents      int
 		shipMethod    *domain.ShippingMethod
+		// shipsWith is the open order this one will be packed with, when there
+		// is one. Its shipping charge covers the box.
+		shipsWith *domain.Order
 	)
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -363,6 +366,20 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		eligible := shipCfg.EligibleLocalMethods(addr.PostalCode)
 		shipMethod = resolveLocalMethod(eligible, "", customer.PreferredLocalFulfillment)
 
+		// One product per signup means a customer subscribing to three
+		// coffees places three orders in minutes. They go out in one box, so
+		// only the first pays for it: a mailed order that will be packed with
+		// an order already on the shelf ships free.
+		if shippingCents > 0 && (shipMethod == nil || *shipMethod == domain.ShippingMethodShipped) {
+			shipsWith, txErr = d.CheckoutService.OpenShipmentTo(ctx, tx, customer.ID, addr.ID, time.Now())
+			if txErr != nil {
+				return fmt.Errorf("find open shipment: %w", txErr)
+			}
+			if shipsWith != nil {
+				shippingCents = 0
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -452,6 +469,15 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
+		actor := app.Actor{
+			Type: domain.AuditActorTypeCustomer,
+			ID:   &customer.ID,
+			Name: "subscription checkout",
+		}
+		metadata := app.SubscriptionSignupOrderMetadata(planID, pi.ID)
+		if shipsWith != nil {
+			metadata[app.OrderMetaShipsWithOrder] = shipsWith.Number
+		}
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 			CustomerID: customer.ID,
 			Items: []app.CartItem{{
@@ -465,14 +491,18 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			ShippingCents:     shippingCents,
 			TaxCents:          taxCents,
 			ShippingMethod:    shipMethod,
-			Metadata:          app.SubscriptionSignupOrderMetadata(planID, pi.ID),
-		}, app.Actor{
-			Type: domain.AuditActorTypeCustomer,
-			ID:   &customer.ID,
-			Name: "subscription checkout",
-		})
+			Metadata:          metadata,
+		}, actor)
 		if txErr != nil {
 			return fmt.Errorf("place signup order: %w", txErr)
+		}
+		if shipsWith != nil {
+			// Staff read the internal note from the fulfillment queue; the
+			// metadata key is for reports. Both say the same thing.
+			note := "Ships with " + shipsWith.Number + " — shipping was charged on that order."
+			if _, txErr := d.OrderService.SetOrderInternalNote(ctx, tx, order.ID, note, actor); txErr != nil {
+				return fmt.Errorf("note ships-with order: %w", txErr)
+			}
 		}
 		if _, txErr := d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, pi.ID); txErr != nil {
 			return fmt.Errorf("link payment intent: %w", txErr)
@@ -508,6 +538,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	shippingLabel := ""
 	if shippingCents == 0 {
 		shippingLabel = "Free"
+	}
+	if shipsWith != nil {
+		shippingLabel = "Free — ships with " + shipsWith.Number
 	}
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
 		ClientSecret:  pi.ClientSecret,

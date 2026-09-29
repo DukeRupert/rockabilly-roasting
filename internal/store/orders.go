@@ -329,9 +329,12 @@ type OrderFilter struct {
 	// staff hand-pick which orders ride along.
 	OrderIDs   []uuid.UUID
 	CustomerID *uuid.UUID
-	PlacedFrom *time.Time
-	PlacedTo   *time.Time
-	Search     string // ILIKE on order number or customer name/email
+	// ShippingAddressID narrows to orders going to one saved address. Nil
+	// leaves the destination unconstrained.
+	ShippingAddressID *uuid.UUID
+	PlacedFrom        *time.Time
+	PlacedTo          *time.Time
+	Search            string // ILIKE on order number or customer name/email
 	// ExcludeUnconfirmed drops orders that are still in the "intent to buy"
 	// state — status=pending AND payment_status=awaiting. These exist between
 	// PI creation and webhook-driven confirmation (especially for async/BNPL
@@ -485,6 +488,11 @@ func orderWhere(query string, f OrderFilter) (string, []any, int) {
 	if f.CustomerID != nil {
 		query += fmt.Sprintf(" AND customer_id = $%d", argN)
 		args = append(args, *f.CustomerID)
+		argN++
+	}
+	if f.ShippingAddressID != nil {
+		query += fmt.Sprintf(" AND shipping_address_id = $%d", argN)
+		args = append(args, *f.ShippingAddressID)
 		argN++
 	}
 	if f.PlacedFrom != nil {

@@ -289,10 +289,16 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrPricingUnavailable):
 		return http.StatusServiceUnavailable, err.Error()
 
-	// The catalog moved between the quote and the confirm, so the total on the
-	// page is not the total this order would be. Conflict rather than a bad
-	// request: nothing the customer sent was wrong when they sent it, and the
-	// fix is to look at the new price, which is what reloading shows them.
+	// Pricing the same lines twice in one request disagreed, so the total the
+	// payment provider was quoted is not the total this order would be. Conflict
+	// rather than a bad request: nothing the customer sent was wrong when they
+	// sent it, and the fix is to look at the new price.
+	//
+	// Nothing reaches this yet. Both PlaceOrder callers hand-roll their phase-3
+	// error handling and send everything but ErrCouponAlreadyUsed to 500; this
+	// is the destination for when they route through Error() instead, alongside
+	// ErrAddressNotFound and the two unavailable sentinels, which have the same
+	// problem. Tracked in docs/open-items.md.
 	case errors.Is(err, app.ErrPriceMoved):
 		return http.StatusConflict, err.Error()
 

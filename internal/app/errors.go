@@ -220,11 +220,20 @@ var (
 	// multiple of the multiple is rejected rather than silently rounded up.
 	ErrInvalidWholesaleMOQ = errors.New("invalid wholesale order quantity rule")
 	ErrPriceListNotFound   = errors.New("price list not found")
-	// ErrPriceMoved means the catalog no longer agrees with the price an order
-	// was submitted at. The ordinary cause is a checkout page that went stale
-	// while the merchant repriced underneath it; the order is refused rather
-	// than written, because the amount already quoted to the payment provider
-	// came from the older answer.
+	// ErrPriceMoved means pricing an order's lines a second time did not give
+	// the answer they were submitted at.
+	//
+	// Not a stale page: the checkout endpoints price their lines in phase 1 and
+	// PlaceOrder re-prices them in phase 3 of the same request, so the window is
+	// a reprice landing between the two — milliseconds. What the guard is for is
+	// the cross-check itself. The amount quoted to the payment provider came
+	// from the first answer, so an order written against a different one would
+	// charge one number and record another, which is the thing this exists to
+	// make impossible.
+	//
+	// Mapped to 409 in web/respond.go, but nothing reaches that mapping yet:
+	// both phase-3 callers hand-roll their error handling and return 500. See
+	// the deferred handler follow-up in docs/open-items.md.
 	ErrPriceMoved = errors.New("a price changed while this order was being placed; please review the total and try again")
 	// ErrPricingUnavailable means this binary has no pricing service wired, so
 	// it cannot say what a line costs. Refusing is the only honest answer:

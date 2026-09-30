@@ -302,11 +302,15 @@ type CartItem struct {
 // line from a bounds-checked quantity and a price it looks up. So no request
 // shape reaches the bad cases.
 //
-// One non-request path does, which is why this is not purely hypothetical:
-// plan.DiscountPct has no CHECK constraint and no validation, and the subscribe
-// handler computes unit - (unit * DiscountPct / 100), so a plan configured above
-// 100% yields a negative unit and is refused here. The renewal path does the
-// same arithmetic but calls CreateOrder directly, so it is not covered.
+// So this is defence in depth rather than a hole that was open. The nearest
+// thing to a live path is plan.DiscountPct, which the subscribe handler takes
+// off the total as unit - (unit * DiscountPct / 100): above 100% that is a
+// negative unit, and nothing in the schema forbids it — discount_pct has no
+// CHECK. What forbids it is the layer above, in two places out of three:
+// admin_plans.go bounds it 0-100 on create and on update, and
+// SubscriptionService.UpdatePlanDiscount bounds it again in the service. Only
+// CreatePlan has no service-layer bound, so the handler is the whole guard
+// there. Reaching this from a plan would take direct SQL.
 //
 // It is here rather than at the callers because the next one to build Items some
 // other way will not know any of the above. A guard where the numbers are

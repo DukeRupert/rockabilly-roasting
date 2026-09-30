@@ -805,12 +805,18 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		//
 		// The address is read unscoped on the next line, used for the tax
 		// calculation, and sent to Stripe as the payment intent's shipping
-		// address in phase 2 — name, street, city, state, postal code, country —
-		// all of which happens before phase 3 refuses the order. Nothing is
-		// echoed back to the client and the intent is cancelled best-effort, so a
-		// prober learns nothing from the response, but the egress has already
-		// happened by then. The fix is to use the address phase 1 resolved rather
-		// than look it up again unscoped.
+		// address in phase 2 — name, street, second line, city, state, postal
+		// code, country — all of which happens before phase 3 refuses the order.
+		// The address is never echoed back and the intent is cancelled
+		// best-effort, but the egress has already happened by then.
+		//
+		// The response is not quite silent either: a foreign address id that
+		// exists now answers 404 from phase 3, while one that does not exist
+		// answers 422 from phase 1, which distinguishes the two to anyone
+		// counting. Infeasible against v4 UUIDs, and it predates this — the two
+		// answers were 500 and 422 before — but it is not nothing. The fix for
+		// both is to use the address phase 1 resolved rather than look it up
+		// again unscoped.
 		//
 		// scoping: addressID comes from client-submitted JSON and is not scoped
 		// to customerID — see above for what that still costs.
@@ -944,7 +950,12 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			Name: "guest checkout",
 		})
 		if txErr != nil {
-			return fmt.Errorf("place order: %w", txErr)
+			// Deliberately unwrapped, unlike its sibling below. This error is
+			// what the shopper is answered from — failCheckout hands it to
+			// mapError, and several sentinels are mapped to their own sentence —
+			// so a "place order:" prefix here is a prefix on the sentence they
+			// read. The phase is already on the log line below.
+			return txErr
 		}
 		if _, txErr := d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, pi.ID); txErr != nil {
 			return fmt.Errorf("link payment intent: %w", txErr)
@@ -991,27 +1002,42 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 // records why, with one rule for both endpoints.
 //
 // The status comes from respond.go's mapping rather than from a branch here.
-// That is the whole point of it existing: both endpoints used to answer
-// everything except ErrCouponAlreadyUsed with a 500, so ErrAddressNotFound,
-// ErrPriceMoved and ErrPricingUnavailable were all reported to the client as
-// faults although mapError gives them 404, 409 and 503 — and the next sentinel
-// PlaceOrder learns to return would have been the fourth. Adding a case per
-// sentinel in two places is how that happened; there is now one place and no
-// cases.
+// Both endpoints used to answer everything except ErrCouponAlreadyUsed with a
+// 500, so every other sentinel PlaceOrder can return was reported to the client
+// as a fault although mapError had a status for it — and the next one added
+// would have been treated the same way. Adding a case per sentinel in two
+// handlers is how that happened; there is one place now and no cases.
+//
+// Two of them actually change what a client sees, because those are the two
+// PlaceOrder raises that a request can reach: ErrAddressNotFound becomes 404 and
+// ErrPriceMoved becomes 409. ErrPricingUnavailable and ErrRecipesUnavailable are
+// mapped to 503 and still unreachable here — both are raised in phase 1, which
+// keeps a per-sentinel switch of its own whose default is a 500. That switch is
+// the same shape as the one this replaced, and it is where those two live; it is
+// the remaining half of this job rather than something this covers.
 //
 // The metric follows the mapped status rather than the sentinel, so a refused
-// order stops counting as an internal error. The "checkout failed" panel was
+// order stops counting as an internal error — the "checkout failed" panel was
 // reading a shopper being told their price moved as the service breaking, which
-// is the kind of alert that gets muted.
+// is the kind of alert that gets muted. ErrPriceMoved gets a label of its own
+// because its rate says something different from the rest: it measures catalog
+// churn against in-flight checkouts, not shoppers mis-filling a form, and
+// burying it in validation_error would hide it just as thoroughly as
+// internal_error did.
 func (d *Deps) failCheckout(w http.ResponseWriter, r *http.Request, channel string, err error) {
 	status, _ := mapError(err)
 	reason := "validation_error"
-	if status >= http.StatusInternalServerError {
+	switch {
+	case status >= http.StatusInternalServerError:
 		reason = "internal_error"
+	case errors.Is(err, app.ErrPriceMoved):
+		reason = "price_moved"
 	}
 	d.Metrics.CheckoutFailed.WithLabelValues(channel, reason).Inc()
 	// Error records the error against the request line with the status it mapped
-	// to, so a 4xx refusal is logged as traffic and a 5xx as a failure.
+	// to, which decides the level: a 5xx is logged as a failure. A 4xx is logged
+	// as ordinary traffic and carries no error field, so the diagnostic for a
+	// refusal is the caller's own log line rather than this one.
 	Error(w, r, err)
 }
 

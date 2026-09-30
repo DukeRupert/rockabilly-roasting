@@ -47,18 +47,28 @@ type fakePaymentProvider struct {
 	// prices the lines and quotes the provider from the answer, phase 3 prices
 	// them again inside PlaceOrder — so this is the seam a test needs to
 	// reproduce a price moving mid-checkout rather than simulating one.
+	//
+	// It is called with the mutex released. A hook does arbitrary work — the one
+	// that exists writes to the database — and sync.Mutex is not reentrant, so a
+	// hook that read back through canceledIDs or provoked a second intent would
+	// deadlock here with no diagnostic until go test's ten-minute panic.
 	onCreate func()
 }
 
 func (f *fakePaymentProvider) CreatePaymentIntent(_ context.Context, req payments.CreatePaymentIntentRequest) (*payments.PaymentIntent, error) {
 	f.mu.Lock()
+	hook, failWith := f.onCreate, f.intentErr
+	f.mu.Unlock()
+
+	if failWith != nil {
+		return nil, failWith
+	}
+	if hook != nil {
+		hook()
+	}
+
+	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.intentErr != nil {
-		return nil, f.intentErr
-	}
-	if f.onCreate != nil {
-		f.onCreate()
-	}
 	f.createdIntents = append(f.createdIntents, req)
 	// A fresh id per intent, not a counter: these tests commit, the id lands
 	// on an order row under a unique index, and a per-test counter collides

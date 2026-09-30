@@ -512,7 +512,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			Metadata:        metadata,
 		}, actor)
 		if txErr != nil {
-			return fmt.Errorf("place signup order: %w", txErr)
+			// Unwrapped for the reason the retail endpoint says at its own
+			// PlaceOrder call: this error becomes the shopper's message.
+			return txErr
 		}
 		if shipsWith != nil {
 			// Staff read the internal note from the fulfillment queue; the

@@ -54,6 +54,10 @@ type checkoutCouponFixture struct {
 	cartID    uuid.UUID
 	addressID uuid.UUID
 	code      string
+	// variantID is the one line in the cart. Exposed so a test can move its
+	// catalog price out from under an in-flight checkout — see
+	// checkout_failure_mapping_test.go.
+	variantID uuid.UUID
 }
 
 // newCheckoutCouponFixture builds a customer with a one-line cart and a
@@ -98,7 +102,8 @@ func newCheckoutCouponFixture(t *testing.T) checkoutCouponFixture {
 
 	require.NoError(t, tx.Commit(ctx))
 	return checkoutCouponFixture{
-		customer: customer, cartID: cart.ID, addressID: address.ID, code: coupon.Code,
+		customer: customer, cartID: cart.ID, addressID: address.ID,
+		code: coupon.Code, variantID: variant.ID,
 	}
 }
 

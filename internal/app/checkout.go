@@ -289,19 +289,26 @@ type CartItem struct {
 // refuseUntrustableLines rejects a line whose quantity or price could not belong
 // to a real order.
 //
-// PlaceOrderParams is not internal input. The checkout endpoints build it from
-// the request body — POST /api/checkout/payment-intent reads customer_id and
-// address_id straight out of the JSON — so every number in it is whatever the
-// caller sent, and the subtotal loop below multiplies them without asking.
+// Unlike the address check below, this one is defence in depth rather than a
+// closed hole: neither of today's callers lets a client name a line. Both build
+// Items from cart rows the server owns, CartService guards quantity when a line
+// is added, and the subscribe path bounds it again before it gets here. No
+// request shape currently reaches the bad cases.
 //
-// The two that matter are not symmetrical. A zero quantity charges nothing for
-// goods the order still ships. A negative unit price is worse than a free line:
-// it is a credit, so a second line at -n cancels the first and a large enough one
-// pays for the rest of the cart, which is a discount the merchant never
-// authorised and no coupon record explains.
+// It is here because this is where the money is computed — the subtotal loop
+// below multiplies these two numbers and asks nothing — and because the next
+// caller to build Items some other way will not know that. A guard at the
+// arithmetic outlives the assumptions of whoever supplies it.
+//
+// The two are not symmetrical. A zero quantity charges nothing for goods the
+// order would still ship. A negative unit price is worse than a free line: it is
+// a credit, so a second line at -n cancels the first and a large enough one pays
+// for the rest of the cart, which is a discount the merchant never authorised and
+// no coupon record explains.
 //
 // Refused per line rather than on the total, because a total that comes out
-// positive says nothing about how it got there.
+// positive says nothing about how it got there: 2x5000 and 1x-9000 sum to an
+// unremarkable 1000.
 func refuseUntrustableLines(items []CartItem) error {
 	for _, item := range items {
 		if item.Quantity <= 0 {
@@ -323,26 +330,40 @@ func refuseUntrustableLines(items []CartItem) error {
 // address id and have it attached to — and shipped to — their own order, and
 // read back off the order afterwards.
 //
-// Enforced the way the rest of the codebase enforces customer ownership, by
+// Enforced the way this codebase enforces customer ownership elsewhere, by
 // scoping the read rather than comparing ids afterwards: CustomerStore.GetAddress
 // takes customerID as a parameter, so an address that is not this customer's
-// simply does not come back. Not-found rather than forbidden is deliberate and
-// is what the scoped query naturally yields — from the caller's side an address
-// they do not own is one that does not exist, and saying otherwise would confirm
-// the id to whoever guessed it.
+// simply does not come back. Not-found rather than forbidden is what the scoped
+// query naturally yields, and is also what should be reported — from the caller's
+// side an address they do not own is one that does not exist, and saying
+// otherwise would confirm the id to whoever guessed it.
+//
+// This guards PlaceOrder only, which is the one order-creating path that takes
+// address ids from its caller. The others derive theirs and are noted where they
+// are; nothing here makes the guarantee repo-wide.
+//
+// One thing the sentinel does not currently buy: neither PlaceOrder caller maps
+// it. Both hand-roll their error handling and special-case only
+// ErrCouponAlreadyUsed, so this surfaces as a 500 rather than the 404 respond.go
+// would give it. The order is still refused, which is the point — but the status
+// is wrong and the handlers are where that has to be fixed.
 func (s *CheckoutService) refuseForeignAddresses(ctx context.Context, tx pgx.Tx, customerID, shippingID, billingID uuid.UUID) error {
-	if err := s.requireOwnedAddress(ctx, tx, shippingID, customerID); err != nil {
+	if err := s.requireOwnedAddress(ctx, tx, customerID, shippingID); err != nil {
 		return err
 	}
 	// One address for both is the common case, and the second read would be the
-	// same row.
+	// same row. Shipping is checked first, so a foreign billing address is still
+	// caught when the two differ.
 	if billingID == shippingID {
 		return nil
 	}
-	return s.requireOwnedAddress(ctx, tx, billingID, customerID)
+	return s.requireOwnedAddress(ctx, tx, customerID, billingID)
 }
 
-func (s *CheckoutService) requireOwnedAddress(ctx context.Context, tx pgx.Tx, addressID, customerID uuid.UUID) error {
+// requireOwnedAddress takes the customer before the address, matching its only
+// caller. Both are uuid.UUID, so a transposition would compile and silently
+// check nothing — one order, stated once.
+func (s *CheckoutService) requireOwnedAddress(ctx context.Context, tx pgx.Tx, customerID, addressID uuid.UUID) error {
 	if _, err := s.customers.GetAddress(ctx, tx, addressID, customerID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrAddressNotFound
@@ -765,6 +786,12 @@ type CreateManualOrderParams struct {
 // coupon flow. Used for reconciliation (e.g. payments processed by Stripe but
 // missing from Hiri) and phone/email orders. Totals are accepted as-given;
 // the admin is the source of truth.
+//
+// It carries no address-ownership check, unlike PlaceOrder, and does not need
+// one: its caller resolves the address through FindOrCreateAddress against the
+// customer it is creating the order for, so the id is server-derived rather than
+// supplied. Said here because the two functions share a file and the same two
+// address fields, and the absence would otherwise read as an oversight.
 func (s *CheckoutService) CreateManualOrder(ctx context.Context, tx pgx.Tx, p CreateManualOrderParams, actor Actor) (*domain.Order, error) {
 	if len(p.Items) == 0 {
 		return nil, ErrCartEmpty

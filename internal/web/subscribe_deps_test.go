@@ -110,8 +110,8 @@ func newSubscribeFixture(t *testing.T) subscribeFixture {
 // same in every case: none of these turn on it, and varying it would only make
 // the shipping and tax numbers harder to reason about. The email is fresh per
 // call, so each signup is a new guest rather than whoever the last test made.
-func subscribePaymentIntentBody(planID, variantID uuid.UUID, quantity int) string {
-	raw, err := json.Marshal(map[string]any{
+func subscribePaymentIntentBody(planID, variantID uuid.UUID, quantity int, opts ...func(map[string]any)) string {
+	body := map[string]any{
 		"plan_id":     planID.String(),
 		"variant_id":  variantID.String(),
 		"quantity":    quantity,
@@ -123,7 +123,11 @@ func subscribePaymentIntentBody(planID, variantID uuid.UUID, quantity int) strin
 		"state":       "MT",
 		"postal_code": "59601",
 		"country":     "US",
-	})
+	}
+	for _, opt := range opts {
+		opt(body)
+	}
+	raw, err := json.Marshal(body)
 	if err != nil {
 		panic(err) // a literal map; unmarshalable means this file is wrong
 	}

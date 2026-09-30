@@ -163,26 +163,43 @@ func TestPaymentIntentPriceMovedIsAConflictNotAFault(t *testing.T) {
 	})
 }
 
-// The wrap guard, and the only one of these sentinels reachable end to end.
+// The wrap guard. Both endpoints, because each has its own PlaceOrder call and
+// its own chance to put a prefix on the sentence a shopper reads — restoring
+// fmt.Errorf("place order: %w", txErr) at one of them is invisible to a test
+// that only drives the other.
 //
-// ErrPriceMoved cannot serve as this: its arm answers with the sentinel's own
-// sentence precisely because app/ wraps it, so a prefix added by a handler never
-// shows there. ErrDiscountExpired is answered with err.Error(), so it does — a
-// handler that wraps its PlaceOrder error tells the shopper "place order:
-// discount has expired". Expiring the coupon's discount from inside
-// CreatePaymentIntent puts it in the same window a real one would expire in:
-// after phase 1 read it, before phase 3 revalidates it.
-func TestCheckoutPaymentIntent_ExpiredDiscountReadsAsAdvice(t *testing.T) {
-	f := newCheckoutCouponFixture(t)
-	d, _ := newCheckoutPaymentDeps(t)
-	fake := d.PaymentProvider.(*fakePaymentProvider)
-	fake.onCreate = func() { expireDiscountFor(t, f.cartID) }
+// ErrPriceMoved cannot serve as the sentinel here: its arm answers with the
+// sentinel's own sentence precisely because app/ wraps it, so a prefix added by
+// a handler never shows there. Each leg below picks a sentinel whose arm is
+// answered with err.Error(), which is what makes a handler's prefix visible —
+// "place order: discount has expired".
+//
+// Each leg raises its sentinel from inside CreatePaymentIntent, which is the one
+// moment between the handler's two pricings, and the reason differs by leg.
+//
+// Retail expires the coupon's discount. Phase 1 has to have read it while it was
+// live for the coupon to be priced into the order at all, and phase 3 revalidates
+// it inside PlaceOrder — so the hook puts the expiry in the window a real one
+// would fall in rather than simulating it.
+//
+// hiri-core drives subscribe here too, retiring a recipe ingredient mid-intent to
+// reach ErrRecipeIncomplete. This shop has no recipes, and nothing else that
+// only PlaceOrder raises on the subscribe path answers with err.Error(): the
+// address guard, the nearest candidate, answers a bare "not found", which would
+// hide a prefix rather than show it. So subscribe.go's PlaceOrder call is not
+// pinned end to end here. It does not wrap; keep it that way.
+func TestPaymentIntentRefusalReadsAsAdviceNotAPrefixedDiagnostic(t *testing.T) {
+	t.Run("retail", func(t *testing.T) {
+		f := newCheckoutCouponFixture(t)
+		d, fake := newCheckoutPaymentDeps(t)
+		fake.onCreate = func() { expireDiscountFor(t, f.cartID) }
 
-	w := f.postIntent(t, d, "")
+		w := f.postIntent(t, d, "")
 
-	require.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
-	assert.JSONEq(t, `{"error":"discount has expired"}`, w.Body.String(),
-		"no handler prefix on the sentence the shopper reads")
+		require.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
+		assert.JSONEq(t, `{"error":"discount has expired"}`, w.Body.String(),
+			"no handler prefix on the sentence the shopper reads")
+	})
 }
 
 // expireDiscountFor moves the discount applied to a cart into the past, in its

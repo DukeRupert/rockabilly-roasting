@@ -108,10 +108,19 @@ func TestFailCheckoutAnswersWithTheMappedStatus(t *testing.T) {
 
 // The sentinels below were invisible before: PlaceOrder could return any of
 // them and the handler answered 500 "failed to place order". Routing through
-// Error() is what makes them reach a shopper, which means a caller that wraps
-// its PlaceOrder error puts its own prefix on the sentence the shopper reads —
-// "place order: discount has expired". Both callers deliberately do not wrap for
-// that reason, and this is the assertion that says so.
+// Error() is what makes them reach a shopper, so what they say is now copy, and
+// this pins that what mapError answers for each of them — the sentinel's own
+// sentence on some arms, a literal of its own on others — is never worded as a
+// diagnostic: no phase prefix, no pricing arithmetic. The "catalog says" case is
+// that second point about ErrPriceMoved specifically — the sentinel's own
+// sentence carries the advice, and the line and both prices live only in
+// refusePricesThatMoved's wrapper inside app/, where the log can have them.
+//
+// It passes bare sentinels, so it says nothing about either handler. A caller
+// that wrapped its PlaceOrder error — "place order: discount has expired" — is
+// caught by TestPaymentIntentRefusalReadsAsAdviceNotAPrefixedDiagnostic below,
+// which drives the retail endpoint end to end. This is the floor under that: the
+// strings themselves, including any sentinel added to the list later.
 func TestCheckoutSentinelsReadAsAdviceNotDiagnostics(t *testing.T) {
 	for _, err := range []error{
 		app.ErrCartEmpty, app.ErrDiscountExpired, app.ErrDiscountNotActive,

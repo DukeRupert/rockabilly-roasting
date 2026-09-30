@@ -220,6 +220,16 @@ var (
 	// multiple of the multiple is rejected rather than silently rounded up.
 	ErrInvalidWholesaleMOQ = errors.New("invalid wholesale order quantity rule")
 	ErrPriceListNotFound   = errors.New("price list not found")
+	// ErrPriceMoved means the catalog no longer agrees with the price an order
+	// was submitted at. The ordinary cause is a checkout page that went stale
+	// while the merchant repriced underneath it; the order is refused rather
+	// than written, because the amount already quoted to the payment provider
+	// came from the older answer.
+	ErrPriceMoved = errors.New("a price changed while this order was being placed; please review the total and try again")
+	// ErrPricingUnavailable means this binary has no pricing service wired, so
+	// it cannot say what a line costs. Refusing is the only honest answer:
+	// guessing writes an order at a price nobody offered.
+	ErrPricingUnavailable = errors.New("pricing is not available in this build")
 
 	// Cart errors (item-level)
 	ErrInvalidQuantity = errors.New("quantity must be greater than zero")

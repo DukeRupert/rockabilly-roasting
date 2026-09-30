@@ -283,6 +283,19 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrJobRetryUnavailable):
 		return http.StatusServiceUnavailable, err.Error()
 
+	// This binary has no pricing service wired, so it cannot say what a line
+	// costs. Nothing the shopper did, and retrying the same request will not help
+	// until the shop is wired differently.
+	case errors.Is(err, app.ErrPricingUnavailable):
+		return http.StatusServiceUnavailable, err.Error()
+
+	// The catalog moved between the quote and the confirm, so the total on the
+	// page is not the total this order would be. Conflict rather than a bad
+	// request: nothing the customer sent was wrong when they sent it, and the
+	// fix is to look at the new price, which is what reloading shows them.
+	case errors.Is(err, app.ErrPriceMoved):
+		return http.StatusConflict, err.Error()
+
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotPayable),
 		errors.Is(err, app.ErrOrderNotCancellable),

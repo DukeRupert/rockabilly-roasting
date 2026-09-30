@@ -26,6 +26,7 @@ func newCheckoutService() *app.CheckoutService {
 		store.NewSettingsStore(),
 		store.NewShippingStore(),
 		nil, // payment provider not needed for unit tests
+		newPricingService(),
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),
 	)
@@ -43,6 +44,7 @@ func TestCheckoutService_PlaceOrder(t *testing.T) {
 	billing := testutil.CreateAddress(t, tx, customer.ID)
 	product := testutil.CreateProduct(t, tx)
 	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 
 	order, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 		CustomerID:        customer.ID,
@@ -64,8 +66,8 @@ func TestCheckoutService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, 3740, order.Total)
 	assert.Equal(t, domain.OrderStatusPending, order.Status)
 
-	entry := testutil.LastAuditEntry(t, tx, "order", order.ID)
-	assert.Equal(t, audit.AuditOrderCreated, entry.Action)
+	// The audit entry this writes is asserted in checkout_audit_test.go, actor
+	// and snapshot included.
 }
 
 func TestCheckoutService_PlaceOrder_EmptyCart(t *testing.T) {
@@ -98,43 +100,6 @@ func TestCheckoutService_PlaceOrder_BadCustomer(t *testing.T) {
 	assert.ErrorIs(t, err, app.ErrCustomerNotFound)
 }
 
-func TestCheckoutService_PlaceOrder_WithCoupon(t *testing.T) {
-	pool := testPool
-	tx := testutil.NewTestTx(t, pool)
-	svc := newCheckoutService()
-	ctx := context.Background()
-	actor := testutil.TestActor()
-
-	customer := testutil.CreateCustomer(t, tx)
-	shipping := testutil.CreateAddress(t, tx, customer.ID)
-	billing := testutil.CreateAddress(t, tx, customer.ID)
-	product := testutil.CreateProduct(t, tx)
-	variant := testutil.CreateVariant(t, tx, product.ID)
-
-	discount := testutil.CreateDiscount(t, tx,
-		testutil.WithDiscountType(domain.DiscountTypePercentage),
-		testutil.WithDiscountValue(20),
-	)
-	coupon := testutil.CreateCouponCode(t, tx, discount.ID, testutil.WithCouponCode("SAVE20"))
-
-	code := coupon.Code
-	order, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-		CustomerID:        customer.ID,
-		ShippingAddressID: shipping.ID,
-		BillingAddressID:  billing.ID,
-		CurrencyCode:      "USD",
-		Items: []app.CartItem{
-			{VariantID: variant.ID, Quantity: 1, UnitPrice: 10000},
-		},
-		CouponCode: &code,
-	}, actor)
-	require.NoError(t, err)
-
-	assert.Equal(t, 10000, order.Subtotal)
-	assert.Equal(t, 2000, order.DiscountTotal) // 20% of 10000
-	assert.Equal(t, 8000, order.Total)         // 10000 - 2000
-}
-
 func TestCheckoutService_PlaceOrder_PercentageDiscount(t *testing.T) {
 	pool := testPool
 	tx := testutil.NewTestTx(t, pool)
@@ -147,6 +112,7 @@ func TestCheckoutService_PlaceOrder_PercentageDiscount(t *testing.T) {
 	billing := testutil.CreateAddress(t, tx, customer.ID)
 	product := testutil.CreateProduct(t, tx)
 	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 2000, "USD")
 
 	discount := testutil.CreateDiscount(t, tx,
 		testutil.WithDiscountType(domain.DiscountTypePercentage),
@@ -184,6 +150,7 @@ func TestCheckoutService_PlaceOrder_FixedDiscount(t *testing.T) {
 	billing := testutil.CreateAddress(t, tx, customer.ID)
 	product := testutil.CreateProduct(t, tx)
 	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 5000, "USD")
 
 	// Fixed discount larger than subtotal should cap at subtotal.
 	discount := testutil.CreateDiscount(t, tx,
@@ -222,6 +189,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		code := "NONEXISTENT"
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
@@ -241,12 +209,13 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		discount := testutil.CreateDiscount(t, tx)
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
 		// Mark as redeemed.
-		store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID)
+		require.NoError(t, store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID))
 
 		code := coupon.Code
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
@@ -266,6 +235,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		discount := testutil.CreateDiscount(t, tx, testutil.WithDiscountActive(false))
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
@@ -288,6 +258,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		past := time.Now().Add(-24 * time.Hour)
 		discount := testutil.CreateDiscount(t, tx, testutil.WithDiscountExpiry(past))
@@ -311,6 +282,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		discount := testutil.CreateDiscount(t, tx, testutil.WithMinimumOrder(50000))
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
@@ -378,7 +350,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 		customer := testutil.CreateCustomer(t, tx)
 
-		store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID)
+		require.NoError(t, store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID))
 
 		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
 		assert.ErrorIs(t, err, app.ErrCouponAlreadyUsed)

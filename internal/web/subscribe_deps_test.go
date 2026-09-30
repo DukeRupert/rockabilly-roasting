@@ -47,7 +47,7 @@ func newSubscribeDeps(t *testing.T) *Deps {
 	d.CustomerService = app.NewCustomerService(store.NewCustomerStore(), audit.NewAuditWriter(), metrics.NewRegistry())
 	d.CheckoutService = app.NewCheckoutService(
 		orderStore, store.NewCustomerStore(), store.NewDiscountStore(),
-		store.NewSettingsStore(), store.NewShippingStore(), nil,
+		store.NewSettingsStore(), store.NewShippingStore(), nil, d.PricingService,
 		audit.NewAuditWriter(), metrics.NewRegistry(),
 	).WithMerchantTZ(time.UTC)
 	d.Metrics = metrics.NewRegistry()

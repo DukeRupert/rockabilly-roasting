@@ -45,6 +45,10 @@ type CheckoutService struct {
 	// back to UTC, which only misplaces the cutoff in dev — production wires
 	// MERCHANT_TIMEZONE.
 	merchantTZ *time.Location
+
+	// pricing resolves what a line costs. Required: PlaceOrder prices its own
+	// lines rather than believing the ones it was handed.
+	pricing *PricingService
 }
 
 // WithMerchantTZ sets the zone used to resolve local-delivery dates against the
@@ -62,6 +66,7 @@ func NewCheckoutService(
 	settings *store.SettingsStore,
 	shipping *store.ShippingStore,
 	payments payments.Provider,
+	pricing *PricingService,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
 ) *CheckoutService {
@@ -72,6 +77,7 @@ func NewCheckoutService(
 		settings:  settings,
 		shipping:  shipping,
 		payments:  payments,
+		pricing:   pricing,
 		audit:     audit,
 		metrics:   metrics,
 	}
@@ -383,8 +389,16 @@ type PlaceOrderParams struct {
 	CurrencyCode      string
 	CouponCode        *string
 	SubscriptionID    *uuid.UUID
-	ShippingCents     int
-	TaxCents          int
+	// PlanDiscountPct is the subscription plan's percentage off for a signup
+	// order, and zero for retail. Named here because the service prices the
+	// lines itself and cannot read a plan off a subscription that the webhook
+	// has not created yet.
+	PlanDiscountPct int
+	// BasePrice is PriceLinesParams.BasePrice, for a subscription signup: its
+	// lines are priced from the base price, as every renewal is.
+	BasePrice     bool
+	ShippingCents int
+	TaxCents      int
 	// ShippingMethod records the chosen fulfillment channel. For retail
 	// checkout this is set to pickup or local_delivery when the ship-to zip
 	// is local and the customer picked one; otherwise nil and downstream
@@ -425,10 +439,13 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		return nil, err
 	}
 
-	// Calculate subtotal.
-	subtotal := 0
-	for _, item := range p.Items {
-		subtotal += item.UnitPrice * item.Quantity
+	// The subtotal is what the catalog says these lines cost, not what the
+	// caller totalled. See refusePricesThatMoved: the caller quoted the payment
+	// provider from PriceLines, and this refuses the order rather than write one
+	// whose total disagrees with the amount being charged.
+	subtotal, err := s.refusePricesThatMoved(ctx, tx, p)
+	if err != nil {
+		return nil, err
 	}
 
 	// Apply coupon/discount if provided.
@@ -969,10 +986,26 @@ func (s *CheckoutService) CreateManualOrder(ctx context.Context, tx pgx.Tx, p Cr
 // generateOrderNumber creates a non-guessable order number using random bytes.
 // Format: "ORD-XXXXXXXXXX" where X is uppercase alphanumeric (5 random bytes → 10 hex chars).
 func generateOrderNumber() string {
+	return newOrderNumber("ORD")
+}
+
+// newOrderNumber mints an order number under the given prefix. Every path that
+// creates an order comes through here, because orders.number is UNIQUE and the
+// collision is expensive in a specific way: the renewal paths charge the card in
+// their own transaction before writing the order, so a number that will not
+// insert means a customer charged with no order to show for it.
+//
+// Time alone is not enough of a key. `SUB-<unix millis>` is what the renewal
+// paths used to mint, and River runs renewals concurrently against a due set the
+// scheduler enqueues all at once, so two of them sharing a millisecond is a
+// question of how many subscriptions the shop has rather than of luck.
+func newOrderNumber(prefix string) string {
 	b := make([]byte, 5)
 	if _, err := rand.Read(b); err != nil {
-		// Fallback to timestamp if crypto/rand fails (extremely unlikely).
-		return fmt.Sprintf("ORD-%d", time.Now().UnixMilli())
+		// crypto/rand does not fail in practice. If it ever does, nanoseconds
+		// are a worse key than random bytes but a far better one than the
+		// milliseconds this replaced.
+		return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
 	}
-	return "ORD-" + strings.ToUpper(hex.EncodeToString(b))
+	return prefix + "-" + strings.ToUpper(hex.EncodeToString(b))
 }

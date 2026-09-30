@@ -731,13 +731,27 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Build subtotal, tax line items, and the order-items snapshot.
-		taxLineItems := make([]domain.TaxLineItem, len(items))
-		orderItems = make([]app.CartItem, len(items))
-		for i, ci := range items {
-			lineTotal := ci.UnitPrice * ci.Quantity
-			subtotal += lineTotal
+		//
+		// The prices come from CheckoutService.PriceLines, which is also what
+		// PlaceOrder prices this order with in phase 3. That is the point: the
+		// amount authorised below and the subtotal the order records are one
+		// calculation rather than two that happen to agree. It answers the same
+		// numbers the repriced cart holds, so the cart page and this endpoint
+		// still cannot disagree about what is being charged for.
+		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
+			CustomerID:   customerID,
+			CurrencyCode: "USD",
+			Lines:        cartOrderLines(items),
+		})
+		if txErr != nil {
+			return txErr
+		}
+		subtotal = priced.Subtotal
+		orderItems = priced.Items
 
-			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+		taxLineItems := make([]domain.TaxLineItem, len(orderItems))
+		for i, li := range orderItems {
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
 			if vErr != nil {
 				return fmt.Errorf("get variant for tax: %w", vErr)
 			}
@@ -748,13 +762,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 			taxLineItems[i] = domain.TaxLineItem{
 				LineIndex: i,
-				Subtotal:  lineTotal,
+				Subtotal:  li.UnitPrice * li.Quantity,
 				TaxExempt: product.TaxExempt,
-			}
-			orderItems[i] = app.CartItem{
-				VariantID: ci.VariantID,
-				Quantity:  ci.Quantity,
-				UnitPrice: ci.UnitPrice,
 			}
 		}
 

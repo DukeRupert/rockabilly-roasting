@@ -570,7 +570,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	var order *domain.Order
 
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
+		orderNumber := newOrderNumber("SUB")
 		customerID := customer.ID
 		subID := sub.ID
 		renewalPlacedAt := time.Now()
@@ -905,7 +905,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	var order *domain.Order
 
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
+		orderNumber := newOrderNumber("SUB")
 		customerID := customer.ID
 		renewalPlacedAt := time.Now()
 		renewalPromised, renewalRun := scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ)

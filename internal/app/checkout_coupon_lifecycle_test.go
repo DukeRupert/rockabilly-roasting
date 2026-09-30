@@ -37,6 +37,7 @@ func placeWithCoupon(t *testing.T, tx pgx.Tx, svc *app.CheckoutService, piID str
 	addr := testutil.CreateAddress(t, tx, customer.ID)
 	product := testutil.CreateProduct(t, tx)
 	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 5000, "USD")
 
 	discount := testutil.CreateDiscount(t, tx,
 		testutil.WithDiscountType(domain.DiscountTypePercentage),
@@ -134,6 +135,7 @@ func TestCheckoutService_SecondCaptureOnOneCodeStillCaptures(t *testing.T) {
 	addr := testutil.CreateAddress(t, tx, customer.ID)
 	product := testutil.CreateProduct(t, tx)
 	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 5000, "USD")
 	code := coupon.Code
 	loser, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 		CustomerID:        customer.ID,
@@ -252,6 +254,7 @@ func TestDiscountService_GetCouponCodeForOrder(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 5000, "USD")
 		order, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 			CustomerID:        customer.ID,
 			ShippingAddressID: addr.ID,

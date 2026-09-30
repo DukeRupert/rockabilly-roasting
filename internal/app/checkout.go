@@ -286,6 +286,72 @@ type CartItem struct {
 	UnitPrice int
 }
 
+// refuseUntrustableLines rejects a line whose quantity or price could not belong
+// to a real order.
+//
+// PlaceOrderParams is not internal input. The checkout endpoints build it from
+// the request body — POST /api/checkout/payment-intent reads customer_id and
+// address_id straight out of the JSON — so every number in it is whatever the
+// caller sent, and the subtotal loop below multiplies them without asking.
+//
+// The two that matter are not symmetrical. A zero quantity charges nothing for
+// goods the order still ships. A negative unit price is worse than a free line:
+// it is a credit, so a second line at -n cancels the first and a large enough one
+// pays for the rest of the cart, which is a discount the merchant never
+// authorised and no coupon record explains.
+//
+// Refused per line rather than on the total, because a total that comes out
+// positive says nothing about how it got there.
+func refuseUntrustableLines(items []CartItem) error {
+	for _, item := range items {
+		if item.Quantity <= 0 {
+			return ErrInvalidQuantity
+		}
+		if item.UnitPrice < 0 {
+			return ErrInvalidPrice
+		}
+	}
+	return nil
+}
+
+// refuseForeignAddresses rejects an order that names an address belonging to
+// somebody else.
+//
+// This is the ownership half of the same problem: the address ids arrive from
+// the caller, and until now they were copied into the order unexamined, so
+// anyone who could reach the checkout endpoint could post another customer's
+// address id and have it attached to — and shipped to — their own order, and
+// read back off the order afterwards.
+//
+// Enforced the way the rest of the codebase enforces customer ownership, by
+// scoping the read rather than comparing ids afterwards: CustomerStore.GetAddress
+// takes customerID as a parameter, so an address that is not this customer's
+// simply does not come back. Not-found rather than forbidden is deliberate and
+// is what the scoped query naturally yields — from the caller's side an address
+// they do not own is one that does not exist, and saying otherwise would confirm
+// the id to whoever guessed it.
+func (s *CheckoutService) refuseForeignAddresses(ctx context.Context, tx pgx.Tx, customerID, shippingID, billingID uuid.UUID) error {
+	if err := s.requireOwnedAddress(ctx, tx, shippingID, customerID); err != nil {
+		return err
+	}
+	// One address for both is the common case, and the second read would be the
+	// same row.
+	if billingID == shippingID {
+		return nil
+	}
+	return s.requireOwnedAddress(ctx, tx, billingID, customerID)
+}
+
+func (s *CheckoutService) requireOwnedAddress(ctx context.Context, tx pgx.Tx, addressID, customerID uuid.UUID) error {
+	if _, err := s.customers.GetAddress(ctx, tx, addressID, customerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrAddressNotFound
+		}
+		return fmt.Errorf("verify address ownership: %w", err)
+	}
+	return nil
+}
+
 // PlaceOrderParams holds all input needed to place an order.
 type PlaceOrderParams struct {
 	CustomerID        uuid.UUID
@@ -312,6 +378,10 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		return nil, ErrCartEmpty
 	}
 
+	if err := refuseUntrustableLines(p.Items); err != nil {
+		return nil, err
+	}
+
 	// Verify customer exists.
 	_, err := s.customers.GetByID(ctx, tx, p.CustomerID)
 	if err != nil {
@@ -319,6 +389,13 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 			return nil, ErrCustomerNotFound
 		}
 		return nil, fmt.Errorf("get customer: %w", err)
+	}
+
+	// Both addresses must belong to the customer this order is for. Checked
+	// after the customer is known to exist, so a bad customer id reports itself
+	// rather than surfacing as a missing address.
+	if err := s.refuseForeignAddresses(ctx, tx, p.CustomerID, p.ShippingAddressID, p.BillingAddressID); err != nil {
+		return nil, err
 	}
 
 	// Calculate subtotal.

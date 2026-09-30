@@ -184,6 +184,12 @@ func TestPaymentIntentPriceMovedIsAConflictNotAFault(t *testing.T) {
 // err.Error(), which is what makes a handler's prefix visible — "place order:
 // discount has expired".
 //
+// The leg therefore reads the expected sentence off the sentinel rather than
+// repeating it. A prefix still fails the comparison, which is the whole point,
+// but rewriting the copy does not: this holds that nothing is prepended, not
+// what the sentence says. The literal wording is pinned once, in the table at
+// the top of this file.
+//
 // Retail raises it from inside CreatePaymentIntent, the one moment between the
 // handler's two pricings, though it does not need that moment. Phase 1 reads the
 // coupon but never its expiry — the condition at checkout.go's applied-discount
@@ -207,7 +213,7 @@ func TestPaymentIntentRefusalReadsAsAdviceNotAPrefixedDiagnostic(t *testing.T) {
 		w := f.postIntent(t, d, "")
 
 		require.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
-		assert.JSONEq(t, `{"error":"discount has expired"}`, w.Body.String(),
+		assert.JSONEq(t, `{"error":`+quoted(app.ErrDiscountExpired.Error())+`}`, w.Body.String(),
 			"no handler prefix on the sentence the shopper reads")
 	})
 }

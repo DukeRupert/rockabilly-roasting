@@ -219,15 +219,18 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 	t.Run("coupon not found", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
 
 		code := "NONEXISTENT"
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:   customer.ID,
-			CurrencyCode: "USD",
-			Items:        []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
-			CouponCode:   &code,
+			CustomerID:        customer.ID,
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
+			CouponCode:        &code,
 		}, actor)
 		assert.ErrorIs(t, err, app.ErrCouponNotFound)
 	})
@@ -235,6 +238,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 	t.Run("coupon already used", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
 
@@ -246,10 +250,12 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 
 		code := coupon.Code
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:   customer.ID,
-			CurrencyCode: "USD",
-			Items:        []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
-			CouponCode:   &code,
+			CustomerID:        customer.ID,
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
+			CouponCode:        &code,
 		}, actor)
 		assert.ErrorIs(t, err, app.ErrCouponAlreadyUsed)
 	})
@@ -257,6 +263,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 	t.Run("discount inactive", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
 
@@ -265,10 +272,12 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 
 		code := coupon.Code
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:   customer.ID,
-			CurrencyCode: "USD",
-			Items:        []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
-			CouponCode:   &code,
+			CustomerID:        customer.ID,
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
+			CouponCode:        &code,
 		}, actor)
 		assert.ErrorIs(t, err, app.ErrDiscountNotActive)
 	})
@@ -276,6 +285,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 	t.Run("discount expired", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
 
@@ -285,10 +295,12 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 
 		code := coupon.Code
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:   customer.ID,
-			CurrencyCode: "USD",
-			Items:        []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
-			CouponCode:   &code,
+			CustomerID:        customer.ID,
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
+			CouponCode:        &code,
 		}, actor)
 		assert.ErrorIs(t, err, app.ErrDiscountExpired)
 	})
@@ -296,6 +308,7 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 	t.Run("minimum order not met", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
 
@@ -304,10 +317,12 @@ func TestCheckoutService_PlaceOrder_CouponErrors(t *testing.T) {
 
 		code := coupon.Code
 		_, err := svc.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:   customer.ID,
-			CurrencyCode: "USD",
-			Items:        []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
-			CouponCode:   &code,
+			CustomerID:        customer.ID,
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 1, UnitPrice: 1000}},
+			CouponCode:        &code,
 		}, actor)
 		assert.ErrorIs(t, err, app.ErrMinimumOrderNotMet)
 	})

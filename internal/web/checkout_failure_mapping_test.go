@@ -172,31 +172,32 @@ func TestPaymentIntentPriceMovedIsAConflictNotAFault(t *testing.T) {
 	})
 }
 
-// The wrap guard. Both endpoints, because each has its own PlaceOrder call and
-// its own chance to put a prefix on the sentence a shopper reads — restoring
+// The wrap guard. Each endpoint has its own PlaceOrder call and its own chance
+// to put a prefix on the sentence a shopper reads, and restoring
 // fmt.Errorf("place order: %w", txErr) at one of them is invisible to a test
-// that only drives the other.
+// that only drives the other. hiri-core drives both; this shop can drive only
+// retail, for the reason at the end.
 //
 // ErrPriceMoved cannot serve as the sentinel here: its arm answers with the
 // sentinel's own sentence precisely because app/ wraps it, so a prefix added by
-// a handler never shows there. Each leg below picks a sentinel whose arm is
-// answered with err.Error(), which is what makes a handler's prefix visible —
-// "place order: discount has expired".
+// a handler never shows there. The sentinel has to be one whose arm answers with
+// err.Error(), which is what makes a handler's prefix visible — "place order:
+// discount has expired".
 //
-// Each leg raises its sentinel from inside CreatePaymentIntent, which is the one
-// moment between the handler's two pricings, and the reason differs by leg.
+// Retail raises it from inside CreatePaymentIntent, the one moment between the
+// handler's two pricings, though it does not need that moment. Phase 1 reads the
+// coupon but never its expiry — the condition at checkout.go's applied-discount
+// block is RedeemedAt, Active and the order minimum — so an already-expired
+// discount is priced in just the same and phase 3 refuses it either way.
+// Expiring it from the hook is for realism, not reach: it puts the expiry in the
+// window a real one would fall in.
 //
-// Retail expires the coupon's discount. Phase 1 has to have read it while it was
-// live for the coupon to be priced into the order at all, and phase 3 revalidates
-// it inside PlaceOrder — so the hook puts the expiry in the window a real one
-// would fall in rather than simulating it.
-//
-// hiri-core drives subscribe here too, retiring a recipe ingredient mid-intent to
-// reach ErrRecipeIncomplete. This shop has no recipes, and nothing else that
-// only PlaceOrder raises on the subscribe path answers with err.Error(): the
-// address guard, the nearest candidate, answers a bare "not found", which would
-// hide a prefix rather than show it. So subscribe.go's PlaceOrder call is not
-// pinned end to end here. It does not wrap; keep it that way.
+// hiri-core's subscribe leg retires a recipe ingredient mid-intent to reach
+// ErrRecipeIncomplete. This shop has no recipes, and nothing else that only
+// PlaceOrder raises on the subscribe path answers with err.Error(): the address
+// guard, the nearest candidate, answers a bare "not found", which would hide a
+// prefix rather than show it. So subscribe.go's PlaceOrder call is not pinned
+// end to end here. It does not wrap; keep it that way.
 func TestPaymentIntentRefusalReadsAsAdviceNotAPrefixedDiagnostic(t *testing.T) {
 	t.Run("retail", func(t *testing.T) {
 		f := newCheckoutCouponFixture(t)

@@ -484,7 +484,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 		// The coupon the customer actually typed. The adjustments table shows the
 		// discount's name, which is not what support gets asked about.
-		coupon, cErr := d.DiscountService.GetCouponCodeForOrder(ctx, tx, id)
+		coupon, cErr := d.DiscountService.GetCouponCodeForOrder(ctx, tx, order)
 		if cErr != nil {
 			return cErr
 		}

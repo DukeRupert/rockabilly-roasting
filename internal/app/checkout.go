@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -394,6 +395,11 @@ type PlaceOrderParams struct {
 }
 
 // PlaceOrder creates a new order from the given parameters within the provided transaction.
+//
+// A coupon passed here is validated and priced into the order, and the order
+// records which coupon it was placed with, but the code is NOT redeemed —
+// ConfirmCheckoutPayment redeems it when the payment is captured. See the
+// comment there for why.
 func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrderParams, actor Actor) (*domain.Order, error) {
 	if len(p.Items) == 0 {
 		return nil, ErrCartEmpty
@@ -478,6 +484,17 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	placedAt := time.Now()
 	scheduledDelivery, deliveryRun := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
 
+	// Record the coupon on the order so capture knows what to redeem. Copied
+	// rather than written through, because the caller's map is its own.
+	metadata := p.Metadata
+	if coupon != nil {
+		metadata = maps.Clone(p.Metadata)
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata[orderMetadataCouponCodeID] = coupon.ID.String()
+	}
+
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
 		Number:                orderNumber,
 		CustomerID:            &customerID,
@@ -497,7 +514,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		ScheduledDeliveryDate: scheduledDelivery,
 		DeliveryRunDate:       deliveryRun,
 		Notes:                 p.Notes,
-		Metadata:              p.Metadata,
+		Metadata:              metadata,
 		PlacedAt:              placedAt,
 	})
 	if err != nil {
@@ -520,7 +537,11 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		}
 	}
 
-	// Create discount adjustment and atomically redeem coupon.
+	// Create the discount adjustment. The coupon is not redeemed here: the
+	// payment step re-runs /api/checkout/payment-intent on every shipping or
+	// pricing change and each run places a fresh order, so redeeming at
+	// placement spent the code on an order the customer was still paying for.
+	// ConfirmCheckoutPayment redeems it at capture instead.
 	if appliedDiscount != nil && coupon != nil {
 		_, err := s.orders.CreateAdjustment(ctx, tx, store.CreateAdjustmentParams{
 			OrderID:    order.ID,
@@ -531,14 +552,6 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create discount adjustment: %w", err)
-		}
-
-		_, err = s.discounts.RedeemCouponCode(ctx, tx, coupon.ID, &p.CustomerID, order.ID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrCouponAlreadyRedeemed
-			}
-			return nil, fmt.Errorf("redeem coupon code: %w", err)
 		}
 	}
 
@@ -647,9 +660,9 @@ func calculateDiscount(d *domain.Discount, subtotal int) int {
 // was already past the awaiting-payment state and no side effects fired —
 // callers should treat that as a successful no-op (idempotent re-entry).
 //
-// Caller must be inside an open transaction. Coupon redemption is NOT done
-// here — it happens in PlaceOrder at order creation time, and is released by
-// CancelOrder if the order is later abandoned.
+// Caller must be inside an open transaction. The coupon the order was placed
+// with — if any — is redeemed here rather than at placement; see
+// redeemOrderCoupon.
 func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx, paymentIntentID string, actor Actor) (*domain.Order, bool, error) {
 	order, err := s.orders.GetOrderByStripePaymentIntentIDForUpdate(ctx, tx, paymentIntentID)
 	if err != nil {
@@ -714,6 +727,10 @@ func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx,
 		}
 	}
 
+	if err := s.redeemOrderCoupon(ctx, tx, order, actor); err != nil {
+		return nil, false, err
+	}
+
 	// Delete the cart that was used to place this order. The cart_id is
 	// stashed in order.Metadata at PlaceOrder time. Best-effort: a missing
 	// or unparseable cart_id is not fatal here (the cart will be GC'd on
@@ -735,13 +752,100 @@ func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx,
 	return order, true, nil
 }
 
+// redeemOrderCoupon claims the coupon code this order was placed with.
+//
+// Redemption happens at capture, not at placement. The payment step re-runs
+// /api/checkout/payment-intent whenever the shipping method or the pricing
+// changes, and every run places a fresh order; redeeming inside PlaceOrder
+// therefore spent the code on an order the same customer was still trying to
+// pay for, and the next run — finding it spent — priced the cart without the
+// discount and said nothing. Claiming it here means a superseded order never
+// held the code at all.
+//
+// Two locks, doing two different jobs. The row lock this transition already
+// holds is on the *order*, and all it buys is that two captures of one order
+// serialize. What arbitrates two different orders reaching for one code is
+// RedeemCouponCode's own optimistic UPDATE … WHERE redeemed_at IS NULL, which
+// is also why the claim can come back empty below.
+//
+// Nothing holds the code between placement and capture, so two customers can
+// both place an order on the same single-use code. The first to pay gets it.
+// The second is not blocked: by the time this runs their money has already
+// moved at Stripe, and stranding a paid order to protect a coupon helps
+// nobody. The lost redemption is recorded in the audit log so the merchant can
+// see that a single-use code went out twice.
+func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, order *domain.Order, actor Actor) error {
+	couponID, ok := couponCodeIDFromMetadata(order.Metadata)
+	if !ok {
+		return nil
+	}
+
+	_, err := s.discounts.RedeemCouponCode(ctx, tx, couponID, order.CustomerID, order.ID)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("redeem coupon code: %w", err)
+	}
+
+	// The claim can fail for two very different reasons, and the query cannot
+	// tell them apart: somebody else holds the code, or this order already
+	// claimed it on an earlier pass. The second is reachable — a late
+	// payment_intent.payment_failed can knock a captured order back to failed,
+	// and the next success re-enters this transition — and filing it as a loss
+	// would tell the merchant a single-use code went out twice when it went to
+	// exactly one order.
+	held, getErr := s.discounts.GetCouponCodeByID(ctx, tx, couponID)
+	if getErr != nil {
+		return fmt.Errorf("get coupon code after failed redeem: %w", getErr)
+	}
+	if held.RedeemedByOrderID != nil && *held.RedeemedByOrderID == order.ID {
+		return nil
+	}
+
+	if auditErr := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCouponRedemptionLost,
+		ResourceType: "order",
+		ResourceID:   order.ID,
+		After:        order,
+		Metadata: map[string]any{
+			"coupon_code_id": couponID.String(),
+			"discount_total": order.DiscountTotal,
+		},
+	}); auditErr != nil {
+		return fmt.Errorf("audit coupon redemption lost: %w", auditErr)
+	}
+	return nil
+}
+
+// orderMetadataCouponCodeID is the order.Metadata key carrying the coupon the
+// order was placed with. A column would be the honest home for it; this is the
+// same route cart_id and payment_intent_id already take.
+const orderMetadataCouponCodeID = "coupon_code_id"
+
 // cartIDFromMetadata pulls a UUID from order.Metadata["cart_id"]. Returns
 // (uuid.Nil, false) if the key is missing or unparseable.
 func cartIDFromMetadata(metadata map[string]any) (uuid.UUID, bool) {
+	return uuidFromMetadata(metadata, "cart_id")
+}
+
+// couponCodeIDFromMetadata pulls the coupon this order was placed with out of
+// order.Metadata. Returns (uuid.Nil, false) when the order carried no coupon.
+func couponCodeIDFromMetadata(metadata map[string]any) (uuid.UUID, bool) {
+	return uuidFromMetadata(metadata, orderMetadataCouponCodeID)
+}
+
+// uuidFromMetadata reads one UUID-valued key out of an order's metadata.
+// Returns (uuid.Nil, false) if the key is missing or unparseable — metadata is
+// JSONB and nothing enforces its shape, so every read has to survive garbage.
+func uuidFromMetadata(metadata map[string]any, key string) (uuid.UUID, bool) {
 	if metadata == nil {
 		return uuid.Nil, false
 	}
-	raw, ok := metadata["cart_id"]
+	raw, ok := metadata[key]
 	if !ok {
 		return uuid.Nil, false
 	}

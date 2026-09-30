@@ -893,9 +893,10 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 	// Phase 3: place the order in pending+awaiting and link it to the PI.
 	// The cart_id is stashed on order.Metadata so ConfirmCheckoutPayment can
-	// find and delete the cart later. If a coupon was applied at Phase 1,
-	// we redeem it inside PlaceOrder — releasing it on order cancellation
-	// (handled by CancelOrder) is the path back if payment never completes.
+	// find and delete the cart later. A coupon applied at phase 1 is priced
+	// into the order and recorded on it, but not redeemed until the payment is
+	// captured — this endpoint re-runs on every method or pricing change, and
+	// an order superseded by the next run must not have spent the code.
 	var couponCodePtr *string
 	if couponCode != "" {
 		couponCodePtr = &couponCode
@@ -936,7 +937,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
 		reason := "internal_error"
-		if errors.Is(err, app.ErrCouponAlreadyRedeemed) || errors.Is(err, app.ErrCouponAlreadyUsed) {
+		if errors.Is(err, app.ErrCouponAlreadyUsed) {
 			reason = "coupon_redeemed"
 			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "coupon was just used by another customer"})
 		} else {
@@ -1328,14 +1329,18 @@ func addressShippable(a *domain.Address) bool {
 }
 
 // classifyCheckoutError maps checkout errors to failure_reason metric labels.
+//
+// Confirm-path errors only: its one caller is handleCheckoutConfirm, which
+// reaches GetPaymentIntent, ConfirmCheckoutPayment and an order read. A coupon
+// error cannot arrive here — the two that exist come from PlaceOrder and
+// ApplyCoupon, neither on this path — so there is no coupon label. The
+// placement path labels its own refusal inline.
 func classifyCheckoutError(err error) string {
 	switch {
 	case errors.Is(err, app.ErrPaymentFailed):
 		return "payment_failed"
 	case errors.Is(err, app.ErrPaymentAmountMismatch):
 		return "payment_amount_mismatch"
-	case errors.Is(err, app.ErrCouponAlreadyRedeemed):
-		return "coupon_redeemed"
 	case errors.Is(err, app.ErrInsufficientStock):
 		return "inventory_unavailable"
 	case errors.Is(err, app.ErrCartEmpty):

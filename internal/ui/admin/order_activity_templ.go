@@ -66,6 +66,8 @@ func orderEventLabel(action string) string {
 		return "Partially paid"
 	case audit.AuditOrderPaymentOverdue:
 		return "Payment overdue"
+	case audit.AuditCouponRedemptionLost:
+		return "Coupon already used by another order"
 	case audit.AuditShipmentLabelCreated:
 		return "Shipping label bought"
 	case audit.AuditShipmentLabelRefundRequested:
@@ -114,6 +116,7 @@ func orderEventMarker(action string) string {
 		audit.AuditOrderFulfillmentReverted,
 		audit.AuditOrderShipmentReverted,
 		audit.AuditOrderPaymentOverdue,
+		audit.AuditCouponRedemptionLost,
 		audit.AuditShipmentLabelRefundFailed,
 		audit.AuditQBInvoiceVoided:
 		return "bg-rr-red"

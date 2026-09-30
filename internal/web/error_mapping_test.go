@@ -150,7 +150,6 @@ var knownUnmappedSentinels = []string{
 	"ErrBoxPresetMaxWeightInvalid",
 	"ErrBoxPresetNameRequired",
 	"ErrCannotModifySelf",
-	"ErrCouponAlreadyRedeemed",
 	"ErrCouponCodeExists",
 	"ErrCustomerUserEmailRequired",
 	"ErrCustomerUserEmailTaken",

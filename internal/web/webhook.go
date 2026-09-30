@@ -205,8 +205,9 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 		// pending+failed rather than being cancelled here: the PaymentIntent
 		// is still live and the customer may fix their card and retry it —
 		// ConfirmCheckoutPayment accepts the failed → captured transition.
-		// If they never do, the abandoned-order sweep cancels the order (and
-		// releases any coupon) after its grace window.
+		// If they never do, the abandoned-order sweep cancels the order after
+		// its grace window. Nothing has to be done about the coupon either
+		// way: it is claimed at capture, so a failed payment never held it.
 
 		// If this order belongs to a subscription, mark it past_due and notify
 		// the customer — but only on the active → past_due transition.

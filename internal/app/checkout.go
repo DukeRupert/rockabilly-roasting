@@ -296,16 +296,21 @@ type CartItem struct {
 // refuseUntrustableLines rejects a line whose quantity or price could not belong
 // to a real order.
 //
-// Unlike the address check below, this one is defence in depth rather than a
-// closed hole: neither of today's callers lets a client name a line. Both build
-// Items from cart rows the server owns, CartService guards quantity when a line
-// is added, and the subscribe path bounds it again before it gets here. No
-// request shape currently reaches the bad cases.
+// Neither of today's callers lets a client name a line. The retail caller builds
+// Items from cart rows the server owns, and CartService guards quantity when a
+// line is added; the subscribe caller touches no cart at all, and builds a single
+// line from a bounds-checked quantity and a price it looks up. So no request
+// shape reaches the bad cases.
 //
-// It is here because this is where the money is computed — the subtotal loop
-// below multiplies these two numbers and asks nothing — and because the next
-// caller to build Items some other way will not know that. A guard at the
-// arithmetic outlives the assumptions of whoever supplies it.
+// One non-request path does, which is why this is not purely hypothetical:
+// plan.DiscountPct has no CHECK constraint and no validation, and the subscribe
+// handler computes unit - (unit * DiscountPct / 100), so a plan configured above
+// 100% yields a negative unit and is refused here. The renewal path does the
+// same arithmetic but calls CreateOrder directly, so it is not covered.
+//
+// It is here rather than at the callers because the next one to build Items some
+// other way will not know any of the above. A guard where the numbers are
+// consumed outlives the assumptions of whoever supplies them.
 //
 // The two are not symmetrical. A zero quantity charges nothing for goods the
 // order would still ship. A negative unit price is worse than a free line: it is
@@ -346,14 +351,14 @@ func refuseUntrustableLines(items []CartItem) error {
 // otherwise would confirm the id to whoever guessed it.
 //
 // This guards PlaceOrder only, which is the one order-creating path that takes
-// address ids from its caller. The others derive theirs and are noted where they
-// are; nothing here makes the guarantee repo-wide.
+// address ids from its caller. The others derive theirs — CreateManualOrder and
+// both renewal sites each say so where they are — and nothing here makes the
+// guarantee repo-wide.
 //
-// One thing the sentinel does not currently buy: neither PlaceOrder caller maps
-// it. Both hand-roll their error handling and special-case only
-// ErrCouponAlreadyUsed, so this surfaces as a 500 rather than the 404 respond.go
-// would give it. The order is still refused, which is the point — but the status
-// is wrong and the handlers are where that has to be fixed.
+// The sentinel reaches the client as a 404 now: both PlaceOrder callers route
+// their terminal error through Error(), so respond.go decides the status. They
+// used to hand-roll it and answer everything but a spent coupon with a 500,
+// which reported a refused address as a fault.
 func (s *CheckoutService) refuseForeignAddresses(ctx context.Context, tx pgx.Tx, customerID, shippingID, billingID uuid.UUID) error {
 	if err := s.requireOwnedAddress(ctx, tx, customerID, shippingID); err != nil {
 		return err

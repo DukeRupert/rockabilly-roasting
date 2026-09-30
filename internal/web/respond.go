@@ -286,21 +286,27 @@ func mapError(err error) (int, string) {
 	// This binary has no pricing service wired, so it cannot say what a line
 	// costs. Nothing the shopper did, and retrying the same request will not help
 	// until the shop is wired differently.
+	//
+	// Returns its own sentence rather than err.Error(), for the reason
+	// ErrPriceMoved does below: it reaches the checkout endpoints from inside
+	// PlaceOrder, wrapped with "place order", and that prefix is for the log.
 	case errors.Is(err, app.ErrPricingUnavailable):
-		return http.StatusServiceUnavailable, err.Error()
+		return http.StatusServiceUnavailable, app.ErrPricingUnavailable.Error()
 
 	// Pricing the same lines twice in one request disagreed, so the total the
 	// payment provider was quoted is not the total this order would be. Conflict
 	// rather than a bad request: nothing the customer sent was wrong when they
 	// sent it, and the fix is to look at the new price.
 	//
-	// Nothing reaches this yet. Both PlaceOrder callers hand-roll their phase-3
-	// error handling and send everything but ErrCouponAlreadyUsed to 500; this
-	// is the destination for when they route through Error() instead, alongside
-	// ErrAddressNotFound and the two unavailable sentinels, which have the same
-	// problem. Tracked in docs/open-items.md.
+	// Both PlaceOrder callers now route through Error(), so this is reached.
+	//
+	// The sentinel's own sentence rather than err.Error(), because this one
+	// arrives wrapped twice — refusePricesThatMoved names the line and both
+	// prices, the handler adds "place order" — and the shopper wants the advice,
+	// not the chain. The chain still reaches the request log through
+	// recordRequestError, which is where it is useful.
 	case errors.Is(err, app.ErrPriceMoved):
-		return http.StatusConflict, err.Error()
+		return http.StatusConflict, app.ErrPriceMoved.Error()
 
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotPayable),

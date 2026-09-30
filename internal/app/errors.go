@@ -231,9 +231,8 @@ var (
 	// charge one number and record another, which is the thing this exists to
 	// make impossible.
 	//
-	// Mapped to 409 in web/respond.go, but nothing reaches that mapping yet:
-	// both phase-3 callers hand-roll their error handling and return 500. See
-	// the deferred handler follow-up in docs/open-items.md.
+	// Mapped to 409 in web/respond.go, which both checkout endpoints reach
+	// through failCheckout.
 	ErrPriceMoved = errors.New("a price changed while this order was being placed; please review the total and try again")
 	// ErrPricingUnavailable means this binary has no pricing service wired, so
 	// it cannot say what a line costs. Refusing is the only honest answer:

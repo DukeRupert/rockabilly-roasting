@@ -534,9 +534,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
-		d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
-		recordRequestError(r.Context(), err, http.StatusInternalServerError)
-		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare order"})
+		// Same one rule as the retail endpoint. This path has no coupon, so it
+		// has no exception either.
+		d.failCheckout(w, r, "subscribe", err)
 		return
 	}
 

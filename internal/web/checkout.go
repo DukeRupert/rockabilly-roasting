@@ -798,9 +798,22 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get customer for tax: %w", txErr)
 		}
 
-		// scoping: addressID comes from client-submitted JSON and is not scoped to customerID.
-		// Impact is limited (tax calc + order creation use the address; content is not echoed back
-		// to the client), but worth tightening post-launch. Tracked as follow-up.
+		// Order creation is no longer part of what this costs: PlaceOrder
+		// verifies address ownership itself and refuses a foreign one. Do not
+		// read that guard as closing this, though — it is downstream of here,
+		// and two things upstream of it are still live.
+		//
+		// The address is read unscoped on the next line, used for the tax
+		// calculation, and sent to Stripe as the payment intent's shipping
+		// address in phase 2 — name, street, city, state, postal code, country —
+		// all of which happens before phase 3 refuses the order. Nothing is
+		// echoed back to the client and the intent is cancelled best-effort, so a
+		// prober learns nothing from the response, but the egress has already
+		// happened by then. The fix is to use the address phase 1 resolved rather
+		// than look it up again unscoped.
+		//
+		// scoping: addressID comes from client-submitted JSON and is not scoped
+		// to customerID — see above for what that still costs.
 		shippingAddr, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, addressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
@@ -945,15 +958,17 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
-		reason := "internal_error"
+		// The coupon race keeps its own answer. It is the one refusal here with
+		// a sentence written for the shopper — someone else spent the code in
+		// the seconds they were paying — and mapError's generic "already exists"
+		// at 409 is not it. Everything else, including every sentinel added
+		// after this was written, goes through the one rule.
 		if errors.Is(err, app.ErrCouponAlreadyUsed) {
-			reason = "coupon_redeemed"
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "coupon_redeemed").Inc()
 			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "coupon was just used by another customer"})
-		} else {
-			recordRequestError(r.Context(), err, http.StatusInternalServerError)
-			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to place order"})
+			return
 		}
-		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
+		d.failCheckout(w, r, "retail", err)
 		return
 	}
 
@@ -970,6 +985,34 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		ShippingTotal: shippingTotal,
 		ShippingLabel: shippingLabel,
 	})
+}
+
+// failCheckout answers a checkout endpoint whose order could not be placed, and
+// records why, with one rule for both endpoints.
+//
+// The status comes from respond.go's mapping rather than from a branch here.
+// That is the whole point of it existing: both endpoints used to answer
+// everything except ErrCouponAlreadyUsed with a 500, so ErrAddressNotFound,
+// ErrPriceMoved and ErrPricingUnavailable were all reported to the client as
+// faults although mapError gives them 404, 409 and 503 — and the next sentinel
+// PlaceOrder learns to return would have been the fourth. Adding a case per
+// sentinel in two places is how that happened; there is now one place and no
+// cases.
+//
+// The metric follows the mapped status rather than the sentinel, so a refused
+// order stops counting as an internal error. The "checkout failed" panel was
+// reading a shopper being told their price moved as the service breaking, which
+// is the kind of alert that gets muted.
+func (d *Deps) failCheckout(w http.ResponseWriter, r *http.Request, channel string, err error) {
+	status, _ := mapError(err)
+	reason := "validation_error"
+	if status >= http.StatusInternalServerError {
+		reason = "internal_error"
+	}
+	d.Metrics.CheckoutFailed.WithLabelValues(channel, reason).Inc()
+	// Error records the error against the request line with the status it mapped
+	// to, so a 4xx refusal is logged as traffic and a 5xx as a failure.
+	Error(w, r, err)
 }
 
 // shippingDisplayLabel returns the customer-facing descriptor for a computed

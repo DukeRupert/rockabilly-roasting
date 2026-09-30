@@ -3,16 +3,21 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/testutil"
 )
 
 // newSubscribeDeps wires what the subscribe and checkout payment-intent
@@ -68,4 +73,79 @@ func decodeCheckoutIntentResponse(t *testing.T, w *httptest.ResponseRecorder) ch
 	var resp checkoutPaymentIntentResponse
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	return resp
+}
+
+// subscribeFixture is a plan and a priced variant a signup can name, committed
+// so a handler's own transaction can read them.
+type subscribeFixture struct {
+	variantID uuid.UUID
+	planID    uuid.UUID
+}
+
+func newSubscribeFixture(t *testing.T) subscribeFixture {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1800, "USD")
+
+	plan, err := store.NewSubscriptionStore(nil).CreatePlan(ctx, tx, store.CreatePlanParams{
+		Name:          "Monthly",
+		Interval:      domain.SubscriptionIntervalEvery30Days,
+		IntervalCount: 1,
+		IsActive:      true,
+		DiscountPct:   10,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, tx.Commit(ctx))
+	return subscribeFixture{variantID: variant.ID, planID: plan.ID}
+}
+
+// subscribePaymentIntentBody builds a signup request body. The address is the
+// same in every case: none of these turn on it, and varying it would only make
+// the shipping and tax numbers harder to reason about. The email is fresh per
+// call, so each signup is a new guest rather than whoever the last test made.
+func subscribePaymentIntentBody(planID, variantID uuid.UUID, quantity int) string {
+	raw, err := json.Marshal(map[string]any{
+		"plan_id":     planID.String(),
+		"variant_id":  variantID.String(),
+		"quantity":    quantity,
+		"email":       "signup-" + uuid.NewString()[:8] + "@example.test",
+		"first_name":  "Ada",
+		"last_name":   "Byron",
+		"line1":       "1 Main St",
+		"city":        "Helena",
+		"state":       "MT",
+		"postal_code": "59601",
+		"country":     "US",
+	})
+	if err != nil {
+		panic(err) // a literal map; unmarshalable means this file is wrong
+	}
+	return string(raw)
+}
+
+// postSubscribePaymentIntent drives the handler as a signed-out visitor.
+func postSubscribePaymentIntent(t *testing.T, d *Deps, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPost, "/api/subscribe/payment-intent", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	d.handleSubscribePaymentIntent(w, r)
+	return w
+}
+
+// newSubscribePaymentDeps is newSubscribeDeps with a payment provider that
+// records rather than calls out.
+func newSubscribePaymentDeps(t *testing.T) (*Deps, *fakePaymentProvider) {
+	t.Helper()
+	d := newSubscribeDeps(t)
+	fake := &fakePaymentProvider{}
+	d.PaymentProvider = fake
+	return d, fake
 }

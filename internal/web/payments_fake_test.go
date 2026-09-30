@@ -31,9 +31,7 @@ type fakePaymentProvider struct {
 	// createdIntents holds every CreatePaymentIntent request in order. The
 	// amount on the last one is the number the card is charged.
 	createdIntents []payments.CreatePaymentIntentRequest
-	// createdCustomers holds every Stripe customer the handler minted. On the
-	// recipe path the email here is the assertion that the signed-in account —
-	// not the email field on the form — is who the subscription belongs to.
+	// createdCustomers holds every Stripe customer the handler minted.
 	createdCustomers []payments.CreateCustomerRequest
 	// canceled holds every PaymentIntent id the handler asked to cancel,
 	// whether abandoning a previous intent or cleaning up an orphaned one.
@@ -43,6 +41,13 @@ type fakePaymentProvider struct {
 	// path there is nothing to set: the handler's own transaction is what
 	// fails there.
 	intentErr error
+
+	// onCreate, when set, runs inside CreatePaymentIntent. Creating the intent
+	// is the only moment that sits between the handler's two pricings — phase 1
+	// prices the lines and quotes the provider from the answer, phase 3 prices
+	// them again inside PlaceOrder — so this is the seam a test needs to
+	// reproduce a price moving mid-checkout rather than simulating one.
+	onCreate func()
 }
 
 func (f *fakePaymentProvider) CreatePaymentIntent(_ context.Context, req payments.CreatePaymentIntentRequest) (*payments.PaymentIntent, error) {
@@ -50,6 +55,9 @@ func (f *fakePaymentProvider) CreatePaymentIntent(_ context.Context, req payment
 	defer f.mu.Unlock()
 	if f.intentErr != nil {
 		return nil, f.intentErr
+	}
+	if f.onCreate != nil {
+		f.onCreate()
 	}
 	f.createdIntents = append(f.createdIntents, req)
 	// A fresh id per intent, not a counter: these tests commit, the id lands

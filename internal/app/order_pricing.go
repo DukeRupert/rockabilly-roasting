@@ -54,8 +54,11 @@ type PriceLinesParams struct {
 	// way because every renewal is: RenewalService charges GetBasePrice less the
 	// plan's discount. A signup resolved through the customer's list would charge
 	// the first box one number and every box after it another, and nothing would
-	// compare the two. Set by the handler that places the signup, never from a
-	// request.
+	// compare the two. Retail checkout is priced this way because the retail
+	// cart is: CartService.AddItem prices at base and the checkout page shows
+	// those numbers, so the charge has to match them. Set by the handler, never
+	// from a request. The wholesale cart is the path that resolves through the
+	// customer's list, and it reprices itself before anything is summed.
 	BasePrice bool
 }
 

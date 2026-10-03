@@ -735,13 +735,21 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		// The prices come from CheckoutService.PriceLines, which is also what
 		// PlaceOrder prices this order with in phase 3. That is the point: the
 		// amount authorised below and the subtotal the order records are one
-		// calculation rather than two that happen to agree. It answers the same
-		// numbers the repriced cart holds, so the cart page and this endpoint
-		// still cannot disagree about what is being charged for.
+		// calculation rather than two that happen to agree.
+		//
+		// BasePrice, because that is what the retail cart holds. The storefront
+		// adds items through CartService.AddItem, which prices at base, and
+		// nothing reprices a retail cart afterwards; the checkout page sums its
+		// lines from the cart and takes the total from this endpoint. Resolving
+		// through the customer's price list here would charge a card one
+		// number while the page shows lines adding up to another, for any
+		// customer staff have put on a list. Phase 3 passes the same flag so the
+		// two pricings agree.
 		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
 			CustomerID:   customerID,
 			CurrencyCode: "USD",
 			Lines:        cartOrderLines(items),
+			BasePrice:    true,
 		})
 		if txErr != nil {
 			return txErr
@@ -937,6 +945,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			BillingAddressID:  addressID,
 			CurrencyCode:      "USD",
 			CouponCode:        couponCodePtr,
+			BasePrice:         true, // as phase 1 priced them; see there
 			ShippingCents:     shippingTotal,
 			TaxCents:          taxTotal,
 			ShippingMethod:    chosenMethod,

@@ -403,8 +403,9 @@ type PlaceOrderParams struct {
 	// lines itself and cannot read a plan off a subscription that the webhook
 	// has not created yet.
 	PlanDiscountPct int
-	// BasePrice is PriceLinesParams.BasePrice, for a subscription signup: its
-	// lines are priced from the base price, as every renewal is.
+	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
+	// whose lines are priced from the base price as every renewal is, and for
+	// retail checkout, whose cart was.
 	BasePrice     bool
 	ShippingCents int
 	TaxCents      int

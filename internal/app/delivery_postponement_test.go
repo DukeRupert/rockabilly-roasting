@@ -28,7 +28,7 @@ func postponementService() *app.CheckoutService {
 		store.NewCustomerStore(),
 		nil, nil,
 		store.NewShippingStore(),
-		nil,
+		nil, nil, // no payment provider, no pricing: this path places no order
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),
 	)

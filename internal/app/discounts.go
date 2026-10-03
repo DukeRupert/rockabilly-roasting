@@ -53,16 +53,39 @@ func (s *DiscountService) ListDiscounts(ctx context.Context, tx pgx.Tx, f store.
 	return discounts, nil
 }
 
-// GetCouponCodeForOrder returns the coupon code redeemed against an order.
+// GetCouponCodeForOrder returns the coupon code this order was placed with.
 // Returns nil, nil when the order carried no coupon — callers display the code
 // when there is one and say nothing when there isn't.
-func (s *DiscountService) GetCouponCodeForOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.CouponCode, error) {
-	code, err := s.discounts.GetCouponCodeByOrderID(ctx, tx, orderID)
+//
+// Two lookups, because a coupon is claimed at capture rather than at placement:
+// an order that has not been paid for yet holds no redemption, and one whose
+// redemption was lost to another customer never will. The redeemed row is
+// asked first anyway — it is the one a fork with its own writer will have — and
+// the coupon the order records having been placed with is the fallback. An
+// order that carried no coupon has neither.
+func (s *DiscountService) GetCouponCodeForOrder(ctx context.Context, tx pgx.Tx, order *domain.Order) (*domain.CouponCode, error) {
+	if order == nil {
+		return nil, nil
+	}
+
+	code, err := s.discounts.GetCouponCodeByOrderID(ctx, tx, order.ID)
+	if err == nil {
+		return code, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("get coupon code for order: %w", err)
+	}
+
+	couponID, ok := couponCodeIDFromMetadata(order.Metadata)
+	if !ok {
+		return nil, nil
+	}
+	code, err = s.discounts.GetCouponCodeByID(ctx, tx, couponID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("get coupon code for order: %w", err)
+		return nil, fmt.Errorf("get coupon code placed with order: %w", err)
 	}
 	return code, nil
 }

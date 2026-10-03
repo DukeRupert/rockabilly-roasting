@@ -235,6 +235,11 @@ const (
 	AuditDiscountCreated     = "discount.created"
 	AuditDiscountUpdated     = "discount.updated"
 	AuditDiscountDeactivated = "discount.deactivated"
+	// AuditCouponRedemptionLost records a paid order whose single-use coupon
+	// was claimed by someone else between placement and capture. The discount
+	// was already charged, so the capture stands and this is the only trace
+	// that a single-use code went out twice.
+	AuditCouponRedemptionLost = "coupon.redemption_lost"
 
 	// Wholesale customer actions
 	AuditWholesaleApplicationApproved = "wholesale.application_approved"

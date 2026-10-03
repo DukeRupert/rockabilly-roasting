@@ -84,15 +84,14 @@ var (
 	ErrFulfillmentNotFound = errors.New("fulfillment not found")
 
 	// Discount errors
-	ErrDiscountNotFound      = errors.New("discount not found")
-	ErrDiscountExpired       = errors.New("discount has expired")
-	ErrDiscountNotActive     = errors.New("discount is not active")
-	ErrCouponAlreadyUsed     = errors.New("coupon code already used")
-	ErrCouponAlreadyRedeemed = errors.New("coupon code was just redeemed by someone else")
-	ErrCouponNotFound        = errors.New("coupon code not found")
-	ErrCouponCodeExists      = errors.New("coupon code already exists")
-	ErrDiscountInvalid       = errors.New("discount fields are invalid")
-	ErrMinimumOrderNotMet    = errors.New("minimum order amount not met")
+	ErrDiscountNotFound   = errors.New("discount not found")
+	ErrDiscountExpired    = errors.New("discount has expired")
+	ErrDiscountNotActive  = errors.New("discount is not active")
+	ErrCouponAlreadyUsed  = errors.New("coupon code already used")
+	ErrCouponNotFound     = errors.New("coupon code not found")
+	ErrCouponCodeExists   = errors.New("coupon code already exists")
+	ErrDiscountInvalid    = errors.New("discount fields are invalid")
+	ErrMinimumOrderNotMet = errors.New("minimum order amount not met")
 
 	// Auth errors
 	ErrSessionExpired   = errors.New("session expired")
@@ -221,6 +220,24 @@ var (
 	// multiple of the multiple is rejected rather than silently rounded up.
 	ErrInvalidWholesaleMOQ = errors.New("invalid wholesale order quantity rule")
 	ErrPriceListNotFound   = errors.New("price list not found")
+	// ErrPriceMoved means pricing an order's lines a second time did not give
+	// the answer they were submitted at.
+	//
+	// Not a stale page: the checkout endpoints price their lines in phase 1 and
+	// PlaceOrder re-prices them in phase 3 of the same request, so the window is
+	// a reprice landing between the two — milliseconds. What the guard is for is
+	// the cross-check itself. The amount quoted to the payment provider came
+	// from the first answer, so an order written against a different one would
+	// charge one number and record another, which is the thing this exists to
+	// make impossible.
+	//
+	// Mapped to 409 in web/respond.go, which both checkout endpoints reach
+	// through failCheckout.
+	ErrPriceMoved = errors.New("a price changed while this order was being placed; please review the total and try again")
+	// ErrPricingUnavailable means this binary has no pricing service wired, so
+	// it cannot say what a line costs. Refusing is the only honest answer:
+	// guessing writes an order at a price nobody offered.
+	ErrPricingUnavailable = errors.New("pricing is not available in this build")
 
 	// Cart errors (item-level)
 	ErrInvalidQuantity = errors.New("quantity must be greater than zero")

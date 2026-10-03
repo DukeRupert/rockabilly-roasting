@@ -55,6 +55,7 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1800, "USD")
 		plan, err := store.NewSubscriptionStore(nil).CreatePlan(ctx, tx, store.CreatePlanParams{
 			Name:          "Monthly",
 			Interval:      domain.SubscriptionIntervalEvery30Days,
@@ -69,8 +70,12 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,
 			CurrencyCode:      "USD",
-			Items:             []app.CartItem{{VariantID: variant.ID, Quantity: 2, UnitPrice: 1620}},
-			Metadata:          app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
+			// 1800 less the plan's 10%. The service does that arithmetic — the
+			// unit price here is what it must agree with, not a number this
+			// test invented.
+			Items:           []app.CartItem{{VariantID: variant.ID, Quantity: 2, UnitPrice: 1620}},
+			PlanDiscountPct: plan.DiscountPct,
+			Metadata:        app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
 		}, actor)
 		require.NoError(t, err)
 
@@ -101,6 +106,7 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1000, "USD")
 
 		order, err := checkout.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 			CustomerID:        customer.ID,
@@ -133,6 +139,7 @@ func TestCheckoutService_ConfirmCheckoutPayment_RecoveryGuards(t *testing.T) {
 		addr := testutil.CreateAddress(t, tx, customer.ID)
 		product := testutil.CreateProduct(t, tx)
 		variant := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 		order, err := checkout.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 			CustomerID:        customer.ID,
 			ShippingAddressID: addr.ID,

@@ -731,13 +731,35 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Build subtotal, tax line items, and the order-items snapshot.
-		taxLineItems := make([]domain.TaxLineItem, len(items))
-		orderItems = make([]app.CartItem, len(items))
-		for i, ci := range items {
-			lineTotal := ci.UnitPrice * ci.Quantity
-			subtotal += lineTotal
+		//
+		// The prices come from CheckoutService.PriceLines, which is also what
+		// PlaceOrder prices this order with in phase 3. That is the point: the
+		// amount authorised below and the subtotal the order records are one
+		// calculation rather than two that happen to agree.
+		//
+		// BasePrice, because that is what the retail cart holds. The storefront
+		// adds items through CartService.AddItem, which prices at base, and
+		// nothing reprices a retail cart afterwards; the checkout page sums its
+		// lines from the cart and takes the total from this endpoint. Resolving
+		// through the customer's price list here would charge a card one
+		// number while the page shows lines adding up to another, for any
+		// customer staff have put on a list. Phase 3 passes the same flag so the
+		// two pricings agree.
+		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
+			CustomerID:   customerID,
+			CurrencyCode: "USD",
+			Lines:        cartOrderLines(items),
+			BasePrice:    true,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		subtotal = priced.Subtotal
+		orderItems = priced.Items
 
-			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+		taxLineItems := make([]domain.TaxLineItem, len(orderItems))
+		for i, li := range orderItems {
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
 			if vErr != nil {
 				return fmt.Errorf("get variant for tax: %w", vErr)
 			}
@@ -748,13 +770,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 			taxLineItems[i] = domain.TaxLineItem{
 				LineIndex: i,
-				Subtotal:  lineTotal,
+				Subtotal:  li.UnitPrice * li.Quantity,
 				TaxExempt: product.TaxExempt,
-			}
-			orderItems[i] = app.CartItem{
-				VariantID: ci.VariantID,
-				Quantity:  ci.Quantity,
-				UnitPrice: ci.UnitPrice,
 			}
 		}
 
@@ -789,9 +806,28 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get customer for tax: %w", txErr)
 		}
 
-		// scoping: addressID comes from client-submitted JSON and is not scoped to customerID.
-		// Impact is limited (tax calc + order creation use the address; content is not echoed back
-		// to the client), but worth tightening post-launch. Tracked as follow-up.
+		// Order creation is no longer part of what this costs: PlaceOrder
+		// verifies address ownership itself and refuses a foreign one. Do not
+		// read that guard as closing this, though — it is downstream of here,
+		// and two things upstream of it are still live.
+		//
+		// The address is read unscoped on the next line, used for the tax
+		// calculation, and sent to Stripe as the payment intent's shipping
+		// address in phase 2 — name, street, second line, city, state, postal
+		// code, country — all of which happens before phase 3 refuses the order.
+		// The address is never echoed back and the intent is cancelled
+		// best-effort, but the egress has already happened by then.
+		//
+		// The response is not quite silent either: a foreign address id that
+		// exists now answers 404 from phase 3, while one that does not exist
+		// answers 422 from phase 1, which distinguishes the two to anyone
+		// counting. Infeasible against v4 UUIDs, and it predates this — the two
+		// answers were 500 and 422 before — but it is not nothing. The fix for
+		// both is to use the address phase 1 resolved rather than look it up
+		// again unscoped.
+		//
+		// scoping: addressID comes from client-submitted JSON and is not scoped
+		// to customerID — see above for what that still costs.
 		shippingAddr, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, addressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
@@ -893,9 +929,10 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 	// Phase 3: place the order in pending+awaiting and link it to the PI.
 	// The cart_id is stashed on order.Metadata so ConfirmCheckoutPayment can
-	// find and delete the cart later. If a coupon was applied at Phase 1,
-	// we redeem it inside PlaceOrder — releasing it on order cancellation
-	// (handled by CancelOrder) is the path back if payment never completes.
+	// find and delete the cart later. A coupon applied at phase 1 is priced
+	// into the order and recorded on it, but not redeemed until the payment is
+	// captured — this endpoint re-runs on every method or pricing change, and
+	// an order superseded by the next run must not have spent the code.
 	var couponCodePtr *string
 	if couponCode != "" {
 		couponCodePtr = &couponCode
@@ -908,6 +945,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			BillingAddressID:  addressID,
 			CurrencyCode:      "USD",
 			CouponCode:        couponCodePtr,
+			BasePrice:         true, // as phase 1 priced them; see there
 			ShippingCents:     shippingTotal,
 			TaxCents:          taxTotal,
 			ShippingMethod:    chosenMethod,
@@ -921,7 +959,12 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			Name: "guest checkout",
 		})
 		if txErr != nil {
-			return fmt.Errorf("place order: %w", txErr)
+			// Deliberately unwrapped, unlike its sibling below. This error is
+			// what the shopper is answered from — failCheckout hands it to
+			// mapError, and several sentinels are mapped to their own sentence —
+			// so a "place order:" prefix here is a prefix on the sentence they
+			// read. The phase is already on the log line below.
+			return txErr
 		}
 		if _, txErr := d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, pi.ID); txErr != nil {
 			return fmt.Errorf("link payment intent: %w", txErr)
@@ -935,15 +978,17 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
-		reason := "internal_error"
-		if errors.Is(err, app.ErrCouponAlreadyRedeemed) || errors.Is(err, app.ErrCouponAlreadyUsed) {
-			reason = "coupon_redeemed"
+		// The coupon race keeps its own answer. It is the one refusal here with
+		// a sentence written for the shopper — someone else spent the code in
+		// the seconds they were paying — and mapError's generic "already exists"
+		// at 409 is not it. Everything else, including every sentinel added
+		// after this was written, goes through the one rule.
+		if errors.Is(err, app.ErrCouponAlreadyUsed) {
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "coupon_redeemed").Inc()
 			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "coupon was just used by another customer"})
-		} else {
-			recordRequestError(r.Context(), err, http.StatusInternalServerError)
-			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to place order"})
+			return
 		}
-		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
+		d.failCheckout(w, r, "retail", err)
 		return
 	}
 
@@ -960,6 +1005,49 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		ShippingTotal: shippingTotal,
 		ShippingLabel: shippingLabel,
 	})
+}
+
+// failCheckout answers a checkout endpoint whose order could not be placed, and
+// records why, with one rule for both endpoints.
+//
+// The status comes from respond.go's mapping rather than from a branch here.
+// Both endpoints used to answer everything except ErrCouponAlreadyUsed with a
+// 500, so every other sentinel PlaceOrder can return was reported to the client
+// as a fault although mapError had a status for it — and the next one added
+// would have been treated the same way. Adding a case per sentinel in two
+// handlers is how that happened; there is one place now and no cases.
+//
+// Two of them actually change what a client sees, because those are the two
+// PlaceOrder raises that a request can reach: ErrAddressNotFound becomes 404 and
+// ErrPriceMoved becomes 409. ErrPricingUnavailable and ErrRecipesUnavailable are
+// mapped to 503 and still unreachable here — both are raised in phase 1, which
+// keeps a per-sentinel switch of its own whose default is a 500. That switch is
+// the same shape as the one this replaced, and it is where those two live; it is
+// the remaining half of this job rather than something this covers.
+//
+// The metric follows the mapped status rather than the sentinel, so a refused
+// order stops counting as an internal error — the "checkout failed" panel was
+// reading a shopper being told their price moved as the service breaking, which
+// is the kind of alert that gets muted. ErrPriceMoved gets a label of its own
+// because its rate says something different from the rest: it measures catalog
+// churn against in-flight checkouts, not shoppers mis-filling a form, and
+// burying it in validation_error would hide it just as thoroughly as
+// internal_error did.
+func (d *Deps) failCheckout(w http.ResponseWriter, r *http.Request, channel string, err error) {
+	status, _ := mapError(err)
+	reason := "validation_error"
+	switch {
+	case status >= http.StatusInternalServerError:
+		reason = "internal_error"
+	case errors.Is(err, app.ErrPriceMoved):
+		reason = "price_moved"
+	}
+	d.Metrics.CheckoutFailed.WithLabelValues(channel, reason).Inc()
+	// Error records the error against the request line with the status it mapped
+	// to, which decides the level: a 5xx is logged as a failure. A 4xx is logged
+	// as ordinary traffic and carries no error field, so the diagnostic for a
+	// refusal is the caller's own log line rather than this one.
+	Error(w, r, err)
 }
 
 // shippingDisplayLabel returns the customer-facing descriptor for a computed
@@ -1328,14 +1416,18 @@ func addressShippable(a *domain.Address) bool {
 }
 
 // classifyCheckoutError maps checkout errors to failure_reason metric labels.
+//
+// Confirm-path errors only: its one caller is handleCheckoutConfirm, which
+// reaches GetPaymentIntent, ConfirmCheckoutPayment and an order read. A coupon
+// error cannot arrive here — the two that exist come from PlaceOrder and
+// ApplyCoupon, neither on this path — so there is no coupon label. The
+// placement path labels its own refusal inline.
 func classifyCheckoutError(err error) string {
 	switch {
 	case errors.Is(err, app.ErrPaymentFailed):
 		return "payment_failed"
 	case errors.Is(err, app.ErrPaymentAmountMismatch):
 		return "payment_amount_mismatch"
-	case errors.Is(err, app.ErrCouponAlreadyRedeemed):
-		return "coupon_redeemed"
 	case errors.Is(err, app.ErrInsufficientStock):
 		return "inventory_unavailable"
 	case errors.Is(err, app.ErrCartEmpty):

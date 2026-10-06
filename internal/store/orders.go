@@ -347,7 +347,8 @@ type OrderFilter struct {
 	// keep aggregate sums consistent with the daily-trend chart.
 	ExcludeCancelledRefunded bool
 	// OnlySubscription narrows to subscription-originated orders (true) or
-	// one-time orders (false). Nil leaves the source unconstrained.
+	// one-time orders (false). Nil leaves the source unconstrained. Honoured
+	// by SumOrderRevenue only; ListOrders does not read it.
 	OnlySubscription *bool
 	// TotalMin / TotalMax bound the order total, in cents, inclusive. Nil
 	// leaves that end unbounded.
@@ -843,10 +844,15 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 		query += " AND status NOT IN ('cancelled', 'refunded')"
 	}
 	if f.OnlySubscription != nil {
+		// subscription_id names one subscription. An order covering several —
+		// a batched renewal, a signup of several items — leaves it null and is
+		// linked only through subscription_orders, so both are asked.
+		const fromSubscription = `(subscription_id IS NOT NULL OR EXISTS (
+			SELECT 1 FROM subscription_orders so WHERE so.order_id = orders.id))`
 		if *f.OnlySubscription {
-			query += " AND subscription_id IS NOT NULL"
+			query += " AND " + fromSubscription
 		} else {
-			query += " AND subscription_id IS NULL"
+			query += " AND NOT " + fromSubscription
 		}
 	}
 

@@ -83,6 +83,11 @@ type OrderShowProps struct {
 	// on purpose — staff know the route better than the zip table — so this
 	// drives a warning on the button, not a lock.
 	ShipToIsLocal bool
+	// SubscriptionIDs is every subscription this order started or renewed: the
+	// one stamped on the order, and any linked through subscription_orders.
+	// An order covering several leaves the stamp null, so the stamp alone
+	// would show none of them.
+	SubscriptionIDs []uuid.UUID
 }
 
 // maxLabelPolls bounds the auto-refresh that runs after a label is queued: the
@@ -620,6 +625,34 @@ templ railCard(title string) {
 			{ children... }
 		</div>
 	</section>
+}
+
+// orderSubscriptionLinks is the rail row linking an order to its
+// subscriptions. One reads as it always has; several get one link each.
+templ orderSubscriptionLinks(ids []uuid.UUID) {
+	if len(ids) > 0 {
+		if len(ids) == 1 {
+			@railRow("Subscription") {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", ids[0].String())) }
+					class="font-semibold text-rr-red hover:text-rr-red-lt"
+				>View plan &rarr;</a>
+			}
+		} else {
+			@railRow("Subscriptions") {
+				<ul class="flex flex-col gap-1">
+					for i, id := range ids {
+						<li>
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", id.String())) }
+								class="font-semibold text-rr-red hover:text-rr-red-lt"
+							>Plan { fmt.Sprint(i + 1) } of { fmt.Sprint(len(ids)) } &rarr;</a>
+						</li>
+					}
+				</ul>
+			}
+		}
+	}
 }
 
 // railRow is one label/value line inside a rail card.
@@ -1425,14 +1458,7 @@ templ orderShippingCard(props OrderShowProps) {
 					{ *props.Order.CustomerPONumber }
 				}
 			}
-			if props.Order.SubscriptionID != nil {
-				@railRow("Subscription") {
-					<a
-						href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", props.Order.SubscriptionID.String())) }
-						class="font-semibold text-rr-red hover:text-rr-red-lt"
-					>View plan &rarr;</a>
-				}
-			}
+			@orderSubscriptionLinks(props.SubscriptionIDs)
 			if canSwapShippingMethod(props.Order) {
 				<div class="mt-1 flex flex-col gap-2 border-t border-rr-border pt-3">
 					@shippingMethodSwap(props.Order.ID, props.Order.ShippingMethod)

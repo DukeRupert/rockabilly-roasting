@@ -13,6 +13,7 @@
     type SubscribeCatalogPlan,
   } from './lib/subscribe-api';
   import { formatCents } from './lib/format';
+  import { IntentSequencer, intentIdOf } from './lib/intent-sequencer';
 
   // One line of the box, as the mount div's data-lines attribute carries it —
   // see storefront.SubscribeLineProps. Read on mount; after an add or remove,
@@ -267,93 +268,98 @@
     }
   }
 
-  // The PI being abandoned when the address or the box changes and a new PI
-  // is created. Sent to the server so the orphaned PI (and its pre-created
-  // order) get cancelled instead of lingering.
-  let previousPaymentIntentId = '';
+  // Payment intents are created one at a time, for the box and address on
+  // screen when each create goes out; an intent the page abandons (the box
+  // or address changed) is cancelled by the next create, and its pre-created
+  // order with it via the payment_intent.canceled webhook. The rules live in
+  // lib/intent-sequencer.ts, where they are unit-tested.
+  //
+  // The address the last create went out with, so a blur only recreates the
+  // intent when the address actually moved.
+  let intentAddressKey = '';
+  const intents = new IntentSequencer<SubscribePaymentIntentResponse>({
+    create: (previousId) => {
+      intentAddressKey = addressKey;
+      return createSubscribePaymentIntent({
+        lines: lines.map((l) => ({
+          plan_id: l.plan_id,
+          variant_id: l.variant_id,
+          quantity: l.quantity,
+        })),
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        line1,
+        line2: line2 || undefined,
+        city,
+        state: addressState,
+        postal_code: postalCode,
+        country,
+        previous_payment_intent_id: previousId,
+      });
+    },
+    idOf: (r) => intentIdOf(r.client_secret),
+    canCreate: () => formValid,
+  });
 
-  // One payment intent is created at a time. A box edit or address change
-  // that lands while a create is in flight only marks it stale: two creates
-  // racing would let whichever answered last decide what the card is charged
-  // for — possibly the box before the edit — and the earlier intent would be
-  // sent no cancellation. When a stale create answers, its intent becomes the
-  // previous one and a fresh create goes out for the current box, so every
-  // abandoned intent is cancelled by its successor.
-  let intentInFlight = false;
-  let intentStale = false;
+  // True when the last create for the page as it is failed: the payment
+  // panel offers a retry instead of loading forever.
+  let intentFailed = $state(false);
 
   async function initStripe() {
-    if (intentInFlight) {
-      intentStale = true;
+    intentFailed = false;
+    stripe = await getStripe(stripeKey);
+    if (!stripe) {
+      error = 'Failed to load payment system';
+      intentFailed = true;
+      stripeInitialized = false;
       return;
     }
-    intentInFlight = true;
-    try {
-      stripe = await getStripe(stripeKey);
-      if (!stripe) {
-        error = 'Failed to load payment system';
+
+    const outcome = await intents.request();
+    switch (outcome.kind) {
+      case 'superseded':
+        // The create already in flight answers for the current page.
+        return;
+      case 'idle':
+        // Nothing valid to charge for; the form turning valid creates one.
+        stripeInitialized = false;
+        return;
+      case 'failed': {
+        const e = outcome.error as { message?: string } | undefined;
+        error = e?.message || 'Failed to initialize payment';
+        intentFailed = true;
+        stripeInitialized = false;
         return;
       }
-
-      let piResponse: SubscribePaymentIntentResponse;
-      for (;;) {
-        intentStale = false;
-        piResponse = await createSubscribePaymentIntent({
-          lines: lines.map((l) => ({
-            plan_id: l.plan_id,
-            variant_id: l.variant_id,
-            quantity: l.quantity,
-          })),
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          line1,
-          line2: line2 || undefined,
-          city,
-          state: addressState,
-          postal_code: postalCode,
-          country,
-          previous_payment_intent_id: previousPaymentIntentId || undefined,
-        });
-        previousPaymentIntentId = '';
-        if (!intentStale) break;
-        // The box or address changed while this was being created: it is
-        // already the wrong charge. Hand it to the next create to cancel.
-        previousPaymentIntentId = piResponse.client_secret.split('_secret')[0];
-        if (!formValid) {
-          // Nothing valid to charge for yet; the next valid change creates
-          // one, and cancels this on the way.
-          stripeInitialized = false;
-          return;
-        }
-      }
-
-      totals = piResponse;
-      // Nothing computed in the browser: every line's price shown from here
-      // on is the server's. Matched on plan and variant together — the key the
-      // server merges lines on — because one variant can be in the box on two
-      // plans at two prices.
-      for (const priced of piResponse.lines) {
-        const line = lines.find(
-          (l) =>
-            l.plan_id === priced.plan_id &&
-            l.variant_id === priced.variant_id,
-        );
-        if (line) line.unit_price = priced.unit_price;
-      }
-      clientSecret = piResponse.client_secret;
-      stripeReady = true;
-      await tick();
-
-      elements = createElements(stripe, clientSecret);
-      const paymentElement = elements.create('payment');
-      paymentElement.mount('#stripe-subscribe-payment');
-    } catch (e: any) {
-      error = e.message || 'Failed to initialize payment';
-      stripeInitialized = false;
-    } finally {
-      intentInFlight = false;
     }
+
+    const piResponse = outcome.result;
+    error = '';
+    totals = piResponse;
+    // Nothing computed in the browser: every line's price shown from here
+    // on is the server's. Matched on plan and variant together — the key the
+    // server merges lines on — because one variant can be in the box on two
+    // plans at two prices.
+    for (const priced of piResponse.lines) {
+      const line = lines.find(
+        (l) =>
+          l.plan_id === priced.plan_id &&
+          l.variant_id === priced.variant_id,
+      );
+      if (line) line.unit_price = priced.unit_price;
+    }
+    const secret = piResponse.client_secret;
+    clientSecret = secret;
+    stripeReady = true;
+    await tick();
+    // A change during the tick has already abandoned this intent and asked
+    // for the next one; mounting it now would show the wrong charge.
+    if (clientSecret !== secret) return;
+
+    elements = createElements(stripe, secret);
+    const paymentElement = elements.create('payment');
+    paymentElement.mount('#stripe-subscribe-payment');
   }
 
   async function handleSubmit(e: Event) {
@@ -364,12 +370,6 @@
     error = '';
 
     try {
-      // If address changed since PI was created, create a new one
-      if (!clientSecret) {
-        await initStripe();
-        if (!clientSecret) return;
-      }
-
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -414,16 +414,13 @@
   // removed is exactly the same kind of change as an edited address: what is
   // being charged for moved, so the intent has to move with it.
   function resetPaymentIntent() {
-    if (clientSecret) {
-      previousPaymentIntentId = clientSecret.split('_secret')[0];
-    }
+    // Whatever a create in flight returns now describes the old box or
+    // address; the sequencer cancels it and creates again.
+    intents.abandon(clientSecret ? intentIdOf(clientSecret) : undefined);
     stripeReady = false;
     clientSecret = '';
     totals = null;
     elements = null;
-    // Whatever a create in flight returns now describes the old box or
-    // address; see initStripe.
-    if (intentInFlight) intentStale = true;
     if (formValid) {
       stripeInitialized = true;
       initStripe();
@@ -432,18 +429,17 @@
     }
   }
 
-  // Re-create payment intent when address changes after initial creation
+  // Re-create the payment intent when the address moved since the last
+  // create went out, or try again when the last create failed (the customer
+  // has likely just fixed what it refused).
   let addressKey = $derived(
     `${email}-${firstName}-${lastName}-${line1}-${line2}-${city}-${addressState}-${postalCode}-${country}`,
   );
-  let lastAddressKey = '';
 
   function handleAddressBlur() {
-    if (!formValid || !stripeInitialized) return;
-    if (addressKey !== lastAddressKey) {
-      lastAddressKey = addressKey;
-      resetPaymentIntent();
-    }
+    if (!formValid) return;
+    if (stripeInitialized && addressKey === intentAddressKey) return;
+    resetPaymentIntent();
   }
 
   // --- The box: add and remove lines ---
@@ -798,12 +794,22 @@
               class="font-oswald text-ink-soft text-sm"
               style="letter-spacing:0.04em;"
             >
-              {#if formValid}
+              {#if formValid && intentFailed}
+                Payment didn't load. Check the details above, then give it another go.
+              {:else if formValid}
                 Loading payment…
               {:else}
                 Fill in your shipping details above to continue.
               {/if}
             </p>
+            {#if formValid && intentFailed}
+              <button
+                type="button"
+                onclick={resetPaymentIntent}
+                class="mt-3 font-oswald font-bold text-rust text-xs"
+                style="letter-spacing:0.14em; text-transform:uppercase;"
+              >Try again</button>
+            {/if}
           </div>
         {:else}
           {#if totals}

@@ -129,7 +129,8 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   one number and every box after it another. It also makes the cart's volume
   rungs irrelevant, so a box holding one variant on two plans prices both lines
   the same way the cart would.
-  `TestPriceLines_ASubscriptionPricesFromTheBaseLikeItsRenewals`.
+  `TestPriceLines_ASubscriptionPricesFromTheBaseLikeItsRenewals`,
+  `TestSubscribePaymentIntent_ACustomerOnAPriceListIsChargedBaseLessEachLinesPlan`.
 - **One price computation.** The subscribe page, the payment intent and
   `PlaceOrder` all price through `CheckoutService.PriceLines`. Because a
   subscription prices from the base, the page needs no customer: a signed-out

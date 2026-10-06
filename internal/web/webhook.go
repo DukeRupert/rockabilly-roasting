@@ -155,16 +155,18 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 			return nil
 		}
 
-		if _, ok := app.SubscriptionSignupPlanID(order.Metadata); ok {
-			sub, aErr := d.SubscriptionService.ActivateFromSignupOrder(ctx, tx, order, systemActor())
+		if app.IsSubscriptionSignupOrder(order.Metadata) {
+			subs, aErr := d.SubscriptionService.ActivateFromSignupOrder(ctx, tx, order, systemActor())
 			if aErr != nil {
 				return fmt.Errorf("activate signup subscription: %w", aErr)
 			}
-			if _, jErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
-				SubscriptionID: sub.ID,
-				CustomerID:     sub.CustomerID,
-			}, nil); jErr != nil {
-				return fmt.Errorf("enqueue subscription confirm email: %w", jErr)
+			for _, sub := range subs {
+				if _, jErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
+					SubscriptionID: sub.ID,
+					CustomerID:     sub.CustomerID,
+				}, nil); jErr != nil {
+					return fmt.Errorf("enqueue subscription confirm email: %w", jErr)
+				}
 			}
 		}
 		return nil

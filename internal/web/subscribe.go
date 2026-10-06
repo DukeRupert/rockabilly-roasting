@@ -632,20 +632,25 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 				return nil
 			}
 
-			sub, txErr := d.SubscriptionService.ActivateFromSignupOrder(ctx, tx, order, app.Actor{
+			subs, txErr := d.SubscriptionService.ActivateFromSignupOrder(ctx, tx, order, app.Actor{
 				Type: domain.AuditActorTypeSystem,
 				Name: "subscribe_confirm",
 			})
 			if txErr != nil {
 				return fmt.Errorf("activate signup subscription: %w", txErr)
 			}
-			resp.SubscriptionID = sub.ID.String()
+			// Every order the subscribe flow places today has one line.
+			if len(subs) == 1 {
+				resp.SubscriptionID = subs[0].ID.String()
+			}
 
-			if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
-				SubscriptionID: sub.ID,
-				CustomerID:     sub.CustomerID,
-			}, nil); txErr != nil {
-				return fmt.Errorf("enqueue subscription confirm email: %w", txErr)
+			for _, sub := range subs {
+				if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
+					SubscriptionID: sub.ID,
+					CustomerID:     sub.CustomerID,
+				}, nil); txErr != nil {
+					return fmt.Errorf("enqueue subscription confirm email: %w", txErr)
+				}
 			}
 			return nil
 		})

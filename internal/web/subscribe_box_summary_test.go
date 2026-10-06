@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -43,9 +42,15 @@ func TestSubscribeBoxSummary_IsThePagesSummaryForTheNewBox(t *testing.T) {
 	assert.Contains(t, body, "$33.30", "the per-delivery total for both")
 	assert.Contains(t, body, "ships together this first time", "two plans: the separate-shipments notice")
 
-	// The app reads the new prices from here, matched by plan and variant.
-	prices := pageLinePricesIn(t, body, "subscribe-box-summary")
-	assert.Len(t, prices, 1, "one variant")
+	// The app reads the new prices from here, matched by plan and variant. One
+	// variant on two plans, so keyed by plan: keyed by variant the
+	// two lines would collapse into one, which is the bug this case exists for.
+	byPlan := map[string]int{}
+	for _, l := range dataLinesOf(t, body, "subscribe-box-summary") {
+		assert.Equal(t, f.first.String(), l.VariantID)
+		byPlan[l.PlanID] = l.UnitPrice
+	}
+	assert.Equal(t, map[string]int{f.weekly.ID.String(): 1620, f.monthly.ID.String(): 1710}, byPlan)
 
 	// A fragment: no layout, and no second Svelte mount.
 	assert.NotContains(t, body, "<html")
@@ -82,12 +87,4 @@ func TestSubscribeBoxSummary_RefusesALineThePageWouldRefuse(t *testing.T) {
 	w := getSubscribeBoxSummary(t, d, lineQuery(f.monthly.ID, f.first, 1))
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	assert.Contains(t, w.Body.String(), "no longer available")
-}
-
-// pageLinePricesIn reads the data-lines JSON off the element with the given id.
-func pageLinePricesIn(t *testing.T, body, id string) map[string]int {
-	t.Helper()
-	m := regexp.MustCompile(`id="` + id + `"[^>]*`).FindString(body)
-	require.NotEmpty(t, m, "element %s", id)
-	return pageLinePrices(t, m)
 }

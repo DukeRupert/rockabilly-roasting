@@ -10,9 +10,10 @@ import (
 )
 
 // SubscribeLineProps is one item in the box: what it is, what plan it renews
-// on, and what it costs. Json tags are read by the mount div's data-lines
-// attribute — see SubscribePageProps.LinesJSON — so the Svelte app can render
-// the box, add to it and remove from it without a round trip on mount.
+// on, and what it costs. The json tags shape the data-lines attribute, which
+// appears twice: on the Svelte mount div, which the app mounts from, and on the
+// box summary, where the app reads each line's price again after an add or
+// remove. See SubscribePageProps.LinesJSON.
 type SubscribeLineProps struct {
 	PlanID    uuid.UUID `json:"plan_id"`
 	VariantID uuid.UUID `json:"variant_id"`
@@ -44,8 +45,9 @@ func (l SubscribeLineProps) Subtotal() int {
 
 type SubscribePageProps struct {
 	Lines []SubscribeLineProps
-	// LinesJSON is Lines marshaled once in the handler — the mount div's
-	// data-lines attribute, and the only form of Lines the Svelte app reads.
+	// LinesJSON is Lines marshaled once in the handler — the data-lines
+	// attribute on the mount div and on the box summary, the two forms of
+	// Lines the Svelte app reads.
 	LinesJSON string
 	// Subtotal is the sum of every line's Subtotal — the recurring item
 	// charge before shipping and tax (those are added and shown at the

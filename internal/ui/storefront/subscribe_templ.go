@@ -18,9 +18,10 @@ import (
 )
 
 // SubscribeLineProps is one item in the box: what it is, what plan it renews
-// on, and what it costs. Json tags are read by the mount div's data-lines
-// attribute — see SubscribePageProps.LinesJSON — so the Svelte app can render
-// the box, add to it and remove from it without a round trip on mount.
+// on, and what it costs. The json tags shape the data-lines attribute, which
+// appears twice: on the Svelte mount div, which the app mounts from, and on the
+// box summary, where the app reads each line's price again after an add or
+// remove. See SubscribePageProps.LinesJSON.
 type SubscribeLineProps struct {
 	PlanID    uuid.UUID `json:"plan_id"`
 	VariantID uuid.UUID `json:"variant_id"`
@@ -52,8 +53,9 @@ func (l SubscribeLineProps) Subtotal() int {
 
 type SubscribePageProps struct {
 	Lines []SubscribeLineProps
-	// LinesJSON is Lines marshaled once in the handler — the mount div's
-	// data-lines attribute, and the only form of Lines the Svelte app reads.
+	// LinesJSON is Lines marshaled once in the handler — the data-lines
+	// attribute on the mount div and on the box summary, the two forms of
+	// Lines the Svelte app reads.
 	LinesJSON string
 	// Subtotal is the sum of every line's Subtotal — the recurring item
 	// charge before shipping and tax (those are added and shown at the
@@ -109,7 +111,7 @@ func SubscribeContent(props SubscribePageProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.LinesJSON)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 91, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 93, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -122,7 +124,7 @@ func SubscribeContent(props SubscribePageProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.StripeKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 92, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 94, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -169,7 +171,7 @@ func SubscribeBoxSummary(props SubscribePageProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.LinesJSON)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 106, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 108, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -192,7 +194,7 @@ func SubscribeBoxSummary(props SubscribePageProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Subtotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 118, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 120, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -210,7 +212,7 @@ func SubscribeBoxSummary(props SubscribePageProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(separateShipmentsNotice)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 125, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 127, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -284,7 +286,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(line.ThumbnailURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 141, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 143, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
@@ -297,7 +299,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(line.ProductTitle)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 141, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 143, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
@@ -316,7 +318,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(line.ProductTitle)[0:1]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 146, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 148, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -345,7 +347,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var14 templ.SafeURL
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + line.ProductSlug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 157, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 159, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -358,7 +360,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(line.ProductTitle)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 159, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 161, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -376,7 +378,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(line.ProductTitle)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 164, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 166, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -395,7 +397,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(line.VariantLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 168, Col: 100}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 170, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -413,7 +415,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(line.PlanName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 171, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 173, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -426,7 +428,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(subscriptionIntervalLabel(line.Interval, line.IntervalCount))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 171, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 173, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -444,7 +446,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(formatDateIn(line.NextChargeAt, tz))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 175, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 177, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -467,7 +469,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(line.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 183, Col: 100}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 185, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -485,7 +487,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(line.UnitPrice))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 185, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 187, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -503,7 +505,7 @@ func subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location)
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("each × %d", line.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 188, Col: 130}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscribe.templ`, Line: 190, Col: 130}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {

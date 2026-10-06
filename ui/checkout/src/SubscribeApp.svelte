@@ -15,8 +15,9 @@
   import { formatCents } from './lib/format';
 
   // One line of the box, as the mount div's data-lines attribute carries it —
-  // see storefront.SubscribeLineProps. Read once on mount; everything after
-  // that is local state, never re-fetched.
+  // see storefront.SubscribeLineProps. Read on mount; after an add or remove,
+  // each line's price is read again from the refreshed box summary (see
+  // refreshSummary). Everything else is local state.
   interface BoxLine {
     plan_id: string;
     variant_id: string;
@@ -74,7 +75,8 @@
   let stripeReady = $state(false);
   // Server-computed charge breakdown (item subtotal + shipping + tax, and
   // each line's own price), known once the PI is created. Until then the
-  // page shows the lines' preview prices from the mount data.
+  // page shows the lines' preview prices: from the mount data, and after an
+  // add or remove from the refreshed box summary.
   let totals = $state<SubscribePaymentIntentResponse | null>(null);
 
   // "Add another item" picker
@@ -171,7 +173,10 @@
         headers: { Accept: 'text/html' },
       });
       if (seq !== summarySeq) return;
-      if (!res.ok) {
+      // Refused (a line that can no longer be offered), or redirected
+      // somewhere fetch followed: either way the page for the new URL is the
+      // answer.
+      if (!res.ok || res.redirected) {
         window.location.assign(baseURL());
         return;
       }

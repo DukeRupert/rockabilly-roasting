@@ -53,10 +53,8 @@ func TestSubscribePage_RendersMultipleLinesWithADataLinesAttribute(t *testing.T)
 	assert.Contains(t, body, "$16.20")
 	assert.Contains(t, body, "$9.50", "the second line's own unit price")
 	assert.Contains(t, body, "$35.20", "the box subtotal")
-	assert.Contains(t, body, `id="subscribe-app"`)
-	assert.Contains(t, body, `data-lines="`)
-	assert.Contains(t, body, f.first.String())
-	assert.Contains(t, body, f.second.String())
+	// What the Svelte app mounts from: both lines, each at its own price.
+	assert.Equal(t, map[string]int{f.first.String(): 1620, f.second.String(): 950}, pageLinePrices(t, body))
 }
 
 // The page and the payment intent quote each line from the same PriceLines
@@ -92,19 +90,36 @@ func TestSubscribePage_PricesMatchThePaymentIntentForTheSameCustomer(t *testing.
 	}
 }
 
+// dataLine is one entry of a data-lines attribute.
+type dataLine struct {
+	PlanID    string `json:"plan_id"`
+	VariantID string `json:"variant_id"`
+	Quantity  int    `json:"quantity"`
+	UnitPrice int    `json:"unit_price"`
+}
+
+// dataLinesOf reads the data-lines JSON off the element with the given id.
+//
+// By id, never "the first data-lines on the page": the page carries two, the
+// box summary's and the Svelte mount div's, and a reader that took the first
+// would test the summary while believing it tested what the app mounts from.
+func dataLinesOf(t *testing.T, body, id string) []dataLine {
+	t.Helper()
+	tag := regexp.MustCompile(`<[^>]*\bid="` + regexp.QuoteMeta(id) + `"[^>]*>`).FindString(body)
+	require.NotEmpty(t, tag, "element %s", id)
+	m := regexp.MustCompile(`data-lines="([^"]*)"`).FindStringSubmatch(tag)
+	require.NotNil(t, m, "%s carries data-lines", id)
+	var lines []dataLine
+	require.NoError(t, json.Unmarshal([]byte(html.UnescapeString(m[1])), &lines))
+	return lines
+}
+
 // pageLinePrices reads each line's unit price, by variant, out of the data-lines
-// JSON the page hands the Svelte app.
+// the page hands the Svelte app on its mount div.
 func pageLinePrices(t *testing.T, body string) map[string]int {
 	t.Helper()
-	m := regexp.MustCompile(`data-lines="([^"]*)"`).FindStringSubmatch(body)
-	require.NotNil(t, m, "the mount div carries data-lines")
-	var lines []struct {
-		VariantID string `json:"variant_id"`
-		UnitPrice int    `json:"unit_price"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(html.UnescapeString(m[1])), &lines))
 	out := map[string]int{}
-	for _, l := range lines {
+	for _, l := range dataLinesOf(t, body, "subscribe-app") {
 		out[l.VariantID] = l.UnitPrice
 	}
 	return out
@@ -127,8 +142,10 @@ func TestSubscribePage_LegacyQueryStillRendersOneLine(t *testing.T) {
 
 	w := getSubscribePage(t, d, "plan_id="+f.weekly.ID.String()+"&variant_id="+f.first.String()+"&quantity=2", nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	assert.Contains(t, w.Body.String(), `id="subscribe-app"`)
-	assert.Contains(t, w.Body.String(), f.first.String())
+	mounted := dataLinesOf(t, w.Body.String(), "subscribe-app")
+	require.Len(t, mounted, 1)
+	assert.Equal(t, f.first.String(), mounted[0].VariantID)
+	assert.Equal(t, 2, mounted[0].Quantity)
 }
 
 func TestSubscribePage_LineErrors(t *testing.T) {

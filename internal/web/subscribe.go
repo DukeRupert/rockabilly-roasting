@@ -644,13 +644,8 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 				resp.SubscriptionID = subs[0].ID.String()
 			}
 
-			for _, sub := range subs {
-				if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
-					SubscriptionID: sub.ID,
-					CustomerID:     sub.CustomerID,
-				}, nil); txErr != nil {
-					return fmt.Errorf("enqueue subscription confirm email: %w", txErr)
-				}
+			if _, txErr := d.RiverClient.InsertTx(ctx, tx, subscriptionConfirmEmail(subs), nil); txErr != nil {
+				return fmt.Errorf("enqueue subscription confirm email: %w", txErr)
 			}
 			return nil
 		})
@@ -690,4 +685,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 
 	d.Metrics.CheckoutCompleted.WithLabelValues("subscribe").Inc()
 	JSON(w, http.StatusOK, resp)
+}
+
+// subscriptionConfirmEmail is the one confirmation job for a signup, naming
+// every subscription it started. Both activation paths (confirm and webhook)
+// enqueue it, so the customer gets one email whichever of them wins.
+func subscriptionConfirmEmail(subs []*domain.Subscription) jobs.SubscriptionConfirmEmailArgs {
+	args := jobs.SubscriptionConfirmEmailArgs{SubscriptionIDs: make([]uuid.UUID, len(subs))}
+	for i, sub := range subs {
+		args.SubscriptionIDs[i] = sub.ID
+		args.CustomerID = sub.CustomerID
+	}
+	return args
 }

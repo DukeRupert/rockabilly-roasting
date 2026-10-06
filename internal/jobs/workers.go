@@ -172,10 +172,15 @@ type OrderConfirmEmailArgs struct {
 // Kind returns the job kind identifier.
 func (OrderConfirmEmailArgs) Kind() string { return "email:order_confirm" }
 
-// SubscriptionConfirmEmailArgs sends a subscription confirmation email.
+// SubscriptionConfirmEmailArgs sends one confirmation email for a signup.
+//
+// SubscriptionIDs is every subscription the signup started. SubscriptionID is
+// the form jobs took when a signup started one; it stays so a job queued before
+// the change still decodes and sends. When both are set, SubscriptionIDs wins.
 type SubscriptionConfirmEmailArgs struct {
-	SubscriptionID uuid.UUID `json:"subscription_id"`
-	CustomerID     uuid.UUID `json:"customer_id"`
+	SubscriptionID  uuid.UUID   `json:"subscription_id"`
+	SubscriptionIDs []uuid.UUID `json:"subscription_ids,omitempty"`
+	CustomerID      uuid.UUID   `json:"customer_id"`
 }
 
 // Kind returns the job kind identifier.

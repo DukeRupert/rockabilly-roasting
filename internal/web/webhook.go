@@ -160,13 +160,8 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 			if aErr != nil {
 				return fmt.Errorf("activate signup subscription: %w", aErr)
 			}
-			for _, sub := range subs {
-				if _, jErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
-					SubscriptionID: sub.ID,
-					CustomerID:     sub.CustomerID,
-				}, nil); jErr != nil {
-					return fmt.Errorf("enqueue subscription confirm email: %w", jErr)
-				}
+			if _, jErr := d.RiverClient.InsertTx(ctx, tx, subscriptionConfirmEmail(subs), nil); jErr != nil {
+				return fmt.Errorf("enqueue subscription confirm email: %w", jErr)
 			}
 		}
 		return nil

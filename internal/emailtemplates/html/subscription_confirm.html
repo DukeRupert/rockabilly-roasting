@@ -11,7 +11,27 @@
   <tr><td style="padding:32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Subscription Started</h1>
     <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
-    <p style="margin:0 0 24px;">Your {{.ProductName}} subscription is set. Here are the details:</p>
+    {{if gt (len .Lines) 1}}<p style="margin:0 0 24px;">Your subscription is set. Here's what we'll be roasting for you:</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr style="background-color:#F5F0E6;">
+        <td style="padding:8px 12px;font-weight:bold;">Product</td>
+        <td style="padding:8px 12px;font-weight:bold;">Plan</td>
+        <td style="padding:8px 12px;font-weight:bold;">Quantity</td>
+      </tr>
+      {{range .Lines}}<tr>
+        <td style="padding:8px 12px;">{{.ProductName}}</td>
+        <td style="padding:8px 12px;">{{.PlanName}}{{if .IntervalDays}} &middot; every {{.IntervalDays}} days{{end}}</td>
+        <td style="padding:8px 12px;">{{.Quantity}}</td>
+      </tr>
+      {{end}}<tr style="background-color:#F5F0E6;">
+        <td style="padding:8px 12px;font-weight:bold;">Next charge</td>
+        <td colspan="2" style="padding:8px 12px;">{{date .NextChargeOn}}</td>
+      </tr>
+    </table>
+    {{if .SeparateRenewals}}
+    <p style="margin:0 0 24px;">These run on their own schedules — {{range $i, $l := .Lines}}{{if $i}}; {{end}}{{$l.ProductName}} ({{$l.PlanName}}) on {{date $l.NextChargeOn}}{{end}}. Each one is roasted, charged and shipped on its own day.</p>
+    {{end}}{{else}}<p style="margin:0 0 24px;">Your {{.ProductName}} subscription is set. Here are the details:</p>
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr style="background-color:#F5F0E6;">
@@ -34,7 +54,7 @@
         <td style="padding:8px 12px;font-weight:bold;">Next charge</td>
         <td style="padding:8px 12px;">{{date .NextChargeOn}}</td>
       </tr>
-    </table>
+    </table>{{end}}
 
     <p style="margin:0 0 24px;text-align:center;">
       <a href="{{.AccountURL}}" style="display:inline-block;background-color:#C0271D;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:bold;border-radius:4px;">Manage your subscription</a>

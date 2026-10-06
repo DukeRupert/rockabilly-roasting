@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
@@ -23,5 +24,9 @@ func NewSubscriptionConfirmEmailWorker(subs *app.SubscriptionService, pool *pgxp
 
 // Work processes a subscription confirmation email job.
 func (w *SubscriptionConfirmEmailWorker) Work(ctx context.Context, job *river.Job[SubscriptionConfirmEmailArgs]) error {
-	return w.subs.SendConfirmationEmail(ctx, w.pool, job.Args.SubscriptionID, job.Args.CustomerID)
+	ids := job.Args.SubscriptionIDs
+	if len(ids) == 0 {
+		ids = []uuid.UUID{job.Args.SubscriptionID}
+	}
+	return w.subs.SendConfirmationEmail(ctx, w.pool, ids, job.Args.CustomerID)
 }

@@ -11,10 +11,11 @@ import (
 	"github.com/dukerupert/hiri/internal/testutil"
 )
 
-// A subscription signup takes one product, so a customer who wants three
-// coffees places three orders in a row. They go out in one box; only the
-// first should pay for it. OpenShipmentTo is how the second and third find
-// the box they will be packed into.
+// A signup holds every item it is given, but a customer can still sign up
+// again tomorrow while today's order is on the shelf. The two go out in one
+// parcel; only the first should pay for it. OpenShipmentTo is how the later
+// order finds the parcel it will be packed into. ("Box" below is that parcel,
+// not the account page's box of subscriptions that renew together.)
 func TestCheckoutService_OpenShipmentTo(t *testing.T) {
 	tx := testutil.NewTestTx(t, testPool)
 	svc := newCheckoutService()

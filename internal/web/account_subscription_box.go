@@ -63,7 +63,8 @@ func (d *Deps) handleAccountSubscriptionBoxSkip(w http.ResponseWriter, r *http.R
 			return txErr
 		}
 		// One email per member, as a per-row skip sends. Chatty for a big box,
-		// and the combined email is deferred on purpose; see the TODO.
+		// and the combined email is deferred on purpose; see
+		// docs/subscriptions-module.md, "Deferred, on purpose".
 		for _, sub := range skipped {
 			if txErr := d.enqueueSkipEmail(ctx, tx, sub, params); txErr != nil {
 				return txErr

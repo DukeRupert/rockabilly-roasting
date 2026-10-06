@@ -23,7 +23,7 @@ import (
 
 // The /subscribe page assembling a box: several lines in one URL, priced
 // through the same PriceLines the payment intent uses, and the picker's
-// catalog endpoint. See docs/subscriptions-multi-item-TODO.md item 7.
+// catalog endpoint. See docs/subscriptions-module.md, "The box".
 
 func getSubscribePage(t *testing.T, d *Deps, query string, customer *domain.Customer) *httptest.ResponseRecorder {
 	t.Helper()

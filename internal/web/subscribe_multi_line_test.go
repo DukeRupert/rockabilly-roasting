@@ -330,6 +330,41 @@ func TestSubscribePaymentIntent_MergesDuplicateLines(t *testing.T) {
 	assert.Equal(t, 5, lines[0].Quantity)
 }
 
+// A signup holds every item it is given, but a customer can still sign up
+// again while the first order is on the shelf. The open-box waiver covers that:
+// the second signup is packed with the first, ships free, and says so on the
+// order. It runs once for the whole multi-line order.
+func TestSubscribePaymentIntent_ASecondSignupRidesWithAnOpenOrder(t *testing.T) {
+	f := newMultiLineFixture(t)
+	d, _ := newSubscribePaymentDeps(t)
+	withFlatShippingRate(t, d, 700)
+	email := "rides-" + uuid.NewString() + "@example.test"
+	sameCustomer := func(m map[string]any) { m["email"] = email }
+
+	w := postSubscribePaymentIntent(t, d, multiLineBody(f.twoLines(), sameCustomer))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	first := decodeSubscribeIntentResponse(t, w)
+	require.Equal(t, 700, first.ShippingTotal, "nothing on the shelf yet, so the first pays shipping")
+	firstOrder, _ := orderForIntent(t, d, piIDFromClientSecret(first.ClientSecret))
+
+	// Paid, and waiting to be packed.
+	ctx := context.Background()
+	_, err := testPool.Exec(ctx,
+		`UPDATE orders SET status = 'confirmed', payment_status = 'captured' WHERE id = $1`, firstOrder.ID)
+	require.NoError(t, err)
+
+	w = postSubscribePaymentIntent(t, d, multiLineBody(f.twoLines(), sameCustomer))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	second := decodeSubscribeIntentResponse(t, w)
+	assert.Zero(t, second.ShippingTotal)
+	assert.Equal(t, "Free — ships with "+firstOrder.Number, second.ShippingLabel)
+	assert.Equal(t, second.Subtotal+second.TaxTotal, second.Amount, "no shipping in the charge")
+
+	secondOrder, lines := orderForIntent(t, d, piIDFromClientSecret(second.ClientSecret))
+	assert.Len(t, lines, 2, "one order for both lines")
+	assert.Equal(t, firstOrder.Number, secondOrder.Metadata["ships_with_order"])
+}
+
 // --- Confirm and webhook ---
 
 var riverMigrateOnce sync.Once

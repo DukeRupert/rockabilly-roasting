@@ -327,8 +327,7 @@ type VerifyEmailData struct {
 //
 // The top-level item fields describe one line — the one charged first, ties
 // broken by product name — and are kept so a fork's template written before
-// Lines existed still renders. Retire them once no template reads them; see
-// docs/open-items.md.
+// Lines existed still renders. Retire them once no template reads them.
 type SubscriptionConfirmData struct {
 	CustomerName string
 	PlanName     string

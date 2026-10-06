@@ -181,8 +181,8 @@ func parseSubscribeLines(q url.Values) ([]subscribeLine, error) {
 // subscribeLineErrorMessage maps an error raised while resolving a signup's
 // lines — whether from the page or from the payment-intent endpoint — to the
 // message shown to the customer. Both handlers hit the same errors resolving
-// the same lines (an inactive plan, a made-to-order variant with no recipe, an
-// unpriced variant), so the wording lives once rather than drifting between
+// the same lines (an inactive plan, an archived variant, an unpriced
+// variant), so the wording lives once rather than drifting between
 // the two places it is shown. ok is false for an error neither expects.
 func subscribeLineErrorMessage(err error) (msg string, ok bool) {
 	switch {
@@ -447,9 +447,8 @@ type subscribeCatalogResponse struct {
 }
 
 // handleSubscribeCatalog answers the "Add another item" picker: every
-// subscribable variant that can be added without a trip through the builder,
-// and every active plan to put it on. Module-gated at the route like its
-// neighbours — a shop without subscriptions has no such endpoint.
+// subscribable, priced variant on the retail channel, and every active plan to
+// put it on.
 func (d *Deps) handleSubscribeCatalog(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

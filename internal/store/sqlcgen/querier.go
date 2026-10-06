@@ -16,6 +16,10 @@ type Querier interface {
 	ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
+	// Claims every subscription named that nobody holds, or whose holder's lease
+	// has run out. The caller compares the rows returned with the ids it asked
+	// for and, on a short count, rolls back: the claim is all or nothing.
+	ClaimSubscriptionRenewal(ctx context.Context, arg ClaimSubscriptionRenewalParams) ([]uuid.UUID, error)
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
@@ -258,6 +262,7 @@ type Querier interface {
 	// again. No-op if the coupon was never redeemed for that order.
 	ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
+	ReleaseSubscriptionRenewalClaim(ctx context.Context, ids []uuid.UUID) error
 	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
 	RemoveProductCustomerVisibility(ctx context.Context, arg RemoveProductCustomerVisibilityParams) error
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)

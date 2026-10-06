@@ -1013,3 +1013,51 @@ func (s *SubscriptionStore) ForecastRenewals(ctx context.Context, tx pgx.Tx, fro
 	}
 	return out, rows.Err()
 }
+
+// ClaimRenewal claims every subscription in ids for one renewal, or none of
+// them. A subscription is claimable when nobody holds it or its holder's claim
+// is older than staleBefore (a renewal that died without releasing). It
+// reports whether the whole set was claimed.
+//
+// All or nothing within the caller's transaction: the claim runs in a savepoint
+// that is rolled back on a short count, so a refused batch leaves its free
+// members free. The per-row condition is in the UPDATE's WHERE rather than a
+// read beforehand because Postgres re-checks it against a row a concurrent
+// claimer has just updated, so two claimers cannot both take one row.
+func (s *SubscriptionStore) ClaimRenewal(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, staleBefore time.Time) (_ bool, err error) {
+	defer trackQuery(s.metrics, "subscriptions.claim_renewal", time.Now(), &err)
+	want := make(map[uuid.UUID]struct{}, len(ids))
+	for _, id := range ids {
+		want[id] = struct{}{}
+	}
+
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("claim renewal savepoint: %w", err)
+	}
+	defer sp.Rollback(ctx) //nolint:errcheck // a no-op once committed
+
+	claimed, err := sqlcgen.New(sp).ClaimSubscriptionRenewal(ctx, sqlcgen.ClaimSubscriptionRenewalParams{
+		Ids:         ids,
+		StaleBefore: pgtype.Timestamptz{Time: staleBefore, Valid: true},
+	})
+	if err != nil {
+		return false, fmt.Errorf("claim renewal: %w", err)
+	}
+	if len(claimed) != len(want) {
+		return false, nil
+	}
+	if err := sp.Commit(ctx); err != nil {
+		return false, fmt.Errorf("claim renewal commit savepoint: %w", err)
+	}
+	return true, nil
+}
+
+// ReleaseRenewalClaim releases a renewal's claim on ids.
+func (s *SubscriptionStore) ReleaseRenewalClaim(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.release_renewal_claim", time.Now(), &err)
+	if err := sqlcgen.New(tx).ReleaseSubscriptionRenewalClaim(ctx, ids); err != nil {
+		return fmt.Errorf("release renewal claim: %w", err)
+	}
+	return nil
+}

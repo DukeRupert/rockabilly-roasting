@@ -44,6 +44,21 @@ UPDATE subscriptions
 SET current_period_start = $2, current_period_end = $3, next_order_at = $4, updated_at = now()
 WHERE id = $1;
 
+-- name: ClaimSubscriptionRenewal :many
+-- Claims every subscription named that nobody holds, or whose holder's lease
+-- has run out. The caller compares the rows returned with the ids it asked
+-- for and, on a short count, rolls back: the claim is all or nothing.
+UPDATE subscriptions
+SET renewal_claimed_at = now()
+WHERE id = ANY(@ids::uuid[])
+  AND (renewal_claimed_at IS NULL OR renewal_claimed_at < @stale_before)
+RETURNING id;
+
+-- name: ReleaseSubscriptionRenewalClaim :exec
+UPDATE subscriptions
+SET renewal_claimed_at = NULL
+WHERE id = ANY(@ids::uuid[]);
+
 -- name: UpdateSubscriptionPauseUntil :exec
 UPDATE subscriptions
 SET pause_until = $2, updated_at = now()

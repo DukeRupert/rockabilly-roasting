@@ -335,11 +335,14 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		// price list the customer is on. Priced here rather than with the plan
 		// above only because the customer is known by now.
 		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
-			CustomerID:      customer.ID,
-			CurrencyCode:    "USD",
-			Lines:           []app.OrderLine{{VariantID: variantID, Quantity: quantity}},
-			PlanDiscountPct: plan.DiscountPct,
-			BasePrice:       true,
+			CustomerID:   customer.ID,
+			CurrencyCode: "USD",
+			Lines: []app.OrderLine{{
+				VariantID:       variantID,
+				Quantity:        quantity,
+				PlanDiscountPct: plan.DiscountPct,
+			}},
+			BasePrice: true,
 		})
 		if txErr != nil {
 			return txErr
@@ -495,6 +498,10 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				VariantID: variantID,
 				Quantity:  quantity,
 				UnitPrice: unit,
+				// The plan's discount is part of what this line costs, so the
+				// service has to be told about it or it would price the line
+				// at full price and refuse the order as one whose price moved.
+				PlanDiscountPct: plan.DiscountPct,
 			}},
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,
@@ -502,14 +509,10 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			ShippingCents:     shippingCents,
 			TaxCents:          taxCents,
 			ShippingMethod:    shipMethod,
-			// The plan's discount is part of what this line costs, so the
-			// service has to be told about it or it would price the line at
-			// full price and refuse the order as one whose price moved. The
-			// same for BasePrice: without it the service would resolve this
-			// customer's list price, which is not what phase 1 quoted.
-			PlanDiscountPct: plan.DiscountPct,
-			BasePrice:       true,
-			Metadata:        metadata,
+			// Without BasePrice the service would resolve this customer's list
+			// price, which is not what phase 1 quoted.
+			BasePrice: true,
+			Metadata:  metadata,
 		}, actor)
 		if txErr != nil {
 			// Unwrapped for the reason the retail endpoint says at its own

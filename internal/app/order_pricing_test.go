@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -69,13 +70,14 @@ func TestPriceLines_PricesAtTheLinesVolumeRung(t *testing.T) {
 
 	t.Run("a plan discount comes off the rung, not the base", func(t *testing.T) {
 		priced, err := svc.PriceLines(ctx, tx, app.PriceLinesParams{
-			CustomerID:      customerID,
-			CurrencyCode:    "USD",
-			Lines:           []app.OrderLine{{VariantID: variantID, Quantity: 12}},
-			PlanDiscountPct: 10,
+			CustomerID:   customerID,
+			CurrencyCode: "USD",
+			Lines:        []app.OrderLine{{VariantID: variantID, Quantity: 12, PlanDiscountPct: 10}},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, 900, priced.Items[0].UnitPrice, "10% off the 12+ rung of 1000")
+		assert.Equal(t, 10, priced.Items[0].PlanDiscountPct,
+			"the priced item carries the discount it was priced at, so PlaceOrder can re-check it")
 	})
 }
 
@@ -90,11 +92,10 @@ func TestPriceLines_ASubscriptionPricesFromTheBaseLikeItsRenewals(t *testing.T) 
 
 	// Base 1500; on the customer's list 1100, and 1000 at 12+.
 	customerID, variantID := newTieredCustomerFixture(t, tx)
-	lines := []app.OrderLine{{VariantID: variantID, Quantity: 12}}
+	lines := []app.OrderLine{{VariantID: variantID, Quantity: 12, PlanDiscountPct: 10}}
 
 	priced, err := svc.PriceLines(ctx, tx, app.PriceLinesParams{
-		CustomerID: customerID, CurrencyCode: "USD", Lines: lines,
-		PlanDiscountPct: 10, BasePrice: true,
+		CustomerID: customerID, CurrencyCode: "USD", Lines: lines, BasePrice: true,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 1350, priced.Items[0].UnitPrice, "1500 less 10%, not the list's 12+ rung")
@@ -106,8 +107,9 @@ func TestPriceLines_ASubscriptionPricesFromTheBaseLikeItsRenewals(t *testing.T) 
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,
 			CurrencyCode:      "USD",
-			Items:             []app.CartItem{{VariantID: variantID, Quantity: 12, UnitPrice: 1350}},
-			PlanDiscountPct:   10,
+			Items: []app.CartItem{{
+				VariantID: variantID, Quantity: 12, UnitPrice: 1350, PlanDiscountPct: 10,
+			}},
 		}
 		_, err := svc.PlaceOrder(ctx, tx, params, testutil.TestActor())
 		assert.ErrorIs(t, err, app.ErrPriceMoved,
@@ -118,6 +120,41 @@ func TestPriceLines_ASubscriptionPricesFromTheBaseLikeItsRenewals(t *testing.T) 
 		require.NoError(t, err)
 		assert.Equal(t, 16200, order.Subtotal)
 	})
+}
+
+// A signup can mix plans, and a weekly line and a monthly line carry different
+// percentages. One percentage for the whole order would price one of them
+// wrong, so the discount is a property of the line.
+func TestPriceLines_DiscountsEachLineByItsOwnPlan(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newCheckoutService()
+
+	customer := testutil.CreateCustomer(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	discounted := testutil.CreateVariant(t, tx, product.ID)
+	full := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, discounted.ID, 1800, "USD")
+	testutil.SetBasePriceForVariant(t, tx, full.ID, 1000, "USD")
+
+	priced, err := svc.PriceLines(ctx, tx, app.PriceLinesParams{
+		CustomerID:   customer.ID,
+		CurrencyCode: "USD",
+		Lines: []app.OrderLine{
+			{VariantID: discounted.ID, Quantity: 1, PlanDiscountPct: 10},
+			{VariantID: full.ID, Quantity: 1},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, priced.Items, 2)
+
+	byVariant := map[uuid.UUID]app.CartItem{}
+	for _, it := range priced.Items {
+		byVariant[it.VariantID] = it
+	}
+	assert.Equal(t, 1620, byVariant[discounted.ID].UnitPrice, "10% off 1800")
+	assert.Equal(t, 1000, byVariant[full.ID].UnitPrice, "no discount on the other line")
+	assert.Equal(t, 2620, priced.Subtotal)
 }
 
 func TestPriceLines_RefusesWhatItCannotPrice(t *testing.T) {
@@ -221,9 +258,41 @@ func TestPlaceOrder_RefusesAPriceThatMoved(t *testing.T) {
 		assert.ErrorIs(t, err, app.ErrPriceMoved, "1620 against a catalog price of 1800")
 
 		// Declared, and it places at the discounted price.
-		params.PlanDiscountPct = 10
+		params.Items[0].PlanDiscountPct = 10
 		order, err := svc.PlaceOrder(ctx, tx, params, actor)
 		require.NoError(t, err)
 		assert.Equal(t, 1620, order.Subtotal)
+	})
+
+	t.Run("two lines on two discounts, each checked against its own", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		customer := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, customer.ID)
+		product := testutil.CreateProduct(t, tx)
+		weekly := testutil.CreateVariant(t, tx, product.ID)
+		monthly := testutil.CreateVariant(t, tx, product.ID)
+		testutil.SetBasePriceForVariant(t, tx, weekly.ID, 1800, "USD")
+		testutil.SetBasePriceForVariant(t, tx, monthly.ID, 1000, "USD")
+
+		params := func(monthlyPrice int) app.PlaceOrderParams {
+			return app.PlaceOrderParams{
+				CustomerID:        customer.ID,
+				ShippingAddressID: addr.ID,
+				BillingAddressID:  addr.ID,
+				CurrencyCode:      "USD",
+				Items: []app.CartItem{
+					{VariantID: weekly.ID, Quantity: 1, UnitPrice: 1620, PlanDiscountPct: 10},
+					{VariantID: monthly.ID, Quantity: 1, UnitPrice: monthlyPrice, PlanDiscountPct: 5},
+				},
+			}
+		}
+
+		// The monthly line quoted at the weekly line's 10% rather than its own 5%.
+		_, err := svc.PlaceOrder(ctx, tx, params(900), actor)
+		assert.ErrorIs(t, err, app.ErrPriceMoved, "900 is 10% off; this line's plan takes 5%")
+
+		order, err := svc.PlaceOrder(ctx, tx, params(950), actor)
+		require.NoError(t, err)
+		assert.Equal(t, 2570, order.Subtotal, "1620 + 950")
 	})
 }

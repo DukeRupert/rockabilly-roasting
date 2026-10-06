@@ -73,9 +73,10 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 			// 1800 less the plan's 10%. The service does that arithmetic — the
 			// unit price here is what it must agree with, not a number this
 			// test invented.
-			Items:           []app.CartItem{{VariantID: variant.ID, Quantity: 2, UnitPrice: 1620}},
-			PlanDiscountPct: plan.DiscountPct,
-			Metadata:        app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
+			Items: []app.CartItem{{
+				VariantID: variant.ID, Quantity: 2, UnitPrice: 1620, PlanDiscountPct: plan.DiscountPct,
+			}},
+			Metadata: app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
 		}, actor)
 		require.NoError(t, err)
 

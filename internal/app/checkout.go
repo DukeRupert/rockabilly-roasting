@@ -291,6 +291,10 @@ type CartItem struct {
 	VariantID uuid.UUID
 	Quantity  int
 	UnitPrice int
+	// PlanDiscountPct is the subscription plan's percentage off this line, and
+	// zero for retail. UnitPrice already has it taken off; it is carried so
+	// PlaceOrder can price the line again and agree. See OrderLine.
+	PlanDiscountPct int
 }
 
 // refuseUntrustableLines rejects a line whose quantity or price could not belong
@@ -398,11 +402,6 @@ type PlaceOrderParams struct {
 	CurrencyCode      string
 	CouponCode        *string
 	SubscriptionID    *uuid.UUID
-	// PlanDiscountPct is the subscription plan's percentage off for a signup
-	// order, and zero for retail. Named here because the service prices the
-	// lines itself and cannot read a plan off a subscription that the webhook
-	// has not created yet.
-	PlanDiscountPct int
 	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
 	// whose lines are priced from the base price as every renewal is, and for
 	// retail checkout, whose cart was.

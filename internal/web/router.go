@@ -319,6 +319,8 @@ func NewRouter(deps *Deps) http.Handler {
 	accountMux.HandleFunc("GET /account/orders", deps.handleAccountOrders)
 	accountMux.HandleFunc("GET /account/orders/{id}", deps.handleAccountOrderShow)
 	accountMux.HandleFunc("GET /account/subscriptions", deps.handleAccountSubscriptions)
+	accountMux.HandleFunc("POST /account/subscriptions/box/skip", deps.handleAccountSubscriptionBoxSkip)
+	accountMux.HandleFunc("POST /account/subscriptions/box/pause", deps.handleAccountSubscriptionBoxPause)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/pause", deps.handleAccountSubscriptionPause)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/resume", deps.handleAccountSubscriptionResume)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/skip", deps.handleAccountSubscriptionSkip)

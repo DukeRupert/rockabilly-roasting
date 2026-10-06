@@ -680,6 +680,12 @@ func (s *SubscriptionService) ActivateFromSignupOrder(ctx context.Context, tx pg
 // PauseSubscription pauses an active subscription. An optional pauseUntil date
 // can be provided for automatic resume scheduling.
 func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time, actor Actor) (*domain.Subscription, error) {
+	return s.pauseSubscription(ctx, tx, id, pauseUntil, actor, nil)
+}
+
+// pauseSubscription is PauseSubscription with extra keys for the audit entry's
+// metadata, which is how a whole-box pause marks each member's entry.
+func (s *SubscriptionService) pauseSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time, actor Actor, extraAuditMeta map[string]any) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -710,6 +716,7 @@ func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, 
 		ResourceType: "subscription",
 		ResourceID:   id,
 		After:        sub,
+		Metadata:     extraAuditMeta,
 	}); err != nil {
 		return nil, fmt.Errorf("audit subscription paused: %w", err)
 	}
@@ -1117,25 +1124,7 @@ func (s *SubscriptionService) LinkOrder(ctx context.Context, tx pgx.Tx, subscrip
 // value (e.g. "every_30_days") is too awkward. Returns 0 for the dev-only
 // every_2_minutes interval — it should never appear in customer comms.
 func intervalDays(interval domain.SubscriptionInterval, count int) int {
-	if count < 1 {
-		count = 1
-	}
-	switch interval {
-	case domain.SubscriptionIntervalEvery7Days:
-		return 7 * count
-	case domain.SubscriptionIntervalEvery14Days:
-		return 14 * count
-	case domain.SubscriptionIntervalEvery21Days:
-		return 21 * count
-	case domain.SubscriptionIntervalEvery30Days:
-		return 30 * count
-	case domain.SubscriptionIntervalEvery60Days:
-		return 60 * count
-	case domain.SubscriptionIntervalEvery90Days:
-		return 90 * count
-	default:
-		return 0
-	}
+	return domain.SubscriptionIntervalDays(interval, count)
 }
 
 // NextRenewalDate previews when the first renewal charge would land for a
@@ -1220,6 +1209,12 @@ func canSkipSubscription(status domain.SubscriptionStatus) bool {
 // no upcoming shipments, and a past-due one has an unpaid charge that must be
 // resolved before its schedule means anything.
 func (s *SubscriptionService) SkipSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, p SkipSubscriptionParams, actor Actor) (*domain.Subscription, error) {
+	return s.skipSubscription(ctx, tx, id, p, actor, nil)
+}
+
+// skipSubscription is SkipSubscription with extra keys for the audit entry's
+// metadata, which is how a whole-box skip marks each member's entry.
+func (s *SubscriptionService) skipSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, p SkipSubscriptionParams, actor Actor, extraAuditMeta map[string]any) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1274,6 +1269,9 @@ func (s *SubscriptionService) SkipSubscription(ctx context.Context, tx pgx.Tx, i
 		meta["skipped_shipments"] = p.Intervals
 	} else {
 		meta["resume_on"] = resumeAt
+	}
+	for k, v := range extraAuditMeta {
+		meta[k] = v
 	}
 
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{

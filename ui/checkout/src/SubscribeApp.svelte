@@ -135,13 +135,66 @@
   // the box after an add or remove.
   //
   // Every line is a repeated `line=<plan>:<variant>:<qty>` param.
-  function baseURL(): string {
+  function boxQuery(): string {
     const params = new URLSearchParams();
     for (const l of lines) {
       params.append('line', `${l.plan_id}:${l.variant_id}:${l.quantity}`);
     }
-    const qs = params.toString();
+    return params.toString();
+  }
+
+  function baseURL(): string {
+    const qs = boxQuery();
     return qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  }
+
+  // refreshSummary swaps in the server's summary of the box after an add or
+  // remove. The summary at the top of the page is server-rendered — each line,
+  // the per-delivery total, the separate-shipments notice — and nothing here
+  // may price it, so the server renders it again
+  // for the new lines: GET /subscribe/box is the page's own summary component.
+  // The fragment's data-lines also carries each line's price, which is how a
+  // line just added gets the server's price without waiting for the payment
+  // step.
+  //
+  // A later change supersedes an earlier fetch still in flight. If the server
+  // refuses the box (a line that can no longer be offered) or cannot be
+  // reached, the page is loaded for the new URL, which answers the same way the
+  // page always does.
+  let summarySeq = 0;
+  async function refreshSummary() {
+    const seq = ++summarySeq;
+    const qs = boxQuery();
+    try {
+      const res = await fetch(`/subscribe/box${qs ? `?${qs}` : ''}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'text/html' },
+      });
+      if (seq !== summarySeq) return;
+      if (!res.ok) {
+        window.location.assign(baseURL());
+        return;
+      }
+      const html = await res.text();
+      if (seq !== summarySeq) return;
+      const parsed = document.createElement('template');
+      parsed.innerHTML = html;
+      const fresh = parsed.content.querySelector<HTMLElement>('#subscribe-box-summary');
+      const current = document.getElementById('subscribe-box-summary');
+      if (!fresh || !current) return;
+      current.replaceWith(fresh);
+      const priced: BoxLine[] = JSON.parse(fresh.dataset.lines || '[]');
+      for (const p of priced) {
+        const line = lines.find(
+          (l) =>
+            l.plan_id === p.plan_id &&
+            l.variant_id === p.variant_id,
+        );
+        if (line) line.unit_price = p.unit_price;
+      }
+    } catch {
+      if (seq === summarySeq) window.location.assign(baseURL());
+    }
   }
 
   // handleRedirectBack runs once on mount. If the URL carries Stripe's
@@ -415,6 +468,7 @@
     pickerOpen = false;
     resetPaymentIntent();
     window.history.replaceState({}, '', baseURL());
+    refreshSummary();
   }
 
   function removeLine(index: number) {
@@ -422,6 +476,7 @@
     lines.splice(index, 1);
     resetPaymentIntent();
     window.history.replaceState({}, '', baseURL());
+    refreshSummary();
   }
 </script>
 

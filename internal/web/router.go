@@ -236,6 +236,7 @@ func NewRouter(deps *Deps) http.Handler {
 		return ratelimit.SubscribeIPKey(ratelimit.ClientIP(r))
 	})
 	mux.HandleFunc("GET /subscribe", deps.handleSubscribePage)
+	mux.HandleFunc("GET /subscribe/box", deps.handleSubscribeBoxSummary)
 	mux.HandleFunc("GET /api/subscribe/context", deps.handleSubscribeContext)
 	mux.HandleFunc("GET /api/subscribe/catalog", deps.handleSubscribeCatalog)
 	mux.Handle("POST /api/subscribe/payment-intent", subscribeIPLimit(http.HandlerFunc(deps.handleSubscribePaymentIntent)))

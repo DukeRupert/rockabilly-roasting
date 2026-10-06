@@ -267,12 +267,42 @@ type subscribeConfirmResponse struct {
 // handleSubscribePage renders the subscription signup page for a box of one
 // or more lines.
 func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
+	props, ok := d.subscribePageProps(w, r)
+	if !ok {
+		return
+	}
+	if IsHTMX(r) {
+		storefront.SubscribeContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.SubscribePage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleSubscribeBoxSummary renders only the page's box summary for the lines
+// in the query string. The Svelte app fetches it after every add or remove and
+// swaps it in, so the summary, its per-delivery total and the separate-shipments
+// notice follow the box as it changes. It is the page's own component built
+// from the page's own props, so the two cannot describe the same box
+// differently.
+func (d *Deps) handleSubscribeBoxSummary(w http.ResponseWriter, r *http.Request) {
+	props, ok := d.subscribePageProps(w, r)
+	if !ok {
+		return
+	}
+	storefront.SubscribeBoxSummary(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// subscribePageProps builds what /subscribe renders for the lines in the query
+// string: each line described and priced, the box's total and whether its lines
+// span plans. ok is false when it has already answered the request — a bad
+// query, or a line that cannot be offered.
+func (d *Deps) subscribePageProps(w http.ResponseWriter, r *http.Request) (storefront.SubscribePageProps, bool) {
 	ctx := r.Context()
 
 	lines, err := parseSubscribeLines(r.URL.Query())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return storefront.SubscribePageProps{}, false
 	}
 
 	pageLines := make([]storefront.SubscribeLineProps, len(lines))
@@ -359,10 +389,10 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if msg, ok := subscribeLineErrorMessage(err); ok {
 			http.Error(w, msg, http.StatusUnprocessableEntity)
-			return
+			return storefront.SubscribePageProps{}, false
 		}
 		Error(w, r, err)
-		return
+		return storefront.SubscribePageProps{}, false
 	}
 
 	subtotal := 0
@@ -375,7 +405,7 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	linesJSON, jsonErr := json.Marshal(pageLines)
 	if jsonErr != nil {
 		Error(w, r, fmt.Errorf("marshal subscribe lines: %w", jsonErr))
-		return
+		return storefront.SubscribePageProps{}, false
 	}
 
 	props := storefront.SubscribePageProps{
@@ -387,12 +417,7 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 		StripeKey:  os.Getenv("STRIPE_PUBLISHABLE_KEY"),
 		CartCount:  d.cartItemCountFromCookie(r),
 	}
-
-	if IsHTMX(r) {
-		storefront.SubscribeContent(props).Render(ctx, w) //nolint:errcheck
-		return
-	}
-	storefront.SubscribePage(props).Render(ctx, w) //nolint:errcheck
+	return props, true
 }
 
 // subscribeContextResponse carries the signed-in customer's prefill for the

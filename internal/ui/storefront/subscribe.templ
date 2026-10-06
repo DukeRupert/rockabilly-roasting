@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/google/uuid"
 )
 
 // SubscribeLineProps is one item in the box: what it is, what plan it renews
@@ -84,30 +84,7 @@ templ SubscribeContent(props SubscribePageProps) {
 					Recurring delivery, roasted fresh each time — pause or cancel anytime from your account.
 				</p>
 			</div>
-			<!-- Box summary card — one row per line, leading with the coffee -->
-			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
-				<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your box</p>
-				<div class="space-y-5">
-					for i, line := range props.Lines {
-						@subscribeLineCard(line, i > 0, props.MerchantTZ)
-					}
-				</div>
-				<!-- Subtotal across the whole box -->
-				<div class="mt-4 pt-4 border-t-2 border-ink flex items-end justify-between gap-3">
-					<p class="font-oswald text-chrome-deep text-[11px]" style="letter-spacing:0.14em; text-transform:uppercase;">
-						Per delivery
-					</p>
-					<p class="font-special text-ink text-xl sm:text-2xl leading-none">{ formatCents(props.Subtotal) }</p>
-				</div>
-				<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
-					First delivery ships now. Shipping and tax shown at payment.
-				</p>
-				if props.MultiPlan {
-					<p class="mt-3 border-l-2 border-ink pl-3 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
-						{ separateShipmentsNotice }
-					</p>
-				}
-			</div>
+			@SubscribeBoxSummary(props)
 			<!-- Subscribe form (Svelte mounts here) -->
 			<div
 				id="subscribe-app"
@@ -117,6 +94,38 @@ templ SubscribeContent(props SubscribePageProps) {
 			<script type="module" src="/static/checkout/subscribe.js"></script>
 		</div>
 	</section>
+}
+
+// SubscribeBoxSummary is the box at the top of /subscribe: one row per line,
+// the per-delivery total and the separate-shipments notice. The page renders
+// it, and GET /subscribe/box renders it alone so the Svelte app can swap in the
+// server's summary of the box after every add or remove. The id is what the app
+// swaps; data-lines is where it reads each line's new price.
+templ SubscribeBoxSummary(props SubscribePageProps) {
+	<!-- Box summary card — one row per line, leading with the coffee -->
+	<div id="subscribe-box-summary" data-lines={ props.LinesJSON } class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
+		<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your box</p>
+		<div class="space-y-5">
+			for i, line := range props.Lines {
+				@subscribeLineCard(line, i > 0, props.MerchantTZ)
+			}
+		</div>
+		<!-- Subtotal across the whole box -->
+		<div class="mt-4 pt-4 border-t-2 border-ink flex items-end justify-between gap-3">
+			<p class="font-oswald text-chrome-deep text-[11px]" style="letter-spacing:0.14em; text-transform:uppercase;">
+				Per delivery
+			</p>
+			<p class="font-special text-ink text-xl sm:text-2xl leading-none">{ formatCents(props.Subtotal) }</p>
+		</div>
+		<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
+			First delivery ships now. Shipping and tax shown at payment.
+		</p>
+		if props.MultiPlan {
+			<p class="mt-3 border-l-2 border-ink pl-3 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
+				{ separateShipmentsNotice }
+			</p>
+		}
+	</div>
 }
 
 // subscribeLineCard renders one line of the box: thumbnail, title, variant,

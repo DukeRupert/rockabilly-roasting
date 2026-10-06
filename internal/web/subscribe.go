@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -132,6 +133,70 @@ func normalizeSubscribeLines(req subscribePaymentIntentRequest) ([]subscribeLine
 	return out, nil
 }
 
+// parseSubscribeLines reads a signup off the /subscribe page's query string:
+// any number of `line=<plan>:<variant>:<qty>` params (the picker's shape),
+// plus the legacy trio (`plan_id`, `variant_id`, `quantity`) that older links
+// still carry. Both can appear together, so the legacy trio is folded into the
+// same slice rather than left on the request's top-level fields, which is what
+// normalizeSubscribeLines refuses combined with `lines`.
+//
+// The error is the message shown to whoever typed or followed the URL.
+func parseSubscribeLines(q url.Values) ([]subscribeLine, error) {
+	var raw []subscribeLineRequest
+
+	planID := strings.TrimSpace(q.Get("plan_id"))
+	variantID := strings.TrimSpace(q.Get("variant_id"))
+	if planID != "" || variantID != "" {
+		quantity := 1
+		if qs := q.Get("quantity"); qs != "" {
+			n, err := strconv.Atoi(qs)
+			if err != nil {
+				return nil, errors.New("invalid quantity")
+			}
+			quantity = n
+		}
+		raw = append(raw, subscribeLineRequest{
+			PlanID: planID, VariantID: variantID, Quantity: quantity,
+		})
+	}
+
+	for _, s := range q["line"] {
+		parts := strings.SplitN(s, ":", 3)
+		if len(parts) != 3 {
+			return nil, errors.New("invalid line")
+		}
+		quantity, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return nil, errors.New("invalid line")
+		}
+		raw = append(raw, subscribeLineRequest{PlanID: parts[0], VariantID: parts[1], Quantity: quantity})
+	}
+
+	if len(raw) == 0 {
+		return nil, errors.New("choose at least one item to subscribe to")
+	}
+	return normalizeSubscribeLines(subscribePaymentIntentRequest{Lines: raw})
+}
+
+// subscribeLineErrorMessage maps an error raised while resolving a signup's
+// lines — whether from the page or from the payment-intent endpoint — to the
+// message shown to the customer. Both handlers hit the same errors resolving
+// the same lines (an inactive plan, a made-to-order variant with no recipe, an
+// unpriced variant), so the wording lives once rather than drifting between
+// the two places it is shown. ok is false for an error neither expects.
+func subscribeLineErrorMessage(err error) (msg string, ok bool) {
+	switch {
+	case errors.Is(err, app.ErrSubscriptionPlanNotFound), errors.Is(err, app.ErrSubscriptionPlanInactive):
+		return "That subscription plan is no longer available. Head back to the product page and pick a current one.", true
+	case errors.Is(err, app.ErrPriceNotFound):
+		return "We couldn't price that item. Head back to the product page and try again.", true
+	case errors.Is(err, app.ErrVariantArchived):
+		return "This item is no longer available. Head back to the product page and pick a current one.", true
+	default:
+		return "", false
+	}
+}
+
 // signupLine is a parsed line with the plan it signs up for. Its order line
 // (what it costs) and its cart item (what the order records) are both built
 // from this one plan value, so the discount a line is priced at and the plan
@@ -197,109 +262,128 @@ type subscribeConfirmResponse struct {
 
 // --- Handlers ---
 
-// handleSubscribePage renders the subscription signup page for a plan + variant.
+// handleSubscribePage renders the subscription signup page for a box of one
+// or more lines.
 func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	planIDStr := r.URL.Query().Get("plan_id")
-	variantIDStr := r.URL.Query().Get("variant_id")
-	quantityStr := r.URL.Query().Get("quantity")
-
-	planID, err := uuid.Parse(planIDStr)
+	lines, err := parseSubscribeLines(r.URL.Query())
 	if err != nil {
-		http.Error(w, "invalid plan_id", http.StatusBadRequest)
-		return
-	}
-	variantID, err := uuid.Parse(variantIDStr)
-	if err != nil {
-		http.Error(w, "invalid variant_id", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	quantity := 1
-	if quantityStr != "" {
-		quantity, err = strconv.Atoi(quantityStr)
-		if err != nil || quantity < 1 || quantity > 10 {
-			http.Error(w, "invalid quantity", http.StatusBadRequest)
-			return
-		}
-	}
-
-	var plan *domain.SubscriptionPlan
-	var basePrice, unitPrice int
-	var productTitle, productSlug, variantLabel, thumbnailURL string
+	pageLines := make([]storefront.SubscribeLineProps, len(lines))
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, planID)
+		plans := make(map[uuid.UUID]*domain.SubscriptionPlan)
+		for i, line := range lines {
+			plan, seen := plans[line.PlanID]
+			if !seen {
+				var txErr error
+				plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, line.PlanID)
+				if txErr != nil {
+					return txErr
+				}
+				if !plan.IsActive {
+					return app.ErrSubscriptionPlanInactive
+				}
+				plans[line.PlanID] = plan
+			}
+
+			// Product context so the card leads with the product, not the plan.
+			variant, txErr := d.CatalogService.GetVariant(ctx, tx, line.VariantID)
+			if txErr != nil {
+				return fmt.Errorf("get variant: %w", txErr)
+			}
+			if variant.ArchivedAt != nil {
+				return app.ErrVariantArchived
+			}
+			product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if txErr != nil {
+				return fmt.Errorf("get product: %w", txErr)
+			}
+
+			lp := storefront.SubscribeLineProps{
+				PlanID:        line.PlanID,
+				VariantID:     line.VariantID,
+				Quantity:      line.Quantity,
+				ProductTitle:  product.Title,
+				ProductSlug:   product.Slug,
+				PlanName:      plan.Name,
+				Interval:      plan.Interval,
+				IntervalCount: plan.IntervalCount,
+				NextChargeAt:  d.SubscriptionService.NextRenewalDate(time.Now(), plan),
+			}
+			if label, lErr := d.CatalogService.VariantLabel(ctx, tx, line.VariantID); lErr == nil {
+				lp.VariantLabel = label
+			}
+			if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
+				lp.ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantThumbnail)
+			}
+
+			price, txErr := d.PricingService.GetBasePrice(ctx, tx, line.VariantID, "USD")
+			if txErr != nil {
+				return txErr
+			}
+			lp.BasePrice = price.Amount
+
+			pageLines[i] = lp
+		}
+
+		// One computation for what a line costs: the same PriceLines the
+		// payment intent prices these lines with, so the page never quotes a
+		// number the card is not charged. From the base, as the payment intent
+		// and every renewal price a subscription, so it needs no customer: a
+		// signed-out visitor and a signed-in one are quoted the same.
+		orderLines := make([]app.OrderLine, len(lines))
+		for i, l := range lines {
+			orderLines[i] = app.OrderLine{
+				VariantID: l.VariantID, Quantity: l.Quantity,
+				PlanDiscountPct: plans[l.PlanID].DiscountPct,
+			}
+		}
+		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
+			CustomerID: uuid.Nil, CurrencyCode: "USD", Lines: orderLines, BasePrice: true,
+		})
 		if txErr != nil {
 			return txErr
 		}
-		if !plan.IsActive {
-			return app.ErrSubscriptionPlanInactive
-		}
-		p, txErr := d.PricingService.GetBasePrice(ctx, tx, variantID, "USD")
-		if txErr != nil {
-			return txErr
-		}
-		basePrice = p.Amount
-		unitPrice = basePrice
-		if plan.DiscountPct > 0 {
-			unitPrice = basePrice - (basePrice * plan.DiscountPct / 100)
-		}
-
-		// Product context so the page leads with the coffee, not the plan.
-		variant, txErr := d.CatalogService.GetVariant(ctx, tx, variantID)
-		if txErr != nil {
-			return fmt.Errorf("get variant: %w", txErr)
-		}
-		product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-		if txErr != nil {
-			return fmt.Errorf("get product: %w", txErr)
-		}
-		productTitle = product.Title
-		productSlug = product.Slug
-
-		if label, lErr := d.CatalogService.VariantLabel(ctx, tx, variantID); lErr == nil {
-			variantLabel = label
-		}
-		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
-			thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantThumbnail)
+		for i, item := range priced.Items {
+			pageLines[i].UnitPrice = item.UnitPrice
 		}
 		return nil
 	})
 	if err != nil {
-		if errors.Is(err, app.ErrSubscriptionPlanNotFound) {
-			http.Error(w, "subscription plan not found", http.StatusNotFound)
-			return
-		}
-		if errors.Is(err, app.ErrSubscriptionPlanInactive) {
-			http.Error(w, "subscription plan is not active", http.StatusNotFound)
-			return
-		}
-		if errors.Is(err, app.ErrPriceNotFound) {
-			http.Error(w, "price not found for this variant", http.StatusNotFound)
+		if msg, ok := subscribeLineErrorMessage(err); ok {
+			http.Error(w, msg, http.StatusUnprocessableEntity)
 			return
 		}
 		Error(w, r, err)
 		return
 	}
 
+	subtotal := 0
+	distinctPlans := map[uuid.UUID]bool{}
+	for _, l := range pageLines {
+		subtotal += l.UnitPrice * l.Quantity
+		distinctPlans[l.PlanID] = true
+	}
+
+	linesJSON, jsonErr := json.Marshal(pageLines)
+	if jsonErr != nil {
+		Error(w, r, fmt.Errorf("marshal subscribe lines: %w", jsonErr))
+		return
+	}
+
 	props := storefront.SubscribePageProps{
-		Plan:         plan,
-		VariantID:    variantID,
-		Quantity:     quantity,
-		UnitPrice:    unitPrice,
-		Subtotal:     unitPrice * quantity,
-		BasePrice:    basePrice,
-		ProductTitle: productTitle,
-		ProductSlug:  productSlug,
-		VariantLabel: variantLabel,
-		ThumbnailURL: thumbnailURL,
-		NextChargeAt: d.SubscriptionService.NextRenewalDate(time.Now(), plan),
-		MerchantTZ:   d.MerchantTZ,
-		StripeKey:    os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-		CartCount:    d.cartItemCountFromCookie(r),
+		Lines:      pageLines,
+		LinesJSON:  string(linesJSON),
+		Subtotal:   subtotal,
+		MultiPlan:  len(distinctPlans) > 1,
+		MerchantTZ: d.MerchantTZ,
+		StripeKey:  os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		CartCount:  d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {
@@ -313,6 +397,108 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 // subscribe form. Prefill is null for guests.
 type subscribeContextResponse struct {
 	Prefill *checkoutPrefill `json:"prefill"`
+}
+
+// subscribeCatalogVariant is one item the in-page picker can add: a variant
+// with a price.
+type subscribeCatalogVariant struct {
+	VariantID    string `json:"variant_id"`
+	ProductTitle string `json:"product_title"`
+	VariantLabel string `json:"variant_label"`
+	BasePrice    int    `json:"base_price"`
+}
+
+type subscribeCatalogPlan struct {
+	PlanID      string `json:"plan_id"`
+	Name        string `json:"name"`
+	DiscountPct int    `json:"discount_pct"`
+}
+
+type subscribeCatalogResponse struct {
+	Variants []subscribeCatalogVariant `json:"variants"`
+	Plans    []subscribeCatalogPlan    `json:"plans"`
+}
+
+// handleSubscribeCatalog answers the "Add another item" picker: every
+// subscribable variant that can be added without a trip through the builder,
+// and every active plan to put it on. Module-gated at the route like its
+// neighbours — a shop without subscriptions has no such endpoint.
+func (d *Deps) handleSubscribeCatalog(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	resp := subscribeCatalogResponse{
+		Variants: []subscribeCatalogVariant{},
+		Plans:    []subscribeCatalogPlan{},
+	}
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		subscribable := true
+		activeStatus := domain.ProductStatusActive
+		// Paged to the end. A fixed limit would drop the rest of a larger
+		// catalog from the picker with nothing on the page saying so.
+		const pageSize = 200
+		var products []domain.Product
+		for offset := 0; ; offset += pageSize {
+			page, txErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
+				Status:       &activeStatus,
+				Subscribable: &subscribable,
+				Limit:        pageSize,
+				Offset:       offset,
+				Visibility:   d.retailVisibility(),
+			})
+			if txErr != nil {
+				return txErr
+			}
+			products = append(products, page...)
+			if len(page) < pageSize {
+				break
+			}
+		}
+
+		for _, product := range products {
+			// The retail channel's variants, as every storefront listing
+			// reads them: a wholesale-only size is not something a retail
+			// subscriber can be sold.
+			variants, vErr := d.CatalogService.ListActiveVariantsForChannel(ctx, tx, product.ID, domain.ChannelRetail)
+			if vErr != nil {
+				return vErr
+			}
+			for _, variant := range variants {
+				price, pErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
+				if pErr != nil {
+					if errors.Is(pErr, app.ErrPriceNotFound) {
+						continue
+					}
+					return pErr
+				}
+				label, lErr := d.CatalogService.VariantLabel(ctx, tx, variant.ID)
+				if lErr != nil {
+					label = ""
+				}
+				resp.Variants = append(resp.Variants, subscribeCatalogVariant{
+					VariantID:    variant.ID.String(),
+					ProductTitle: product.Title,
+					VariantLabel: label,
+					BasePrice:    price.Amount,
+				})
+			}
+		}
+
+		plans, pErr := d.SubscriptionService.ListActivePlans(ctx, tx)
+		if pErr != nil {
+			return pErr
+		}
+		for _, plan := range plans {
+			resp.Plans = append(resp.Plans, subscribeCatalogPlan{
+				PlanID: plan.ID.String(), Name: plan.Name, DiscountPct: plan.DiscountPct,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	JSON(w, http.StatusOK, resp)
 }
 
 // handleSubscribeContext returns the session customer's contact + default
@@ -544,17 +730,12 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		logger.Error("subscribe payment-intent: phase 1", "error", err)
 		switch {
-		case errors.Is(err, app.ErrSubscriptionPlanNotFound), errors.Is(err, app.ErrSubscriptionPlanInactive):
-			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "validation_error").Inc()
-			JSON(w, http.StatusUnprocessableEntity, map[string]string{
-				"error": "That subscription plan is no longer available. Head back to the product page and pick a current one.",
-			})
-		case errors.Is(err, app.ErrPriceNotFound):
-			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "validation_error").Inc()
-			JSON(w, http.StatusUnprocessableEntity, map[string]string{
-				"error": "We couldn't price that item. Head back to the product page and try again.",
-			})
 		default:
+			if msg, ok := subscribeLineErrorMessage(err); ok {
+				d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "validation_error").Inc()
+				JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": msg})
+				return
+			}
 			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
 			recordRequestError(r.Context(), err, http.StatusInternalServerError)
 			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare payment"})

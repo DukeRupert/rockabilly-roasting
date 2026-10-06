@@ -33,11 +33,15 @@ func TestSubscribePageRendersNextChargeInTheMerchantZone(t *testing.T) {
 
 	var buf bytes.Buffer
 	require.NoError(t, SubscribeContent(SubscribePageProps{
-		Plan:         &domain.SubscriptionPlan{Name: "Weekly", Interval: domain.SubscriptionIntervalEvery7Days, IntervalCount: 1},
-		Quantity:     1,
-		ProductTitle: "Switchblade Espresso",
-		NextChargeAt: time.Date(2027, 3, 12, 22, 0, 0, 0, la).UTC(),
-		MerchantTZ:   la,
+		Lines: []SubscribeLineProps{{
+			PlanName:      "Weekly",
+			Interval:      domain.SubscriptionIntervalEvery7Days,
+			IntervalCount: 1,
+			Quantity:      1,
+			ProductTitle:  "Switchblade Espresso",
+			NextChargeAt:  time.Date(2027, 3, 12, 22, 0, 0, 0, la).UTC(),
+		}},
+		MerchantTZ: la,
 	}).Render(context.Background(), &buf))
 
 	assert.Contains(t, buf.String(), "Mar 12, 2027")

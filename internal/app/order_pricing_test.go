@@ -296,3 +296,28 @@ func TestPlaceOrder_RefusesAPriceThatMoved(t *testing.T) {
 		assert.Equal(t, 2570, order.Subtotal, "1620 + 950")
 	})
 }
+
+// A visitor who has not signed in has no customer row until checkout creates
+// one, and the /subscribe page they read before paying still has to quote the
+// number the charge will be. A subscription line is priced from the base, so
+// it never asks who the customer is, and uuid.Nil prices exactly as a known
+// customer would.
+func TestPriceLines_ASubscriptionPricesForAVisitorWithNoCustomerYet(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newCheckoutService()
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1800, "USD")
+
+	priced, err := svc.PriceLines(ctx, tx, app.PriceLinesParams{
+		CustomerID:   uuid.Nil,
+		CurrencyCode: "USD",
+		Lines:        []app.OrderLine{{VariantID: variant.ID, Quantity: 2, PlanDiscountPct: 10}},
+		BasePrice:    true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1620, priced.Items[0].UnitPrice)
+	assert.Equal(t, 3240, priced.Subtotal)
+}

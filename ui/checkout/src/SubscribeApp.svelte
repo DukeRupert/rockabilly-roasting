@@ -6,28 +6,51 @@
     createSubscribePaymentIntent,
     confirmSubscription,
     getSubscribeContext,
+    getSubscribeCatalog,
     type SubscribePaymentIntentResponse,
+    type SubscribeCatalogResponse,
+    type SubscribeCatalogVariant,
+    type SubscribeCatalogPlan,
   } from './lib/subscribe-api';
   import { formatCents } from './lib/format';
 
-  interface Props {
-    planId: string;
-    variantId: string;
+  // One line of the box, as the mount div's data-lines attribute carries it —
+  // see storefront.SubscribeLineProps. Read once on mount; everything after
+  // that is local state, never re-fetched.
+  interface BoxLine {
+    plan_id: string;
+    variant_id: string;
     quantity: number;
-    planName: string;
-    price: number;
+    // Null until the server has priced the line: a line just added from the
+    // picker has no price of the server's yet, and one computed here would be
+    // a second price computation that could disagree with the charge.
+    unit_price: number | null;
+    base_price: number;
+    product_title: string;
+    product_slug: string;
+    variant_label: string;
+    thumbnail_url?: string;
+    plan_name: string;
     interval: string;
+    interval_count: number;
+  }
+
+  interface Props {
+    lines: BoxLine[];
     stripeKey: string;
   }
 
-  let { planId, variantId, quantity, planName, price, interval, stripeKey }: Props = $props();
+  let { lines: initialLines, stripeKey }: Props = $props();
+
+  let lines = $state<BoxLine[]>(initialLines);
 
   type Step = 'form' | 'confirmation';
 
   let step = $state<Step>('form');
-  let subscriptionId = $state('');
-  // 'active' — subscription exists; 'processing' — payment is settling and
-  // the payment_intent.succeeded webhook will activate it server-side.
+  // Every subscription the signup started, named for the success screen.
+  let confirmedSubscriptionIds = $state<string[]>([]);
+  // 'active' — subscriptions exist; 'processing' — payment is settling and
+  // the payment_intent.succeeded webhook will activate them server-side.
   let confirmationStatus = $state<'active' | 'processing'>('active');
   // True while we're handling a Stripe redirect-back (async payment methods).
   // Suppresses the form and shows a finalizing state instead.
@@ -49,9 +72,21 @@
   let elements = $state<StripeElements | null>(null);
   let clientSecret = $state('');
   let stripeReady = $state(false);
-  // Server-computed charge breakdown (item subtotal + shipping + tax), known
-  // once the PI is created. Until then the page shows the static item price.
+  // Server-computed charge breakdown (item subtotal + shipping + tax, and
+  // each line's own price), known once the PI is created. Until then the
+  // page shows the lines' preview prices from the mount data.
   let totals = $state<SubscribePaymentIntentResponse | null>(null);
+
+  // "Add another item" picker
+  let pickerOpen = $state(false);
+  let catalog = $state<SubscribeCatalogResponse | null>(null);
+  let catalogError = $state('');
+  // What the picker refused, said rather than silently clamped: the server
+  // refuses a merged quantity over the cap, and so does this.
+  let pickerError = $state('');
+  let pickerVariantId = $state('');
+  let pickerPlanId = $state('');
+  let pickerQuantity = $state(1);
 
   // UI state
   let processing = $state(false);
@@ -95,9 +130,18 @@
   });
 
   // baseURL is this page's canonical address without Stripe's redirect-back
-  // query params, used to reset the URL after handling (or failing) one.
+  // query params, rebuilt from the current lines every time the box changes
+  // — used both to reset the URL after a redirect and to keep it describing
+  // the box after an add or remove.
+  //
+  // Every line is a repeated `line=<plan>:<variant>:<qty>` param.
   function baseURL(): string {
-    return `${window.location.pathname}?plan_id=${planId}&variant_id=${variantId}&quantity=${quantity}`;
+    const params = new URLSearchParams();
+    for (const l of lines) {
+      params.append('line', `${l.plan_id}:${l.variant_id}:${l.quantity}`);
+    }
+    const qs = params.toString();
+    return qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
   }
 
   // handleRedirectBack runs once on mount. If the URL carries Stripe's
@@ -105,7 +149,7 @@
   // customer is returning from an async payment method. The order was
   // pre-created server-side at PaymentIntent time, so finalizing is a single
   // confirm call — and even if it fails here, the payment_intent.succeeded
-  // webhook activates the subscription without us.
+  // webhook activates the subscriptions without us.
   async function handleRedirectBack() {
     const params = new URLSearchParams(window.location.search);
     const redirectPI = params.get('payment_intent');
@@ -129,7 +173,7 @@
     finalizing = true;
     try {
       const result = await confirmSubscription({ payment_intent_id: redirectPI });
-      subscriptionId = result.subscription_id || '';
+      confirmedSubscriptionIds = result.subscription_ids || (result.subscription_id ? [result.subscription_id] : []);
       confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
       step = 'confirmation';
       window.history.replaceState({}, '', baseURL());
@@ -165,9 +209,9 @@
     }
   }
 
-  // The PI being abandoned when the address changes and a new PI is created.
-  // Sent to the server so the orphaned PI (and its pre-created order) get
-  // cancelled instead of lingering.
+  // The PI being abandoned when the address or the box changes and a new PI
+  // is created. Sent to the server so the orphaned PI (and its pre-created
+  // order) get cancelled instead of lingering.
   let previousPaymentIntentId = '';
 
   async function initStripe() {
@@ -179,9 +223,11 @@
       }
 
       const piResponse = await createSubscribePaymentIntent({
-        plan_id: planId,
-        variant_id: variantId,
-        quantity,
+        lines: lines.map((l) => ({
+          plan_id: l.plan_id,
+          variant_id: l.variant_id,
+          quantity: l.quantity,
+        })),
         email,
         first_name: firstName,
         last_name: lastName,
@@ -196,6 +242,12 @@
       previousPaymentIntentId = '';
 
       totals = piResponse;
+      // Nothing computed in the browser: every line's price shown from here
+      // on is the server's, matched by variant, never position.
+      for (const priced of piResponse.lines) {
+        const line = lines.find((l) => l.variant_id === priced.variant_id);
+        if (line) line.unit_price = priced.unit_price;
+      }
       clientSecret = piResponse.client_secret;
       stripeReady = true;
       await tick();
@@ -245,11 +297,11 @@
 
       try {
         const result = await confirmSubscription({ payment_intent_id: paymentIntent.id });
-        subscriptionId = result.subscription_id || '';
+        confirmedSubscriptionIds = result.subscription_ids || (result.subscription_id ? [result.subscription_id] : []);
         confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
       } catch {
         // The charge went through; the payment_intent.succeeded webhook will
-        // activate the subscription server-side. Show the truthful
+        // activate the subscriptions server-side. Show the truthful
         // processing state instead of an error the customer can't act on.
         confirmationStatus = 'processing';
       }
@@ -258,6 +310,27 @@
       error = e.message || 'Failed to complete subscription';
     } finally {
       processing = false;
+    }
+  }
+
+  // resetPaymentIntent abandons whatever PI is in flight (remembering it for
+  // cancellation) and recreates one for the current lines + address. Shared
+  // by the address-blur handler and every box edit — a line added or
+  // removed is exactly the same kind of change as an edited address: what is
+  // being charged for moved, so the intent has to move with it.
+  function resetPaymentIntent() {
+    if (clientSecret) {
+      previousPaymentIntentId = clientSecret.split('_secret')[0];
+    }
+    stripeReady = false;
+    clientSecret = '';
+    totals = null;
+    elements = null;
+    if (formValid) {
+      stripeInitialized = true;
+      initStripe();
+    } else {
+      stripeInitialized = false;
     }
   }
 
@@ -271,19 +344,78 @@
     if (!formValid || !stripeInitialized) return;
     if (addressKey !== lastAddressKey) {
       lastAddressKey = addressKey;
-      // Reset Stripe to get a new PI with updated address. Remember the old
-      // PI so the server can cancel it and its pre-created order.
-      if (clientSecret) {
-        previousPaymentIntentId = clientSecret.split('_secret')[0];
-      }
-      stripeReady = false;
-      stripeInitialized = false;
-      clientSecret = '';
-      totals = null;
-      elements = null;
-      stripeInitialized = true;
-      initStripe();
+      resetPaymentIntent();
     }
+  }
+
+  // --- The box: add and remove lines ---
+
+  async function openPicker() {
+    pickerOpen = true;
+    if (catalog) return;
+    try {
+      catalog = await getSubscribeCatalog();
+      if (catalog.plans.length > 0) pickerPlanId = catalog.plans[0].plan_id;
+      if (catalog.variants.length > 0) pickerVariantId = catalog.variants[0].variant_id;
+    } catch (e: any) {
+      catalogError = e.message || 'Failed to load items';
+    }
+  }
+
+  function closePicker() {
+    pickerOpen = false;
+  }
+
+  function addPickedItem() {
+    pickerError = '';
+    if (!catalog || !pickerVariantId || !pickerPlanId) return;
+    const variant = catalog.variants.find((v: SubscribeCatalogVariant) => v.variant_id === pickerVariantId);
+    const plan = catalog.plans.find((p: SubscribeCatalogPlan) => p.plan_id === pickerPlanId);
+    if (!variant || !plan) return;
+    if (!Number.isInteger(pickerQuantity) || pickerQuantity < 1 || pickerQuantity > 10) {
+      pickerError = 'Choose a quantity from 1 to 10.';
+      return;
+    }
+
+    const existing = lines.find((l) => l.variant_id === variant.variant_id && l.plan_id === plan.plan_id);
+    if (existing) {
+      // Refused, never clamped: the server refuses the same merged total.
+      if (existing.quantity + pickerQuantity > 10) {
+        pickerError = `That would make ${existing.quantity + pickerQuantity} of one item. The most is 10.`;
+        return;
+      }
+      existing.quantity += pickerQuantity;
+    } else {
+      if (lines.length >= 10) {
+        pickerError = 'A subscription can hold at most 10 items.';
+        return;
+      }
+      lines.push({
+        plan_id: plan.plan_id,
+        variant_id: variant.variant_id,
+        quantity: pickerQuantity,
+        // Priced by the server when the payment is next set up.
+        unit_price: null,
+        base_price: variant.base_price,
+        product_title: variant.product_title,
+        product_slug: '',
+        variant_label: variant.variant_label,
+        plan_name: plan.name,
+        interval: '',
+        interval_count: 1,
+      });
+    }
+    pickerQuantity = 1;
+    pickerOpen = false;
+    resetPaymentIntent();
+    window.history.replaceState({}, '', baseURL());
+  }
+
+  function removeLine(index: number) {
+    if (lines.length <= 1) return;
+    lines.splice(index, 1);
+    resetPaymentIntent();
+    window.history.replaceState({}, '', baseURL());
   }
 </script>
 
@@ -310,11 +442,101 @@
       </div>
     {/if}
 
+    <!-- Box editor: what's in it, and a way to add or remove -->
+    <section class="space-y-3 mb-8">
+      <div class="flex items-center justify-between">
+        <h2 class="font-slab uppercase text-ink leading-[0.95]" style="font-size: clamp(1.5rem, 3vw, 1.875rem); letter-spacing:-0.005em;">
+          Your box
+        </h2>
+        {#if lines.length < 10}
+          <button
+            type="button"
+            onclick={openPicker}
+            class="font-oswald font-bold text-rust text-xs"
+            style="letter-spacing:0.14em; text-transform:uppercase;"
+          >+ Add another item</button>
+        {/if}
+      </div>
+
+      <ul class="space-y-2">
+        {#each lines as line, i (line.variant_id + line.plan_id)}
+          <li class="border-2 border-ink bg-cream-hi p-3 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-oswald font-bold text-ink text-sm truncate" style="letter-spacing:0.02em;">
+                {line.product_title}{line.variant_label ? ` — ${line.variant_label}` : ''}
+              </p>
+              <p class="font-oswald text-ink-soft text-xs" style="letter-spacing:0.04em;">
+                {line.plan_name} · Qty {line.quantity} · {line.unit_price === null ? 'priced at payment' : formatCents(line.unit_price)}
+              </p>
+            </div>
+            {#if lines.length > 1}
+              <button
+                type="button"
+                onclick={() => removeLine(i)}
+                class="font-oswald font-bold text-chrome-deep text-xs shrink-0 hover:text-rust"
+                style="letter-spacing:0.1em; text-transform:uppercase;"
+                aria-label={`Remove ${line.product_title}`}
+              >Remove</button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+
+      {#if pickerOpen}
+        <div class="border-2 border-ink bg-cream-hi p-4 space-y-3">
+          {#if pickerError}
+            <p class="font-oswald text-rust text-sm" role="alert">{pickerError}</p>
+          {/if}
+          {#if catalogError}
+            <p class="font-oswald text-rust text-sm">{catalogError}</p>
+          {:else if !catalog}
+            <p class="font-oswald text-ink-soft text-sm">Loading items…</p>
+          {:else}
+            <div>
+              <label for="picker-variant" class={labelClasses} style={labelStyle}>Item</label>
+              <select id="picker-variant" bind:value={pickerVariantId} class={inputClasses} style={inputStyle}>
+                {#each catalog.variants as v (v.variant_id)}
+                  <option value={v.variant_id}>{v.product_title}{v.variant_label ? ` — ${v.variant_label}` : ''} · {formatCents(v.base_price)}</option>
+                {/each}
+              </select>
+            </div>
+            <div>
+              <label for="picker-plan" class={labelClasses} style={labelStyle}>Plan</label>
+              <select id="picker-plan" bind:value={pickerPlanId} class={inputClasses} style={inputStyle}>
+                {#each catalog.plans as p (p.plan_id)}
+                  <option value={p.plan_id}>{p.name}{p.discount_pct > 0 ? ` (${p.discount_pct}% off)` : ''}</option>
+                {/each}
+              </select>
+            </div>
+            <div>
+              <label for="picker-qty" class={labelClasses} style={labelStyle}>Quantity</label>
+              <input id="picker-qty" type="number" min="1" max="10" bind:value={pickerQuantity} class={inputClasses} style={inputStyle} />
+            </div>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                onclick={addPickedItem}
+                disabled={!pickerVariantId || !pickerPlanId}
+                class="btn-stamp flex-1 bg-rust text-paper border-2 border-ink px-4 py-2.5 font-oswald font-bold text-xs disabled:opacity-60"
+                style="letter-spacing:0.14em; text-transform:uppercase;"
+              >Add to box</button>
+              <button
+                type="button"
+                onclick={closePicker}
+                class="font-oswald font-bold text-chrome-deep text-xs px-4"
+                style="letter-spacing:0.14em; text-transform:uppercase;"
+              >Cancel</button>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </section>
+
     <form onsubmit={handleSubmit} class="space-y-8">
       <!-- Contact & shipping -->
       <section class="space-y-4">
         <h2
-          class="font-slab text-ink uppercase leading-[0.95]"
+          class="font-slab uppercase text-ink leading-[0.95]"
           style="font-size: clamp(1.5rem, 3vw, 1.875rem); letter-spacing:-0.005em;"
         >
           Contact &amp; shipping
@@ -464,7 +686,7 @@
       <!-- Payment -->
       <section class="space-y-4">
         <h2
-          class="font-slab text-ink uppercase leading-[0.95]"
+          class="font-slab uppercase text-ink leading-[0.95]"
           style="font-size: clamp(1.5rem, 3vw, 1.875rem); letter-spacing:-0.005em;"
         >
           Payment
@@ -488,7 +710,7 @@
             <!-- Charge breakdown — what the card is actually charged today. -->
             <div class="border-2 border-ink bg-cream-hi p-4 sm:p-5 space-y-2">
               <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
-                <span>Your roast</span>
+                <span>Your box</span>
                 <span class="font-special">{formatCents(totals.subtotal)}</span>
               </div>
               <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
@@ -547,7 +769,7 @@
           </svg>
           Processing…
         {:else}
-          Subscribe · {formatCents(totals ? totals.amount : price)}
+          {totals ? `Subscribe · ${formatCents(totals.amount)}` : 'Subscribe'}
           <svg
             class="size-4"
             fill="none"
@@ -567,7 +789,7 @@
     </form>
   </div>
 {:else if confirmationStatus === 'processing'}
-  <!-- Payment processing — the webhook activates the subscription server-side. -->
+  <!-- Payment processing — the webhook activates the subscriptions server-side. -->
   <div class="mt-10 text-center">
     <div class="inline-flex items-center justify-center mb-6">
       <span
@@ -600,16 +822,20 @@
       Payment processing
     </p>
     <h2
-      class="font-slab text-ink uppercase leading-[0.92] mt-3"
+      class="font-slab uppercase leading-[0.92] text-ink mt-3"
       style="font-size: clamp(2rem, 4vw, 2.5rem); letter-spacing:-0.005em;"
     >
       Order received.
     </h2>
     <p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-md mx-auto">
       Your payment is still clearing. As soon as it does — usually within a few
-      minutes — we'll activate your
-      <strong class="font-oswald font-bold text-ink">{planName}</strong>
-      subscription and email your confirmation. No need to order again.
+      minutes — we'll activate
+      {#if lines.length > 1}
+        your subscriptions
+      {:else}
+        your <strong class="font-oswald font-bold text-ink">{lines[0]?.product_title}</strong> subscription
+      {/if}
+      and email your confirmation. No need to order again.
     </p>
 
     <a
@@ -635,7 +861,7 @@
     </a>
   </div>
 {:else}
-  <!-- Confirmation -->
+  <!-- Confirmation — names every item the box started. -->
   <div class="mt-10 text-center">
     <div class="inline-flex items-center justify-center mb-6">
       <span
@@ -665,10 +891,10 @@
       class="font-oswald text-chrome-deep text-xs font-semibold"
       style="letter-spacing:0.24em; text-transform:uppercase;"
     >
-      Subscription active
+      Subscription{lines.length > 1 ? 's' : ''} active
     </p>
     <h2
-      class="font-slab text-ink uppercase leading-[0.92] mt-3"
+      class="font-slab uppercase leading-[0.92] text-ink mt-3"
       style="font-size: clamp(2rem, 4vw, 2.5rem); letter-spacing:-0.005em;"
     >
       You're on the
@@ -677,10 +903,23 @@
         style="font-size:1.1em; letter-spacing:0;">list.</span
       >
     </h2>
-    <p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-md mx-auto">
-      Your <strong class="font-oswald font-bold text-ink">{planName}</strong> subscription is live.
-      Confirmation email's on its way with the details.
-    </p>
+    {#if lines.length > 1}
+      <ul class="mt-5 max-w-md mx-auto text-left space-y-1">
+        {#each lines as line (line.variant_id + line.plan_id)}
+          <li class="font-oswald text-ink-soft text-sm">
+            <strong class="font-oswald font-bold text-ink">{line.product_title}</strong> — {line.plan_name}
+          </li>
+        {/each}
+      </ul>
+      <p class="mt-4 font-oswald text-ink-soft text-base leading-relaxed max-w-md mx-auto">
+        Confirmation email's on its way with the details.
+      </p>
+    {:else}
+      <p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-md mx-auto">
+        Your <strong class="font-oswald font-bold text-ink">{lines[0]?.product_title}</strong> subscription is live.
+        Confirmation email's on its way with the details.
+      </p>
+    {/if}
 
     <a
       href="/catalog"

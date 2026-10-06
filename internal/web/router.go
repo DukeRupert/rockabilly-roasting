@@ -237,6 +237,7 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 	mux.HandleFunc("GET /subscribe", deps.handleSubscribePage)
 	mux.HandleFunc("GET /api/subscribe/context", deps.handleSubscribeContext)
+	mux.HandleFunc("GET /api/subscribe/catalog", deps.handleSubscribeCatalog)
 	mux.Handle("POST /api/subscribe/payment-intent", subscribeIPLimit(http.HandlerFunc(deps.handleSubscribePaymentIntent)))
 	mux.HandleFunc("POST /api/subscribe/confirm", deps.handleSubscribeConfirm)
 

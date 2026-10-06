@@ -1,7 +1,13 @@
-export interface SubscribePaymentIntentRequest {
+// One line of the box being signed up for. Mirrors internal/web/subscribe.go's
+// subscribeLineRequest — a variant, the plan it renews on, and how many.
+export interface SubscribeLineRequest {
   plan_id: string;
   variant_id: string;
   quantity: number;
+}
+
+export interface SubscribePaymentIntentRequest {
+  lines: SubscribeLineRequest[];
   email: string;
   first_name: string;
   last_name: string;
@@ -13,10 +19,22 @@ export interface SubscribePaymentIntentRequest {
   country: string;
   /**
    * The PI the client is abandoning (address edited after the payment
-   * element mounted). The server cancels it so its pre-created order is
-   * cleaned up via the payment_intent.canceled webhook.
+   * element mounted, or a line added/removed). The server cancels it so its
+   * pre-created order is cleaned up via the payment_intent.canceled webhook.
    */
   previous_payment_intent_id?: string;
+}
+
+// SubscribeLinePriced is what one line of the box actually costs, read back
+// from the server rather than computed here: nothing is priced in the
+// browser. Matched to a SubscribeLineRequest by variant_id, never by
+// position: the order's lines are not
+// returned in request order.
+export interface SubscribeLinePriced {
+  variant_id: string;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
 }
 
 export interface SubscribePaymentIntentResponse {
@@ -29,6 +47,7 @@ export interface SubscribePaymentIntentResponse {
   shipping_label?: string;
   tax_total: number;
   tax_label?: string;
+  lines: SubscribeLinePriced[];
 }
 
 export interface SubscribeConfirmRequest {
@@ -36,6 +55,9 @@ export interface SubscribeConfirmRequest {
 }
 
 export interface SubscribeConfirmResponse {
+  /** Every subscription the signup started. */
+  subscription_ids?: string[];
+  /** Set only when there is exactly one. */
   subscription_id?: string;
   order_id: string;
   /**
@@ -97,4 +119,29 @@ export function confirmSubscription(
     method: 'POST',
     body: JSON.stringify(req),
   });
+}
+
+// One item the "Add another item" picker can offer, and the plans it can put
+// that item on. Fed by GET /api/subscribe/catalog: the retail catalog's
+// subscribable, priced variants.
+export interface SubscribeCatalogVariant {
+  variant_id: string;
+  product_title: string;
+  variant_label: string;
+  base_price: number;
+}
+
+export interface SubscribeCatalogPlan {
+  plan_id: string;
+  name: string;
+  discount_pct: number;
+}
+
+export interface SubscribeCatalogResponse {
+  variants: SubscribeCatalogVariant[];
+  plans: SubscribeCatalogPlan[];
+}
+
+export function getSubscribeCatalog(): Promise<SubscribeCatalogResponse> {
+  return request<SubscribeCatalogResponse>('/api/subscribe/catalog');
 }

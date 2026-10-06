@@ -9,31 +9,61 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-type SubscribePageProps struct {
-	Plan      *domain.SubscriptionPlan
-	VariantID uuid.UUID
-	Quantity  int
-	// UnitPrice is the per-delivery price of one unit after the plan discount.
-	// Subtotal is UnitPrice × Quantity — the recurring item charge before
-	// shipping and tax (those are added and shown at the payment step).
-	UnitPrice int
-	Subtotal  int
-	// BasePrice is the pre-discount per-unit price, shown struck through when
-	// the plan carries a discount. Zero when there's no discount.
-	BasePrice int
-	// Product context so the page leads with the coffee, not the plan record.
-	ProductTitle string
-	ProductSlug  string
-	VariantLabel string
-	ThumbnailURL string
-	// NextChargeAt previews when the first renewal would land. Rendered in
-	// MerchantTZ: it is built from the server clock, so formatting it as it
-	// arrives shows an evening visitor tomorrow's date.
-	NextChargeAt time.Time
-	MerchantTZ   *time.Location
-	StripeKey    string
-	CartCount    int
+// SubscribeLineProps is one item in the box: what it is, what plan it renews
+// on, and what it costs. Json tags are read by the mount div's data-lines
+// attribute — see SubscribePageProps.LinesJSON — so the Svelte app can render
+// the box, add to it and remove from it without a round trip on mount.
+type SubscribeLineProps struct {
+	PlanID    uuid.UUID `json:"plan_id"`
+	VariantID uuid.UUID `json:"variant_id"`
+	Quantity  int       `json:"quantity"`
+	// UnitPrice is this line's per-delivery price after its own plan's
+	// discount. BasePrice is the pre-discount price, shown struck through when
+	// the two differ.
+	UnitPrice int `json:"unit_price"`
+	BasePrice int `json:"base_price"`
+	// Product context so the card leads with the coffee, not the plan.
+	ProductTitle  string                      `json:"product_title"`
+	ProductSlug   string                      `json:"product_slug"`
+	VariantLabel  string                      `json:"variant_label"`
+	ThumbnailURL  string                      `json:"thumbnail_url,omitempty"`
+	PlanName      string                      `json:"plan_name"`
+	Interval      domain.SubscriptionInterval `json:"interval"`
+	IntervalCount int                         `json:"interval_count"`
+	// NextChargeAt is this line's own plan's first renewal preview, rendered
+	// in MerchantTZ. Not carried in the JSON the Svelte app reads — it is
+	// built from the server clock, so re-rendering it client-side after
+	// add/remove would show a stale time zone's date.
+	NextChargeAt time.Time `json:"-"`
 }
+
+// Subtotal is this line's UnitPrice × Quantity.
+func (l SubscribeLineProps) Subtotal() int {
+	return l.UnitPrice * l.Quantity
+}
+
+type SubscribePageProps struct {
+	Lines []SubscribeLineProps
+	// LinesJSON is Lines marshaled once in the handler — the mount div's
+	// data-lines attribute, and the only form of Lines the Svelte app reads.
+	LinesJSON string
+	// Subtotal is the sum of every line's Subtotal — the recurring item
+	// charge before shipping and tax (those are added and shown at the
+	// payment step, priced once for the whole box).
+	Subtotal int
+	// MultiPlan is true when the box's lines are not all on the same plan,
+	// which is when they ship together only the first time and separately —
+	// each with its own shipping charge — after that. Drives the notice.
+	MultiPlan  bool
+	MerchantTZ *time.Location
+	StripeKey  string
+	CartCount  int
+}
+
+// separateShipmentsNotice is shown when a box's lines are on more than one
+// plan. A single-plan box gets no notice: everything in it renews together,
+// which is what the customer already assumes.
+const separateShipmentsNotice = "Mixed schedules: it all ships together this first time — after that, each schedule rides out on its own day, with its own shipping. Skip or pause a whole box anytime from your account."
 
 templ SubscribeContent(props SubscribePageProps) {
 	<!-- Full-bleed paper surface -->
@@ -54,83 +84,34 @@ templ SubscribeContent(props SubscribePageProps) {
 					Recurring delivery, roasted fresh each time — pause or cancel anytime from your account.
 				</p>
 			</div>
-			<!-- Subscription summary card — leads with the coffee, not the plan -->
+			<!-- Box summary card — one row per line, leading with the coffee -->
 			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
-				<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your subscription</p>
-				<div class="flex items-start gap-4">
-					<!-- Thumbnail -->
-					<div class="shrink-0 w-20 h-20 border-2 border-ink bg-paper-warm overflow-hidden">
-						if props.ThumbnailURL != "" {
-							<img src={ props.ThumbnailURL } alt={ props.ProductTitle } class="h-full w-full object-cover object-center" loading="lazy"/>
-						} else {
-							<div class="flex h-full w-full items-center justify-center">
-								<span class="font-slab text-ink text-2xl leading-none">
-									if props.ProductTitle != "" {
-										{ string([]rune(props.ProductTitle)[0:1]) }
-									} else {
-										★
-									}
-								</span>
-							</div>
-						}
-					</div>
-					<!-- Title + variant + cadence -->
-					<div class="flex-1 min-w-0">
-						if props.ProductSlug != "" {
-							<a href={ templ.SafeURL("/catalog/" + props.ProductSlug) } class="group inline-block">
-								<p class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0] group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
-									{ props.ProductTitle }
-								</p>
-							</a>
-						} else {
-							<p class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0]" style="letter-spacing:-0.005em;">
-								{ props.ProductTitle }
-							</p>
-						}
-						if props.VariantLabel != "" {
-							<p class="font-oswald text-ink text-sm mt-1.5" style="letter-spacing:0.04em;">{ props.VariantLabel }</p>
-						}
-						<p class="font-oswald font-bold text-chrome-deep text-[11px] mt-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">
-							{ subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
-						</p>
-					</div>
-				</div>
-				<!-- Price -->
-				<div class="mt-4 pt-4 border-t-2 border-ink flex items-end justify-between gap-3">
-					<div class="min-w-0">
-						<span class="inline-flex items-baseline gap-2 flex-wrap">
-							if props.BasePrice > props.UnitPrice {
-								<span class="font-special text-chrome-deep text-sm line-through">{ formatCents(props.BasePrice) }</span>
-							}
-							<span class="font-special text-ink text-lg">{ formatCents(props.UnitPrice) }</span>
-							if props.Quantity > 1 {
-								<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">each &times; { fmt.Sprintf("%d", props.Quantity) }</span>
-							}
-						</span>
-					</div>
-					<div class="text-right shrink-0">
-						<p class="font-special text-ink text-xl sm:text-2xl leading-none">{ formatCents(props.Subtotal) }</p>
-						<p class="font-oswald text-chrome-deep text-[11px] mt-1" style="letter-spacing:0.14em; text-transform:uppercase;">Per delivery</p>
-					</div>
-				</div>
-				<!-- Billing rhythm — say plainly when it ships and renews -->
-				<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
-					First bag ships now, then renews { subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }.
-					if !props.NextChargeAt.IsZero() {
-						<span>Next charge around <span class="font-bold text-ink">{ formatDateIn(props.NextChargeAt, props.MerchantTZ) }</span>.</span>
+				<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your box</p>
+				<div class="space-y-5">
+					for i, line := range props.Lines {
+						@subscribeLineCard(line, i > 0, props.MerchantTZ)
 					}
-					<span>Shipping and tax shown at payment.</span>
+				</div>
+				<!-- Subtotal across the whole box -->
+				<div class="mt-4 pt-4 border-t-2 border-ink flex items-end justify-between gap-3">
+					<p class="font-oswald text-chrome-deep text-[11px]" style="letter-spacing:0.14em; text-transform:uppercase;">
+						Per delivery
+					</p>
+					<p class="font-special text-ink text-xl sm:text-2xl leading-none">{ formatCents(props.Subtotal) }</p>
+				</div>
+				<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
+					First delivery ships now. Shipping and tax shown at payment.
 				</p>
+				if props.MultiPlan {
+					<p class="mt-3 border-l-2 border-ink pl-3 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
+						{ separateShipmentsNotice }
+					</p>
+				}
 			</div>
 			<!-- Subscribe form (Svelte mounts here) -->
 			<div
 				id="subscribe-app"
-				data-plan-id={ props.Plan.ID.String() }
-				data-variant-id={ props.VariantID.String() }
-				data-quantity={ fmt.Sprintf("%d", props.Quantity) }
-				data-plan-name={ subscriptionConfirmName(props) }
-				data-price={ fmt.Sprintf("%d", props.Subtotal) }
-				data-interval={ string(props.Plan.Interval) }
+				data-lines={ props.LinesJSON }
 				data-stripe-key={ props.StripeKey }
 			></div>
 			<script type="module" src="/static/checkout/subscribe.js"></script>
@@ -138,19 +119,73 @@ templ SubscribeContent(props SubscribePageProps) {
 	</section>
 }
 
-// subscriptionConfirmName is the name the Svelte confirmation screen shows in
-// "Your {name} subscription is live." The product title reads far better there
-// than a cadence-style plan name ("Every 30 Days"), so prefer it.
-func subscriptionConfirmName(props SubscribePageProps) string {
-	if props.ProductTitle != "" {
-		return props.ProductTitle
-	}
-	return props.Plan.Name
+// subscribeLineCard renders one line of the box: thumbnail, title, variant,
+// plan and price. divider draws the rule above every row after the first, so
+// the list reads as one card with several rows rather than several cards
+// stacked.
+templ subscribeLineCard(line SubscribeLineProps, divider bool, tz *time.Location) {
+	<div class={ templ.KV("pt-5 border-t-2 border-ink", divider) }>
+		<div class="flex items-start gap-4">
+			<!-- Thumbnail -->
+			<div class="shrink-0 w-16 h-16 border-2 border-ink bg-paper-warm overflow-hidden">
+				if line.ThumbnailURL != "" {
+					<img src={ line.ThumbnailURL } alt={ line.ProductTitle } class="h-full w-full object-cover object-center" loading="lazy"/>
+				} else {
+					<div class="flex h-full w-full items-center justify-center">
+						<span class="font-slab text-ink text-xl leading-none">
+							if line.ProductTitle != "" {
+								{ string([]rune(line.ProductTitle)[0:1]) }
+							} else {
+								★
+							}
+						</span>
+					</div>
+				}
+			</div>
+			<!-- Title + variant + cadence -->
+			<div class="flex-1 min-w-0">
+				if line.ProductSlug != "" {
+					<a href={ templ.SafeURL("/catalog/" + line.ProductSlug) } class="group inline-block">
+						<p class="font-slab text-ink uppercase text-base sm:text-lg leading-[1.0] group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
+							{ line.ProductTitle }
+						</p>
+					</a>
+				} else {
+					<p class="font-slab text-ink uppercase text-base sm:text-lg leading-[1.0]" style="letter-spacing:-0.005em;">
+						{ line.ProductTitle }
+					</p>
+				}
+				if line.VariantLabel != "" {
+					<p class="font-oswald text-ink text-sm mt-1" style="letter-spacing:0.04em;">{ line.VariantLabel }</p>
+				}
+				<p class="font-oswald font-bold text-chrome-deep text-[11px] mt-1" style="letter-spacing:0.16em; text-transform:uppercase;">
+					{ line.PlanName } · { subscriptionIntervalLabel(line.Interval, line.IntervalCount) }
+				</p>
+				if !line.NextChargeAt.IsZero() {
+					<p class="font-oswald text-ink-soft text-xs mt-1" style="letter-spacing:0.04em;">
+						Next charge around <span class="font-bold text-ink">{ formatDateIn(line.NextChargeAt, tz) }</span>
+					</p>
+				}
+			</div>
+			<!-- Price -->
+			<div class="text-right shrink-0">
+				<span class="inline-flex items-baseline gap-1.5 flex-wrap justify-end">
+					if line.BasePrice > line.UnitPrice {
+						<span class="font-special text-chrome-deep text-xs line-through">{ formatCents(line.BasePrice) }</span>
+					}
+					<span class="font-special text-ink text-base">{ formatCents(line.UnitPrice) }</span>
+				</span>
+				if line.Quantity > 1 {
+					<p class="font-oswald text-ink-soft text-xs mt-0.5" style="letter-spacing:0.04em;">{ fmt.Sprintf("each × %d", line.Quantity) }</p>
+				}
+			</div>
+		</div>
+	</div>
 }
 
 templ SubscribePage(props SubscribePageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:     "Subscribe — " + props.Plan.Name,
+		Title:     "Subscribe",
 		CartCount: props.CartCount,
 	}) {
 		@SubscribeContent(props)

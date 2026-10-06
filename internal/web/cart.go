@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
@@ -323,4 +324,16 @@ func (d *Deps) renderCartBadge(w http.ResponseWriter, r *http.Request) {
 // handleCartCount returns just the cart badge (for htmx polling or OOB swaps).
 func (d *Deps) handleCartCount(w http.ResponseWriter, r *http.Request) {
 	d.renderCartBadge(w, r)
+}
+
+// cartOrderLines drops a cart line to what it is an order for — variant and
+// quantity — so the checkout can ask CheckoutService.PriceLines what it
+// costs. The cart's own stored price is deliberately not carried across: the
+// service resolves it, and one resolver is the whole point.
+func cartOrderLines(items []domain.CartItem) []app.OrderLine {
+	lines := make([]app.OrderLine, len(items))
+	for i, ci := range items {
+		lines[i] = app.OrderLine{VariantID: ci.VariantID, Quantity: ci.Quantity}
+	}
+	return lines
 }

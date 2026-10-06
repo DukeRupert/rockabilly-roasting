@@ -29,8 +29,13 @@ const abandonedOrderBatch = 100
 
 // AbandonedOrderCleanupWorker scans for orders that were pre-created at PI
 // time but never moved past pending+awaiting (customer abandoned checkout
-// before confirming payment) and cancels them. Cancellation releases any
-// held coupon redemption so the code can be reused.
+// before confirming payment) and cancels them.
+//
+// Cancellation still releases a coupon redemption tied to the order, but an
+// abandoned order does not hold one: a coupon is claimed at capture, so a
+// checkout nobody paid for never took the code out of circulation and the
+// release here is a no-op. It stays because an order that was paid for and is
+// cancelled later reaches the same call through CancelOrder.
 type AbandonedOrderCleanupWorker struct {
 	river.WorkerDefaults[AbandonedOrderCleanupArgs]
 	orderSvc *app.OrderService

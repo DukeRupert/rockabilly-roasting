@@ -287,15 +287,6 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			return app.ErrSubscriptionPlanInactive
 		}
 
-		p, txErr := d.PricingService.GetBasePrice(ctx, tx, variantID, "USD")
-		if txErr != nil {
-			return txErr
-		}
-		unit = p.Amount
-		if plan.DiscountPct > 0 {
-			unit = unit - (unit * plan.DiscountPct / 100)
-		}
-
 		customer, txErr = d.CustomerService.GetCustomerByEmail(ctx, tx, req.Email)
 		if txErr != nil {
 			if !errors.Is(txErr, app.ErrCustomerNotFound) {
@@ -335,10 +326,30 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			return fmt.Errorf("create address: %w", txErr)
 		}
 
-		// Tax + shipping, matching retail checkout. The subscription plan
-		// discount is already baked into `unit`, so the taxable subtotal is
-		// the discounted line total.
-		subtotal := unit * quantity
+		// What the line costs, from the one function that decides that — the
+		// same one PlaceOrder prices this order with in phase 3, so the amount
+		// authorised and the subtotal the order records cannot drift apart.
+		//
+		// From the base price, less the plan's discount: BasePrice, because that
+		// is what RenewalService charges for every box after this one, whatever
+		// price list the customer is on. Priced here rather than with the plan
+		// above only because the customer is known by now.
+		priced, txErr := d.CheckoutService.PriceLines(ctx, tx, app.PriceLinesParams{
+			CustomerID:      customer.ID,
+			CurrencyCode:    "USD",
+			Lines:           []app.OrderLine{{VariantID: variantID, Quantity: quantity}},
+			PlanDiscountPct: plan.DiscountPct,
+			BasePrice:       true,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		unit = priced.Items[0].UnitPrice
+
+		// Tax + shipping, matching retail checkout. The plan discount is already
+		// baked into the unit price, so the taxable subtotal is the discounted
+		// line total.
+		subtotal := priced.Subtotal
 		variant, txErr := d.CatalogService.GetVariant(ctx, tx, variantID)
 		if txErr != nil {
 			return fmt.Errorf("get variant for tax: %w", txErr)
@@ -491,10 +502,19 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			ShippingCents:     shippingCents,
 			TaxCents:          taxCents,
 			ShippingMethod:    shipMethod,
-			Metadata:          metadata,
+			// The plan's discount is part of what this line costs, so the
+			// service has to be told about it or it would price the line at
+			// full price and refuse the order as one whose price moved. The
+			// same for BasePrice: without it the service would resolve this
+			// customer's list price, which is not what phase 1 quoted.
+			PlanDiscountPct: plan.DiscountPct,
+			BasePrice:       true,
+			Metadata:        metadata,
 		}, actor)
 		if txErr != nil {
-			return fmt.Errorf("place signup order: %w", txErr)
+			// Unwrapped for the reason the retail endpoint says at its own
+			// PlaceOrder call: this error becomes the shopper's message.
+			return txErr
 		}
 		if shipsWith != nil {
 			// Staff read the internal note from the fulfillment queue; the
@@ -516,9 +536,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
-		d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "internal_error").Inc()
-		recordRequestError(r.Context(), err, http.StatusInternalServerError)
-		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare order"})
+		// Same one rule as the retail endpoint. This path has no coupon, so it
+		// has no exception either.
+		d.failCheckout(w, r, "subscribe", err)
 		return
 	}
 

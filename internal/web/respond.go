@@ -283,6 +283,28 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrJobRetryUnavailable):
 		return http.StatusServiceUnavailable, err.Error()
 
+	// Same shape: this binary has no pricing service wired, so it cannot say what
+	// a line costs. Nothing the shopper did, and retrying the same request will
+	// not help until the shop is wired differently.
+	case errors.Is(err, app.ErrPricingUnavailable):
+		return http.StatusServiceUnavailable, err.Error()
+
+	// Pricing the same lines twice in one request disagreed, so the total the
+	// payment provider was quoted is not the total this order would be. Conflict
+	// rather than a bad request: nothing the customer sent was wrong when they
+	// sent it, and the fix is to look at the new price.
+	//
+	// Both PlaceOrder callers now route through Error(), so this is reached.
+	//
+	// The sentinel's own sentence rather than err.Error(), because this one is
+	// wrapped by whoever raises it — refusePricesThatMoved names the line and
+	// both prices — and the shopper wants the advice, not the arithmetic. Unlike
+	// the arms above, that wrapping is inside app/ and no handler can decline it.
+	//
+	// The detail is not lost: the handler logs the full chain on its own line.
+	case errors.Is(err, app.ErrPriceMoved):
+		return http.StatusConflict, app.ErrPriceMoved.Error()
+
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotPayable),
 		errors.Is(err, app.ErrOrderNotCancellable),

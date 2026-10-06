@@ -150,7 +150,6 @@ var knownUnmappedSentinels = []string{
 	"ErrBoxPresetMaxWeightInvalid",
 	"ErrBoxPresetNameRequired",
 	"ErrCannotModifySelf",
-	"ErrCouponAlreadyRedeemed",
 	"ErrCouponCodeExists",
 	"ErrCustomerUserEmailRequired",
 	"ErrCustomerUserEmailTaken",
@@ -231,6 +230,14 @@ func TestPreviouslyUnmappedSentinels(t *testing.T) {
 
 		// Nothing the operator did — this process has no River client.
 		{app.ErrJobRetryUnavailable, http.StatusServiceUnavailable},
+
+		// The three the checkout endpoints raise from PlaceOrder. They are
+		// listed because both endpoints used to answer every one of them with a
+		// 500 — they hand-rolled their phase-3 handling and only knew about a
+		// spent coupon — so the mapping existed and was unreachable. They route
+		// through Error() now; these pin what it is allowed to say.
+		{app.ErrPriceMoved, http.StatusConflict},
+		{app.ErrPricingUnavailable, http.StatusServiceUnavailable},
 	}
 
 	for _, tc := range cases {

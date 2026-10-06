@@ -570,7 +570,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	var order *domain.Order
 
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
+		orderNumber := newOrderNumber("SUB")
 		customerID := customer.ID
 		subID := sub.ID
 		renewalPlacedAt := time.Now()
@@ -578,16 +578,19 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
-			Number:                orderNumber,
-			CustomerID:            &customerID,
-			Status:                domain.OrderStatusConfirmed,
-			PaymentStatus:         domain.PaymentStatusCaptured,
-			FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
-			CurrencyCode:          "USD",
-			Subtotal:              subtotalCents,
-			ShippingTotal:         shippingCents,
-			TaxTotal:              taxCents,
-			Total:                 totalCents,
+			Number:            orderNumber,
+			CustomerID:        &customerID,
+			Status:            domain.OrderStatusConfirmed,
+			PaymentStatus:     domain.PaymentStatusCaptured,
+			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
+			CurrencyCode:      "USD",
+			Subtotal:          subtotalCents,
+			ShippingTotal:     shippingCents,
+			TaxTotal:          taxCents,
+			Total:             totalCents,
+			// Server-derived, not caller-supplied: the address is the one on
+			// the subscription record. No ownership check needed here, unlike
+			// PlaceOrder, which takes its address ids from a request body.
 			ShippingAddressID:     sub.ShippingAddressID,
 			BillingAddressID:      sub.ShippingAddressID,
 			SubscriptionID:        &subID,
@@ -905,23 +908,27 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	var order *domain.Order
 
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
+		orderNumber := newOrderNumber("SUB")
 		customerID := customer.ID
 		renewalPlacedAt := time.Now()
 		renewalPromised, renewalRun := scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ)
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
-			Number:                orderNumber,
-			CustomerID:            &customerID,
-			Status:                domain.OrderStatusConfirmed,
-			PaymentStatus:         domain.PaymentStatusCaptured,
-			FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
-			CurrencyCode:          "USD",
-			Subtotal:              subtotalCents,
-			ShippingTotal:         shippingCents,
-			TaxTotal:              taxCents,
-			Total:                 orderTotal,
+			Number:            orderNumber,
+			CustomerID:        &customerID,
+			Status:            domain.OrderStatusConfirmed,
+			PaymentStatus:     domain.PaymentStatusCaptured,
+			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
+			CurrencyCode:      "USD",
+			Subtotal:          subtotalCents,
+			ShippingTotal:     shippingCents,
+			TaxTotal:          taxCents,
+			Total:             orderTotal,
+			// Server-derived like the single-subscription path above: addressID
+			// comes off the subscription records this batch was grouped by, and
+			// every one of them was checked to agree. Caller-supplied address
+			// ids are PlaceOrder's problem, and PlaceOrder guards them.
 			ShippingAddressID:     addr.ID,
 			BillingAddressID:      addr.ID,
 			SubscriptionID:        nil, // batched — use subscription_orders for linking

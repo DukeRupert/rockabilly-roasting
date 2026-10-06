@@ -345,7 +345,8 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 ### Discounts
 
 - **Fixed-amount discounts are capped at subtotal — never go negative.** Avoids "negative subtotal" states and matches user intuition.
-- **Coupon redemption uses optimistic locking (`WHERE redeemed_at IS NULL` + `UPDATE ... RETURNING`), not distributed locks.** Two concurrent checkouts both pass the "not yet redeemed" read; only one `UPDATE` returns a row. The loser sees `ErrCouponAlreadyRedeemed`. Scales without Redis.
+- **Coupon redemption uses optimistic locking (`WHERE redeemed_at IS NULL` + `UPDATE ... RETURNING`), not distributed locks.** Two concurrent claims both pass the "not yet redeemed" read; only one `UPDATE` returns a row. Scales without Redis.
+- **A coupon is claimed at capture, not at placement.** `PlaceOrder` validates it and prices it in, and records it on `order.Metadata["coupon_code_id"]`; `ConfirmCheckoutPayment` claims it. The payment step re-runs `/api/checkout/payment-intent` on every method or pricing change and each run places a fresh order, so claiming at placement spent the code on an order the customer was still trying to pay for. Nothing holds a code in between, so two orders can be placed on one single-use code: first to pay wins, the loser still captures (their money has already moved) and the lost claim is recorded as `coupon.redemption_lost` in the audit log. See `docs/checkout-coupon-scope-TODO.md`.
 
 ### Wholesale & B2B
 
@@ -403,7 +404,7 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 ### Testing
 
 - **Test isolation is per-transaction rollback, not per-test truncation.** `testutil.NewTestTx` opens a tx that always rolls back. No test ordering dependencies, no shared state, no truncation scripts.
-- **Coupon redemption race is the highest-priority concurrency test.** Two concurrent attempts on a single-use code — exactly one must succeed. Without this test, optimistic-locking bugs ship to production.
+- **The coupon race worth testing is at capture, not at placement.** Two orders may hold one single-use code — that is by design since redemption moved to capture — so "exactly one succeeds" is a claim about `ConfirmCheckoutPayment`, and the loser capturing anyway is part of it. `internal/app/checkout_coupon_lifecycle_test.go` covers the sequence; a genuinely concurrent one does not exist yet.
 - **Svelte checkout endpoints have golden-file contract tests.** Response shape changes fail CI; updating the golden requires `go test -update`. Prevents silent Go/Svelte API drift.
 
 ### UI

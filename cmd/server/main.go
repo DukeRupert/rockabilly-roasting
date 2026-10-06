@@ -544,11 +544,12 @@ func run() error {
 		WithOrderActionSigner(orderActionSigner)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
-	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg).
-		WithMerchantTZ(merchantTZ).
-		WithDeliveryRoutes(routeStore)
+	// Built before the checkout, which prices every order through it.
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
 		WithSettings(settingsStore)
+	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, pricingSvc, auditWriter, metricsReg).
+		WithMerchantTZ(merchantTZ).
+		WithDeliveryRoutes(routeStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
 	authSvc := app.NewAuthService(staffStore, customerStore, customerUserStore, magicLinkStore, staffInviteTokenStore, customerUserInviteTokenStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)

@@ -60,8 +60,9 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 			// test invented.
 			Items: []app.CartItem{{
 				VariantID: variant.ID, Quantity: 2, UnitPrice: 1620, PlanDiscountPct: plan.DiscountPct,
+				SubscriptionPlanID: &plan.ID,
 			}},
-			Metadata: app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
+			Metadata: app.SubscriptionSignupOrderMetadata("pi_test_activate"),
 		}, actor)
 		require.NoError(t, err)
 

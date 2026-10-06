@@ -153,3 +153,56 @@ func newSubscribePaymentDeps(t *testing.T) (*Deps, *fakePaymentProvider) {
 	d.PaymentProvider = fake
 	return d, fake
 }
+
+// withFlatShippingRate configures a flat rate for one test and restores what
+// was there afterwards. The config is a single instance-wide row, so this is
+// only safe because nothing in this package runs in parallel — see the note in
+// setup_test.go about not adding t.Parallel() to a test that writes.
+func withFlatShippingRate(t *testing.T, d *Deps, cents int) {
+	t.Helper()
+	set := func(cfg domain.ShippingConfig) {
+		ctx := context.Background()
+		tx, err := testPool.Begin(ctx)
+		require.NoError(t, err)
+		require.NoError(t, d.CheckoutService.UpdateShippingConfig(ctx, tx, cfg, testutil.TestActor()))
+		require.NoError(t, tx.Commit(ctx))
+	}
+
+	ctx := context.Background()
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	before, err := d.CheckoutService.GetShippingConfig(ctx, tx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Rollback(ctx))
+
+	restore := *before
+	t.Cleanup(func() { set(restore) })
+
+	cfg := *before
+	cfg.FlatRateCents = cents
+	// No threshold: a waived rate is a rate that never reaches the card, which
+	// is the case the caller exists to rule out.
+	cfg.FreeShippingThreshold = nil
+	set(cfg)
+}
+
+func countOrders(t *testing.T, d *Deps, customerID uuid.UUID) int {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+	n, err := d.OrderService.CountCustomerOrders(ctx, tx, customerID)
+	require.NoError(t, err)
+	return n
+}
+
+// piIDFromClientSecret recovers the intent id from the client secret the
+// handler returns, which is the only place the response carries it.
+//
+// This works on the fake's secrets, which are "<id>_secret", and on nothing
+// else: a real Stripe secret is "<id>_secret_<random>" and would come back
+// from here unchanged. It is a test helper reading test output, not a parser.
+func piIDFromClientSecret(secret string) string {
+	return strings.TrimSuffix(secret, "_secret")
+}

@@ -573,13 +573,25 @@ func legacySignupLine(order *domain.Order, item domain.LineItem) ([]SignupLine, 
 }
 
 // SubscriptionSignupOrderMetadata builds the order metadata that marks a
-// pre-created order as a subscription signup for the given plan.
-func SubscriptionSignupOrderMetadata(planID uuid.UUID, paymentIntentID string) map[string]any {
+// pre-created order as a subscription signup. It names no plan: each line
+// records its own (signupLineMetadata), because one signup can carry lines on
+// different plans.
+//
+// Orders written before that carried subscription_plan_id here;
+// legacySignupLine still reads it.
+func SubscriptionSignupOrderMetadata(paymentIntentID string) map[string]any {
 	return map[string]any{
 		orderMetaSubscriptionSignup: true,
-		orderMetaSubscriptionPlanID: planID.String(),
 		"payment_intent_id":         paymentIntentID,
 	}
+}
+
+// ListSubscriptionsByOrder returns every subscription an order started or
+// renewed. An order covering several leaves orders.subscription_id null, so
+// this is the only way to find them. Unscoped, like the store method: the
+// caller reached the order through something that proved it may see it.
+func (s *SubscriptionService) ListSubscriptionsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.Subscription, error) {
+	return s.subscriptions.ListByOrder(ctx, tx, orderID)
 }
 
 // ActivateFromSignupOrder creates and links the subscriptions promised by a

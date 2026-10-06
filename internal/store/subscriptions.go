@@ -213,6 +213,22 @@ func (s *SubscriptionStore) ListByCustomer(ctx context.Context, tx pgx.Tx, custo
 	return subs, nil
 }
 
+// ListByOrder returns every subscription an order started or renewed, through
+// subscription_orders. Unscoped: callers reach an order through something
+// that already proved they may see it.
+func (s *SubscriptionStore) ListByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (_ []domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.list_by_order", time.Now(), &err)
+	rows, err := sqlcgen.New(tx).ListSubscriptionsByOrder(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions by order: %w", err)
+	}
+	subs := make([]domain.Subscription, len(rows))
+	for i, r := range rows {
+		subs[i] = *subscriptionFromRow(r)
+	}
+	return subs, nil
+}
+
 // UpdateStatus updates a subscription's status and returns it.
 func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.SubscriptionStatus) (_ *domain.Subscription, err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_status", time.Now(), &err)

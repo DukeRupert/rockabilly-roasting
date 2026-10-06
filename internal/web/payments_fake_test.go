@@ -41,6 +41,9 @@ type fakePaymentProvider struct {
 	// path there is nothing to set: the handler's own transaction is what
 	// fails there.
 	intentErr error
+	// intentStatus is what GetPaymentIntent reports. Empty means the default
+	// "nobody has paid yet"; a confirm test sets it to succeeded.
+	intentStatus payments.PaymentIntentStatus
 
 	// onCreate, when set, runs inside CreatePaymentIntent. Creating the intent
 	// is the only moment that sits between the handler's two pricings — phase 1
@@ -103,6 +106,17 @@ func (f *fakePaymentProvider) CancelPaymentIntent(_ context.Context, id string) 
 	defer f.mu.Unlock()
 	f.canceled = append(f.canceled, id)
 	return nil
+}
+
+// GetPaymentIntent reports the status a test asked for.
+func (f *fakePaymentProvider) GetPaymentIntent(_ context.Context, id string) (*payments.PaymentIntent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	status := f.intentStatus
+	if status == "" {
+		status = payments.PaymentIntentStatusRequiresPaymentMethod
+	}
+	return &payments.PaymentIntent{ID: id, Status: status}, nil
 }
 
 // lastIntent is the PaymentIntent request the handler most recently made, and

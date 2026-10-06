@@ -231,6 +231,9 @@ type Querier interface {
 	ListSubscriptionOrdersBySubscription(ctx context.Context, subscriptionID uuid.UUID) ([]SubscriptionOrder, error)
 	ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan, error)
 	ListSubscriptionsByCustomer(ctx context.Context, customerID uuid.UUID) ([]Subscription, error)
+	// Every subscription an order started or renewed. orders.subscription_id names
+	// one; an order that covers several leaves it null, and this join is the link.
+	ListSubscriptionsByOrder(ctx context.Context, orderID uuid.UUID) ([]Subscription, error)
 	// Picks up both fresh active renewals and past_due dunning retries: for a
 	// past_due subscription next_order_at is the next dunning retry time, pushed
 	// forward on each failed charge so this never spins. Exhausted subscriptions

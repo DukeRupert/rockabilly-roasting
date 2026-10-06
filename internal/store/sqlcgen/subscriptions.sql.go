@@ -378,6 +378,54 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 	return items, nil
 }
 
+const listSubscriptionsByOrder = `-- name: ListSubscriptionsByOrder :many
+SELECT s.id, s.customer_id, s.plan_id, s.status, s.shipping_address_id, s.current_period_start, s.current_period_end, s.next_order_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at, s.variant_id, s.quantity, s.ends_at, s.stripe_payment_method_id, s.renewal_claimed_at FROM subscriptions s
+JOIN subscription_orders so ON so.subscription_id = s.id
+WHERE so.order_id = $1
+ORDER BY s.created_at, s.id
+`
+
+// Every subscription an order started or renewed. orders.subscription_id names
+// one; an order that covers several leaves it null, and this join is the link.
+func (q *Queries) ListSubscriptionsByOrder(ctx context.Context, orderID uuid.UUID) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, listSubscriptionsByOrder, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Subscription{}
+	for rows.Next() {
+		var i Subscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.CustomerID,
+			&i.PlanID,
+			&i.Status,
+			&i.ShippingAddressID,
+			&i.CurrentPeriodStart,
+			&i.CurrentPeriodEnd,
+			&i.NextOrderAt,
+			&i.CancelledAt,
+			&i.PauseUntil,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VariantID,
+			&i.Quantity,
+			&i.EndsAt,
+			&i.StripePaymentMethodID,
+			&i.RenewalClaimedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
 SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at FROM subscriptions
 WHERE status IN ('active', 'past_due') AND next_order_at <= now()

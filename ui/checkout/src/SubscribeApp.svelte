@@ -272,7 +272,22 @@
   // order) get cancelled instead of lingering.
   let previousPaymentIntentId = '';
 
+  // One payment intent is created at a time. A box edit or address change
+  // that lands while a create is in flight only marks it stale: two creates
+  // racing would let whichever answered last decide what the card is charged
+  // for — possibly the box before the edit — and the earlier intent would be
+  // sent no cancellation. When a stale create answers, its intent becomes the
+  // previous one and a fresh create goes out for the current box, so every
+  // abandoned intent is cancelled by its successor.
+  let intentInFlight = false;
+  let intentStale = false;
+
   async function initStripe() {
+    if (intentInFlight) {
+      intentStale = true;
+      return;
+    }
+    intentInFlight = true;
     try {
       stripe = await getStripe(stripeKey);
       if (!stripe) {
@@ -280,24 +295,38 @@
         return;
       }
 
-      const piResponse = await createSubscribePaymentIntent({
-        lines: lines.map((l) => ({
-          plan_id: l.plan_id,
-          variant_id: l.variant_id,
-          quantity: l.quantity,
-        })),
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        line1,
-        line2: line2 || undefined,
-        city,
-        state: addressState,
-        postal_code: postalCode,
-        country,
-        previous_payment_intent_id: previousPaymentIntentId || undefined,
-      });
-      previousPaymentIntentId = '';
+      let piResponse: SubscribePaymentIntentResponse;
+      for (;;) {
+        intentStale = false;
+        piResponse = await createSubscribePaymentIntent({
+          lines: lines.map((l) => ({
+            plan_id: l.plan_id,
+            variant_id: l.variant_id,
+            quantity: l.quantity,
+          })),
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          line1,
+          line2: line2 || undefined,
+          city,
+          state: addressState,
+          postal_code: postalCode,
+          country,
+          previous_payment_intent_id: previousPaymentIntentId || undefined,
+        });
+        previousPaymentIntentId = '';
+        if (!intentStale) break;
+        // The box or address changed while this was being created: it is
+        // already the wrong charge. Hand it to the next create to cancel.
+        previousPaymentIntentId = piResponse.client_secret.split('_secret')[0];
+        if (!formValid) {
+          // Nothing valid to charge for yet; the next valid change creates
+          // one, and cancels this on the way.
+          stripeInitialized = false;
+          return;
+        }
+      }
 
       totals = piResponse;
       // Nothing computed in the browser: every line's price shown from here
@@ -322,6 +351,8 @@
     } catch (e: any) {
       error = e.message || 'Failed to initialize payment';
       stripeInitialized = false;
+    } finally {
+      intentInFlight = false;
     }
   }
 
@@ -390,6 +421,9 @@
     clientSecret = '';
     totals = null;
     elements = null;
+    // Whatever a create in flight returns now describes the old box or
+    // address; see initStripe.
+    if (intentInFlight) intentStale = true;
     if (formValid) {
       stripeInitialized = true;
       initStripe();

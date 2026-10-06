@@ -502,6 +502,10 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				// service has to be told about it or it would price the line
 				// at full price and refuse the order as one whose price moved.
 				PlanDiscountPct: plan.DiscountPct,
+				// Recorded on the line as well as on the order below. The
+				// order-level keys are what activation reads today; the line's
+				// are what it reads once an order can carry several.
+				SubscriptionPlanID: &planID,
 			}},
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,

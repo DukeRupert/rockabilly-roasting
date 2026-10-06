@@ -488,6 +488,85 @@ const (
 // CheckoutService.OpenShipmentTo.
 const OrderMetaShipsWithOrder = "ships_with_order"
 
+// lineMetaSubscriptionPlanID is the metadata key on a signup order's line
+// items naming the plan that line signs up for. The string matches the
+// order-level key above; the tables differ. The order-level key names one
+// plan for the whole order, which is all a one-line signup needed; a signup
+// of several lines records each line's own here.
+const lineMetaSubscriptionPlanID = "subscription_plan_id"
+
+// signupLineMetadata is what a signup line records about the subscription it
+// becomes, or nil for a retail line.
+//
+// The plan is the standing instruction the subscription inherits, not a
+// record of what this order was, so it sits beside the line it belongs to in
+// line_items.metadata.
+func signupLineMetadata(item CartItem) map[string]any {
+	if item.SubscriptionPlanID == nil {
+		return nil
+	}
+	return map[string]any{lineMetaSubscriptionPlanID: item.SubscriptionPlanID.String()}
+}
+
+// IsSubscriptionSignupOrder reports whether an order was pre-created by the
+// subscribe flow. It reads the flag alone: an order whose lines carry their
+// plans names no plan at the order level.
+func IsSubscriptionSignupOrder(metadata map[string]any) bool {
+	flag, _ := metadata[orderMetaSubscriptionSignup].(bool)
+	return flag
+}
+
+// SignupLine is one line of a signup order and the subscription it asks for.
+type SignupLine struct {
+	Line   domain.LineItem
+	PlanID uuid.UUID
+}
+
+// SignupLines reads, for each line of a signup order, the plan the line
+// signed up for.
+//
+// Every line must name its plan. The one exception is an order with exactly
+// one line that names none: that is an order placed before lines carried their
+// plan, and legacySignupLine reads it off the order instead. Two or more lines
+// never fall back — the order-level key names one plan, and handing it to a
+// line that did not ask for it is a guess about what the customer bought.
+//
+// The result is in the order items came in, which is not the order the
+// customer added them; callers match on the line, never on position.
+func SignupLines(order *domain.Order, items []domain.LineItem) ([]SignupLine, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("signup order %s has no line items", order.ID)
+	}
+	if len(items) == 1 && items[0].Metadata[lineMetaSubscriptionPlanID] == nil {
+		return legacySignupLine(order, items[0])
+	}
+
+	out := make([]SignupLine, len(items))
+	for i, item := range items {
+		raw, _ := item.Metadata[lineMetaSubscriptionPlanID].(string)
+		planID, err := uuid.Parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("signup order %s line %s names no plan", order.ID, item.ID)
+		}
+		out[i] = SignupLine{Line: item, PlanID: planID}
+	}
+	return out, nil
+}
+
+// legacySignupLine resolves the one line of a signup order placed before lines
+// carried their own plan, from the order-level key that order was written
+// with. It can go once no signup order from before the change can still be
+// paid for and activated, meaning every such order's PaymentIntent has
+// expired.
+func legacySignupLine(order *domain.Order, item domain.LineItem) ([]SignupLine, error) {
+	raw, _ := order.Metadata[orderMetaSubscriptionPlanID].(string)
+	planID, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("signup order %s names no plan", order.ID)
+	}
+	return []SignupLine{{Line: item, PlanID: planID}}, nil
+}
+
 // SubscriptionSignupOrderMetadata builds the order metadata that marks a
 // pre-created order as a subscription signup for the given plan.
 func SubscriptionSignupOrderMetadata(planID uuid.UUID, paymentIntentID string) map[string]any {

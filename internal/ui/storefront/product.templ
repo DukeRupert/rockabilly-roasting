@@ -1090,7 +1090,9 @@ templ purchaseModeScript() {
 						var checked = document.querySelector('.subscribe-frequency-option input:checked');
 						if (checked) pid = checked.closest('.subscribe-frequency-option').dataset.planId;
 					}
-					if (pid) window.location.href = '/subscribe?plan_id=' + pid + '&variant_id=' + vid + '&quantity=' + qty;
+					// A fresh, one-line box — it does not append to whatever box
+					// somebody was already assembling in another tab.
+					if (pid) window.location.href = '/subscribe?line=' + encodeURIComponent(pid + ':' + vid + ':' + qty);
 				});
 			}
 

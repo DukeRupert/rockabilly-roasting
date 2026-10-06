@@ -60,11 +60,16 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 		//
 		// This has to be decided here rather than left to jobs.ErrorHandler:
 		// River does not run the handler for a cancelled job. The batch worker
-		// makes the same call on the same three sentinels; if that judgement
+		// makes the same call on the same sentinels; if that judgement
 		// ever changes, change it in both or the two paths disagree about what
 		// a declined card is worth.
 		switch {
-		case errors.Is(err, app.ErrSubscriptionNotActive), errors.Is(err, app.ErrSubscriptionNotFound):
+		case errors.Is(err, app.ErrSubscriptionNotActive), errors.Is(err, app.ErrSubscriptionNotFound),
+			errors.Is(err, app.ErrRenewalNotDue):
+			// Not due is a Retry arriving after a batch (or the batch's own
+			// retry) already charged it. ErrRenewalInFlight is deliberately
+			// absent: another renewal holds it, and River's retry comes back
+			// once that renewal settles.
 			metrics.TrackJobCancelled(w.metrics, "subscription_renewal", start)
 			slog.WarnContext(ctx, "background job subscription_renewal cancelled: subscription no longer renewable", attrs...)
 			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))

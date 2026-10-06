@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -396,6 +397,67 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	return nil
 }
 
+// renewalClaimLease is how long a renewal's claim on its subscriptions holds
+// before another renewal may take it over. Far longer than a renewal takes —
+// the Stripe call is the slow part and times out in well under a minute — so
+// only a renewal whose process died is ever overtaken. See migration 090.
+const renewalClaimLease = 15 * time.Minute
+
+// claimRenewal claims ids for this renewal, in its own transaction, or refuses
+// with ErrRenewalInFlight when another renewal holds any of them. release gives
+// the claim back and is safe to defer.
+//
+// This is what stops a customer or staff Retry and the scheduler's batch job
+// charging one subscription twice. They are different job kinds, so River's
+// uniqueness cannot deduplicate them, and a renewal's charge sits between two
+// transactions where neither can see the other renewal. The claim spans all
+// three phases; renewableNow, read under it, covers the case where the other
+// renewal has already finished.
+func (s *RenewalService) claimRenewal(ctx context.Context, pool *pgxpool.Pool, ids []uuid.UUID) (release func(), err error) {
+	var claimed bool
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var txErr error
+		claimed, txErr = s.subscriptions.ClaimRenewal(ctx, tx, ids, time.Now().Add(-renewalClaimLease))
+		return txErr
+	}); err != nil {
+		return nil, fmt.Errorf("claim renewal: %w", err)
+	}
+	if !claimed {
+		return nil, ErrRenewalInFlight
+	}
+	return func() {
+		// Detached from ctx: a renewal cancelled after charging must still give
+		// its claim back. If the release itself fails the lease runs out and the
+		// next renewal takes the claim over, so a failure here delays rather
+		// than blocks — logged, because it is otherwise invisible.
+		rctx := context.WithoutCancel(ctx)
+		if err := store.Tx(rctx, pool, func(tx pgx.Tx) error {
+			return s.subscriptions.ReleaseRenewalClaim(rctx, tx, ids)
+		}); err != nil {
+			slog.WarnContext(rctx, "release renewal claim", "error", err, "subscription_ids", ids)
+		}
+	}, nil
+}
+
+// renewableNow reports whether a subscription should be charged by the renewal
+// reading it: past due (the dunning ladder and Retry both charge before
+// next_order_at, which is the next rung), or active and due.
+//
+// An active subscription that is not due reached here because another renewal
+// charged it first and advanced its period — a batch, or a Retry queued beside
+// one. Charging it again is the double charge claimRenewal exists to prevent,
+// in the order it cannot see.
+func renewableNow(sub *domain.Subscription, now time.Time) bool {
+	switch sub.Status {
+	case domain.SubscriptionStatusPastDue:
+		return true
+	case domain.SubscriptionStatusActive:
+		return !sub.NextOrderAt.After(now)
+	default:
+		return false
+	}
+}
+
 // RenewSubscription processes a single subscription renewal:
 // 1. Load subscription + plan + customer + address + price
 // 2. Create off-session PaymentIntent via Stripe (external, outside tx)
@@ -404,6 +466,13 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 // Returns the created order on success. On payment failure, marks the subscription
 // past_due and returns an error.
 func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Pool, subscriptionID uuid.UUID) (*domain.Order, error) {
+	// Claimed before it is read, and held until the result is written.
+	release, err := s.claimRenewal(ctx, pool, []uuid.UUID{subscriptionID})
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	// --- Phase 1: read data (in a read-only tx) ---
 	var sub *domain.Subscription
 	var plan *domain.SubscriptionPlan
@@ -415,7 +484,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	var taxCents int
 	var shipMethod *domain.ShippingMethod
 
-	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var txErr error
 		sub, txErr = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
 		if txErr != nil {
@@ -424,6 +493,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 		if sub.Status != domain.SubscriptionStatusActive && sub.Status != domain.SubscriptionStatusPastDue {
 			return ErrSubscriptionNotActive
+		}
+		if !renewableNow(sub, time.Now()) {
+			return ErrRenewalNotDue
 		}
 
 		plan, txErr = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
@@ -705,6 +777,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return s.RenewSubscription(ctx, pool, subscriptionIDs[0])
 	}
 
+	// Every member claimed before any is read, or none: one member in another
+	// renewal's hands holds back the whole box until that renewal settles.
+	release, err := s.claimRenewal(ctx, pool, subscriptionIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	// --- Phase 1: read data (in a read-only tx) ---
 	var items []subscriptionLineItem
 	var customer *domain.Customer
@@ -715,7 +795,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	var orderTotal int
 	var shipMethod *domain.ShippingMethod
 
-	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+	now := time.Now()
+	var deadCardDropped int
+	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var customerID uuid.UUID
 		var addressID uuid.UUID
 
@@ -756,6 +838,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			// scheduler enqueues next time is where it gets a fair hearing.
 			// Advancing it here would burn a rung on a card we never tried.
 			if sub.DunningHasDeadCard() {
+				deadCardDropped++
+				continue
+			}
+
+			// Renewed already, by a Retry that ran while this batch was
+			// queued. Dropped rather than failing the box, like the two cases
+			// either side of it: the other members are still owed theirs.
+			if !renewableNow(sub, now) {
 				continue
 			}
 
@@ -829,13 +919,19 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil, fmt.Errorf("batch renewal read phase: %w", err)
 	}
 
-	// Every subscription in the batch was hard-declined and skipped above. There
-	// is no order to place and no ladder to advance here; the scheduler routes
-	// these to individual renewals, which is the path that can resolve their
-	// payment method and decide whether the latch still holds.
-	if len(items) == 0 {
+	// Every subscription left was hard-declined and skipped above. There is no
+	// order to place and no ladder to advance here; the scheduler routes these
+	// to individual renewals, which is the path that can resolve their payment
+	// method and decide whether the latch still holds.
+	if len(items) == 0 && deadCardDropped > 0 {
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("all batched subscriptions hard-declined: %w", ErrRenewalPaymentDeclined)
+	}
+
+	// Every member was renewed by something else first — Retries that ran while
+	// this batch was queued. Nothing failed and nothing is owed.
+	if len(items) == 0 {
+		return nil, nil
 	}
 
 	orderTotal = subtotalCents + shippingCents + taxCents

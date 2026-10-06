@@ -2,14 +2,21 @@
 
 Hi {{.CustomerName}},
 
-Your {{.ProductName}} subscription is set. Here are the details:
+{{if gt (len .Lines) 1}}Your subscription is set. Here's what we'll be roasting for you:
+
+{{range .Lines}}{{.Quantity}} × {{.ProductName}} ({{.PlanName}}{{if .IntervalDays}}, every {{.IntervalDays}} days{{end}})
+{{end}}
+Next charge: {{date .NextChargeOn}}
+{{if .SeparateRenewals}}
+These run on their own schedules — {{range $i, $l := .Lines}}{{if $i}}; {{end}}{{$l.ProductName}} ({{$l.PlanName}}) on {{date $l.NextChargeOn}}{{end}}. Each one is roasted, charged and shipped on its own day.
+{{end}}{{else}}Your {{.ProductName}} subscription is set. Here are the details:
 
 Product:     {{.ProductName}}
 Plan:        {{.PlanName}}
 Quantity:    {{.Quantity}}
 {{if .IntervalDays}}Ships:       Every {{.IntervalDays}} days
 {{end}}Next charge: {{date .NextChargeOn}}
-
+{{end}}
 Update your shipping address or payment method, or pause or cancel, any time:
 {{.AccountURL}}
 

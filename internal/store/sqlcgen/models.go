@@ -598,6 +598,7 @@ type QbInvoicePreview struct {
 	UpdatedAt           time.Time       `json:"updated_at"`
 	AutoBilled          bool            `json:"auto_billed"`
 	BillingMethod       string          `json:"billing_method"`
+	TaxCents            int32           `json:"tax_cents"`
 }
 
 type ResetToken struct {
@@ -870,6 +871,7 @@ type Subscription struct {
 	Quantity              int32              `json:"quantity"`
 	EndsAt                pgtype.Timestamptz `json:"ends_at"`
 	StripePaymentMethodID *string            `json:"stripe_payment_method_id"`
+	RenewalClaimedAt      pgtype.Timestamptz `json:"renewal_claimed_at"`
 }
 
 type SubscriptionOrder struct {

@@ -236,7 +236,9 @@ func NewRouter(deps *Deps) http.Handler {
 		return ratelimit.SubscribeIPKey(ratelimit.ClientIP(r))
 	})
 	mux.HandleFunc("GET /subscribe", deps.handleSubscribePage)
+	mux.HandleFunc("GET /subscribe/box", deps.handleSubscribeBoxSummary)
 	mux.HandleFunc("GET /api/subscribe/context", deps.handleSubscribeContext)
+	mux.HandleFunc("GET /api/subscribe/catalog", deps.handleSubscribeCatalog)
 	mux.Handle("POST /api/subscribe/payment-intent", subscribeIPLimit(http.HandlerFunc(deps.handleSubscribePaymentIntent)))
 	mux.HandleFunc("POST /api/subscribe/confirm", deps.handleSubscribeConfirm)
 
@@ -318,6 +320,8 @@ func NewRouter(deps *Deps) http.Handler {
 	accountMux.HandleFunc("GET /account/orders", deps.handleAccountOrders)
 	accountMux.HandleFunc("GET /account/orders/{id}", deps.handleAccountOrderShow)
 	accountMux.HandleFunc("GET /account/subscriptions", deps.handleAccountSubscriptions)
+	accountMux.HandleFunc("POST /account/subscriptions/box/skip", deps.handleAccountSubscriptionBoxSkip)
+	accountMux.HandleFunc("POST /account/subscriptions/box/pause", deps.handleAccountSubscriptionBoxPause)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/pause", deps.handleAccountSubscriptionPause)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/resume", deps.handleAccountSubscriptionResume)
 	accountMux.HandleFunc("POST /account/subscriptions/{id}/skip", deps.handleAccountSubscriptionSkip)

@@ -76,7 +76,16 @@ var (
 	// the dunning state has already been advanced (past_due retry scheduled, or
 	// expired at the cap). The job worker treats it as terminal — the renewal
 	// scheduler owns the next attempt, so River must not retry the job.
-	ErrRenewalPaymentDeclined   = errors.New("renewal payment declined")
+	ErrRenewalPaymentDeclined = errors.New("renewal payment declined")
+	// ErrRenewalNotDue signals that a subscription reached a renewal while it
+	// is neither past due nor due: something else already renewed it — a batch,
+	// or a Retry that ran first. Terminal for the job; there is nothing to do.
+	ErrRenewalNotDue = errors.New("subscription is not due for renewal")
+	// ErrRenewalInFlight signals that another renewal holds one of the
+	// subscriptions between its read and its write. Retryable: once that
+	// renewal settles, a retry either finds the subscription renewed
+	// (ErrRenewalNotDue) or charges it.
+	ErrRenewalInFlight          = errors.New("subscription renewal already in progress")
 	ErrSubscriptionPlanNotFound = errors.New("subscription plan not found")
 	ErrSubscriptionPlanInactive = errors.New("subscription plan is not active")
 

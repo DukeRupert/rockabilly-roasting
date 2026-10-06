@@ -16,6 +16,10 @@ type Querier interface {
 	ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
+	// Claims every subscription named that nobody holds, or whose holder's lease
+	// has run out. The caller compares the rows returned with the ids it asked
+	// for and, on a short count, rolls back: the claim is all or nothing.
+	ClaimSubscriptionRenewal(ctx context.Context, arg ClaimSubscriptionRenewalParams) ([]uuid.UUID, error)
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
@@ -227,6 +231,9 @@ type Querier interface {
 	ListSubscriptionOrdersBySubscription(ctx context.Context, subscriptionID uuid.UUID) ([]SubscriptionOrder, error)
 	ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan, error)
 	ListSubscriptionsByCustomer(ctx context.Context, customerID uuid.UUID) ([]Subscription, error)
+	// Every subscription an order started or renewed. orders.subscription_id names
+	// one; an order that covers several leaves it null, and this join is the link.
+	ListSubscriptionsByOrder(ctx context.Context, orderID uuid.UUID) ([]Subscription, error)
 	// Picks up both fresh active renewals and past_due dunning retries: for a
 	// past_due subscription next_order_at is the next dunning retry time, pushed
 	// forward on each failed charge so this never spins. Exhausted subscriptions
@@ -258,6 +265,7 @@ type Querier interface {
 	// again. No-op if the coupon was never redeemed for that order.
 	ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
+	ReleaseSubscriptionRenewalClaim(ctx context.Context, ids []uuid.UUID) error
 	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
 	RemoveProductCustomerVisibility(ctx context.Context, arg RemoveProductCustomerVisibilityParams) error
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)

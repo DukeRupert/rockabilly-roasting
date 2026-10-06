@@ -341,6 +341,8 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 
 - **Subscriptions are a scheduling mechanism, not a billing engine.** Each renewal generates a standard Order + PaymentIntent — no Stripe Subscriptions/Billing objects. Reasons: (1) WooCommerce migration compatibility, since existing customers had PaymentIntents and not Billing tokens; (2) full control over retry/grace logic without being constrained by Stripe's subscription lifecycle.
 - **Renewal payment-method lookup uses `ListPaymentMethods[0]` of any type, not filtered to `"card"`.** Filtering to card breaks Stripe Link customers.
+- **The plan discount is a property of the line, not the order.** One signup can carry a weekly line and a monthly line, and their plans take different percentages; a single percentage on the order priced one of them wrong. `OrderLine.PlanDiscountPct` is declared by the caller because the subscription does not exist yet when the signup is priced, and `PlaceOrder` re-prices each line at its own percentage and refuses one that moved.
+- **A signup's plan lives in each line's metadata, not the order's.** One signup can carry lines on different plans, so the order-level `subscription_plan_id` key could only ever name one of them. The plan is the standing instruction the line's subscription inherits, so it sits on the line it belongs to (`line_items.metadata`). Signup orders written before lines carried their plan still name it at the order level, and `legacySignupLine` reads that for a one-line order; it can go once no such order's PaymentIntent can still be paid. See `docs/subscriptions-module.md`.
 
 ### Discounts
 
@@ -368,7 +370,7 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 ### Shipping
 
 - **Shipping rates at checkout are calculated internally** (flat rate + free threshold). No external API call on the hot path.
-- **A signup order packed with an open order ships free.** The subscribe form takes one product per signup, so a customer subscribing to three coffees places three orders in minutes; each priced its own flat rate and one box carried three charges. `CheckoutService.OpenShipmentTo` finds the customer's paid, unpacked, mailed order to the same address from the last 72h; when there is one the new order's shipping is 0, its internal note names the sibling, and `ships_with_order` is stamped in metadata. Retail cart checkout does not do this — a cart already holds every item.
+- **A signup order packed with an open order ships free.** Before a signup could hold several items, a customer subscribing to three coffees placed three orders in minutes; each priced its own flat rate and one parcel carried three charges. A signup now holds every item it is given, but a customer can still sign up again tomorrow while today's order is on the shelf, so the waiver stays. `CheckoutService.OpenShipmentTo` finds the customer's paid, unpacked, mailed order to the same address from the last 72h; when there is one the new order's shipping is 0, its internal note names the sibling, and `ships_with_order` is stamped in metadata. Retail cart checkout does not do this — a cart already holds every item.
 - **Label provider calls happen before the shipment record is persisted.** If the provider succeeds but the DB write fails, the label still exists in the provider's dashboard and the order number is in the Reference field for manual lookup.
 
 ### Authentication

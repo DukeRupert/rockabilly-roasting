@@ -291,6 +291,13 @@ type CartItem struct {
 	VariantID uuid.UUID
 	Quantity  int
 	UnitPrice int
+	// PlanDiscountPct is the subscription plan's percentage off this line, and
+	// zero for retail. UnitPrice already has it taken off; it is carried so
+	// PlaceOrder can price the line again and agree. See OrderLine.
+	PlanDiscountPct int
+	// SubscriptionPlanID is the plan a signup line asks the subscription it
+	// becomes to renew on, written into the line's metadata; nil on retail.
+	SubscriptionPlanID *uuid.UUID
 }
 
 // refuseUntrustableLines rejects a line whose quantity or price could not belong
@@ -398,11 +405,6 @@ type PlaceOrderParams struct {
 	CurrencyCode      string
 	CouponCode        *string
 	SubscriptionID    *uuid.UUID
-	// PlanDiscountPct is the subscription plan's percentage off for a signup
-	// order, and zero for retail. Named here because the service prices the
-	// lines itself and cannot read a plan off a subscription that the webhook
-	// has not created yet.
-	PlanDiscountPct int
 	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
 	// whose lines are priced from the base price as every renewal is, and for
 	// retail checkout, whose cart was.
@@ -548,7 +550,8 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		return nil, fmt.Errorf("create order: %w", err)
 	}
 
-	// Create line items.
+	// Create line items. A signup line records its plan in its own metadata;
+	// see signupLineMetadata.
 	for _, item := range p.Items {
 		lineSubtotal := item.UnitPrice * item.Quantity
 		_, err := s.orders.CreateLineItem(ctx, tx, store.CreateLineItemParams{
@@ -558,6 +561,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 			UnitPrice: item.UnitPrice,
 			Subtotal:  lineSubtotal,
 			Total:     lineSubtotal,
+			Metadata:  signupLineMetadata(item),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create line item: %w", err)

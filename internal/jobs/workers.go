@@ -54,9 +54,11 @@ func (SubscriptionRenewalArgs) Kind() string { return "subscription_renewal" }
 //
 // That bit us: the scheduler used ByArgs+ByPeriod while both manual-retry
 // buttons used ByArgs alone, so a staff Retry and the scheduler's rung for the
-// same subscription each got their own key and both ran. RenewSubscription has
-// no period guard, so two jobs mean two PaymentIntents and two renewal orders
-// for one billing period — a genuine double charge.
+// same subscription each got their own key and both ran, and two jobs meant two
+// PaymentIntents and two renewal orders for one billing period — a genuine
+// double charge. The renewal claim (renewal_claimed_at, migration 090) now
+// refuses the second entrant and drops a subscription already renewed, so
+// identical options are the first guard rather than the only one.
 //
 // # Why these particular options
 //
@@ -73,7 +75,7 @@ func (SubscriptionRenewalArgs) Kind() string { return "subscription_renewal" }
 // The bucket is truncation-based, not rolling, so two attempts either side of
 // UTC midnight land in different buckets and both run. That window is about as
 // wide as the scheduler's one-minute cadence and needs a human clicking Retry
-// inside it; the residual risk is noted in RenewSubscription.
+// inside it, and the renewal claim refuses the second of the two.
 func RenewalInsertOpts() *river.InsertOpts {
 	return &river.InsertOpts{UniqueOpts: river.UniqueOpts{
 		ByArgs:   true,
@@ -172,10 +174,15 @@ type OrderConfirmEmailArgs struct {
 // Kind returns the job kind identifier.
 func (OrderConfirmEmailArgs) Kind() string { return "email:order_confirm" }
 
-// SubscriptionConfirmEmailArgs sends a subscription confirmation email.
+// SubscriptionConfirmEmailArgs sends one confirmation email for a signup.
+//
+// SubscriptionIDs is every subscription the signup started. SubscriptionID is
+// the form jobs took when a signup started one; it stays so a job queued before
+// the change still decodes and sends. When both are set, SubscriptionIDs wins.
 type SubscriptionConfirmEmailArgs struct {
-	SubscriptionID uuid.UUID `json:"subscription_id"`
-	CustomerID     uuid.UUID `json:"customer_id"`
+	SubscriptionID  uuid.UUID   `json:"subscription_id"`
+	SubscriptionIDs []uuid.UUID `json:"subscription_ids,omitempty"`
+	CustomerID      uuid.UUID   `json:"customer_id"`
 }
 
 // Kind returns the job kind identifier.

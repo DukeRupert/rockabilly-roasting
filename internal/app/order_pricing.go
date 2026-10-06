@@ -35,6 +35,16 @@ type OrderLine struct {
 	// holds, exactly as the cart priced it, or the two would disagree for every
 	// tiered variant and PlaceOrder would refuse the order as moved.
 	Quantity int
+	// PlanDiscountPct is this line's subscription plan's percentage off, applied
+	// to the resolved unit price. Zero for retail.
+	//
+	// A property of the line, not the order: one signup can carry a weekly line
+	// and a monthly line, and the two plans take different percentages.
+	//
+	// Declared by the caller rather than derived here because a signup's plan is
+	// not yet attached to anything this function could read it from: the
+	// subscription record is created by the webhook, after the order exists.
+	PlanDiscountPct int
 }
 
 // PriceLinesParams asks what a set of lines costs for one customer.
@@ -42,13 +52,6 @@ type PriceLinesParams struct {
 	CustomerID   uuid.UUID
 	CurrencyCode string
 	Lines        []OrderLine
-	// PlanDiscountPct is a subscription plan's percentage off, applied to the
-	// resolved unit price. Zero for retail.
-	//
-	// Declared by the caller rather than derived here because a signup's plan is
-	// not yet attached to anything this function could read it from: the
-	// subscription record is created by the webhook, after the order exists.
-	PlanDiscountPct int
 	// BasePrice prices every line from the variant's base price, passing over
 	// the customer's price list and volume rungs. A subscription is priced this
 	// way because every renewal is: RenewalService charges GetBasePrice less the
@@ -73,7 +76,8 @@ type PricedLines struct {
 //
 // Prices come from the pricing service, so a customer on a price list gets
 // theirs, at the volume rung the line's quantity reaches; a plan discount comes
-// off that. Nothing here reads a price off the request.
+// off that, at each line's own percentage. Nothing here reads a price off the
+// request.
 func (s *CheckoutService) PriceLines(ctx context.Context, tx pgx.Tx, p PriceLinesParams) (*PricedLines, error) {
 	if s.pricing == nil {
 		// A binary that cannot price a line must not place an order at a price
@@ -95,8 +99,8 @@ func (s *CheckoutService) PriceLines(ctx context.Context, tx pgx.Tx, p PriceLine
 			return nil, fmt.Errorf("resolve price for variant %s: %w", line.VariantID, err)
 		}
 
-		if p.PlanDiscountPct > 0 {
-			unit -= unit * p.PlanDiscountPct / 100
+		if line.PlanDiscountPct > 0 {
+			unit -= unit * line.PlanDiscountPct / 100
 		}
 
 		if unit < 0 {
@@ -106,9 +110,10 @@ func (s *CheckoutService) PriceLines(ctx context.Context, tx pgx.Tx, p PriceLine
 		}
 
 		out.Items[i] = CartItem{
-			VariantID: line.VariantID,
-			Quantity:  line.Quantity,
-			UnitPrice: unit,
+			VariantID:       line.VariantID,
+			Quantity:        line.Quantity,
+			UnitPrice:       unit,
+			PlanDiscountPct: line.PlanDiscountPct,
 		}
 		out.Subtotal += unit * line.Quantity
 	}
@@ -137,7 +142,11 @@ func (s *CheckoutService) lineUnitPrice(ctx context.Context, tx pgx.Tx, p PriceL
 func linesOf(items []CartItem) []OrderLine {
 	lines := make([]OrderLine, len(items))
 	for i, it := range items {
-		lines[i] = OrderLine{VariantID: it.VariantID, Quantity: it.Quantity}
+		lines[i] = OrderLine{
+			VariantID:       it.VariantID,
+			Quantity:        it.Quantity,
+			PlanDiscountPct: it.PlanDiscountPct,
+		}
 	}
 	return lines
 }
@@ -153,11 +162,10 @@ func linesOf(items []CartItem) []OrderLine {
 // quote and the confirm.
 func (s *CheckoutService) refusePricesThatMoved(ctx context.Context, tx pgx.Tx, p PlaceOrderParams) (int, error) {
 	priced, err := s.PriceLines(ctx, tx, PriceLinesParams{
-		CustomerID:      p.CustomerID,
-		CurrencyCode:    p.CurrencyCode,
-		Lines:           linesOf(p.Items),
-		PlanDiscountPct: p.PlanDiscountPct,
-		BasePrice:       p.BasePrice,
+		CustomerID:   p.CustomerID,
+		CurrencyCode: p.CurrencyCode,
+		Lines:        linesOf(p.Items),
+		BasePrice:    p.BasePrice,
 	})
 	if err != nil {
 		return 0, err

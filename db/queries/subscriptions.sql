@@ -44,6 +44,21 @@ UPDATE subscriptions
 SET current_period_start = $2, current_period_end = $3, next_order_at = $4, updated_at = now()
 WHERE id = $1;
 
+-- name: ClaimSubscriptionRenewal :many
+-- Claims every subscription named that nobody holds, or whose holder's lease
+-- has run out. The caller compares the rows returned with the ids it asked
+-- for and, on a short count, rolls back: the claim is all or nothing.
+UPDATE subscriptions
+SET renewal_claimed_at = now()
+WHERE id = ANY(@ids::uuid[])
+  AND (renewal_claimed_at IS NULL OR renewal_claimed_at < @stale_before)
+RETURNING id;
+
+-- name: ReleaseSubscriptionRenewalClaim :exec
+UPDATE subscriptions
+SET renewal_claimed_at = NULL
+WHERE id = ANY(@ids::uuid[]);
+
 -- name: UpdateSubscriptionPauseUntil :exec
 UPDATE subscriptions
 SET pause_until = $2, updated_at = now()
@@ -83,6 +98,14 @@ SELECT * FROM subscriptions
 WHERE status IN ('active', 'past_due') AND next_order_at <= now()
   AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC;
+
+-- name: ListSubscriptionsByOrder :many
+-- Every subscription an order started or renewed. orders.subscription_id names
+-- one; an order that covers several leaves it null, and this join is the link.
+SELECT s.* FROM subscriptions s
+JOIN subscription_orders so ON so.subscription_id = s.id
+WHERE so.order_id = $1
+ORDER BY s.created_at, s.id;
 
 -- name: CreateSubscriptionOrder :exec
 INSERT INTO subscription_orders (subscription_id, order_id, period_start, period_end)

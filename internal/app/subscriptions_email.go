@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,47 +20,83 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// SendConfirmationEmail sends a subscription-active confirmation email. Uses
-// the three-phase pattern (read → send → audit).
-func (s *SubscriptionService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID) error {
+// SendConfirmationEmail sends one subscription-active confirmation for a
+// signup, listing every subscription it started. Uses the three-phase pattern
+// (read → send → audit).
+//
+// Every subscription must belong to customerID, or nothing is sent. The job
+// names the customer and the subscriptions separately, and the read below is
+// unscoped; without this check a crossed or forged job would mail one
+// customer's subscriptions to another.
+func (s *SubscriptionService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionIDs []uuid.UUID, customerID uuid.UUID) error {
+	if len(subscriptionIDs) == 0 {
+		return fmt.Errorf("send subscription confirm: no subscriptions named")
+	}
+
 	var (
-		sub         *domain.Subscription
-		customer    *domain.Customer
-		plan        *domain.SubscriptionPlan
-		productName = "Product"
+		subs     []*domain.Subscription
+		customer *domain.Customer
+		lines    []emailtemplates.SubscriptionConfirmLine
 	)
 
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var err error
-		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
-		if err != nil {
-			return fmt.Errorf("get subscription %s: %w", subscriptionID, err)
-		}
 		customer, err = s.customers.GetByID(ctx, tx, customerID)
 		if err != nil {
 			return fmt.Errorf("get customer %s: %w", customerID, err)
 		}
-		plan, err = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
-		if err != nil {
-			return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
-		}
-		if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
-			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
-				productName = product.Title
+		for _, id := range subscriptionIDs {
+			sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+			if err != nil {
+				return fmt.Errorf("get subscription %s: %w", id, err)
 			}
+			if sub.CustomerID != customerID {
+				return fmt.Errorf("subscription %s is not customer %s's: %w", id, customerID, ErrSubscriptionNotFound)
+			}
+			plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+			if err != nil {
+				return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
+			}
+			productName := "Product"
+			if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
+				if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+					productName = product.Title
+				}
+			}
+			subs = append(subs, sub)
+			lines = append(lines, emailtemplates.SubscriptionConfirmLine{
+				ProductName:  productName,
+				PlanName:     plan.Name,
+				Quantity:     sub.Quantity,
+				IntervalDays: intervalDays(plan.Interval, plan.IntervalCount),
+				NextChargeOn: sub.NextOrderAt,
+			})
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
 
+	// Earliest charge first, and the top-level fields from that line, so
+	// "Next charge" is the first money that moves. Ties by product name: the
+	// ids arrive in whatever order the lines came off the order, which is not
+	// an order anyone chose.
+	sort.SliceStable(lines, func(i, j int) bool {
+		if !lines[i].NextChargeOn.Equal(lines[j].NextChargeOn) {
+			return lines[i].NextChargeOn.Before(lines[j].NextChargeOn)
+		}
+		return lines[i].ProductName < lines[j].ProductName
+	})
+	first := lines[0]
+
 	html, text, err := s.email.Renderer.Render("subscription_confirm", emailtemplates.SubscriptionConfirmData{
 		CustomerName: customer.FirstName,
-		PlanName:     plan.Name,
-		ProductName:  productName,
-		Quantity:     sub.Quantity,
-		IntervalDays: intervalDays(plan.Interval, plan.IntervalCount),
-		NextChargeOn: sub.NextOrderAt,
+		PlanName:     first.PlanName,
+		ProductName:  first.ProductName,
+		Quantity:     first.Quantity,
+		IntervalDays: first.IntervalDays,
+		NextChargeOn: first.NextChargeOn,
+		Lines:        lines,
 		StoreName:    s.email.StoreName,
 		StoreURL:     s.email.BaseURL,
 		AccountURL:   s.email.BaseURL + "/account/subscriptions",
@@ -81,14 +118,20 @@ func (s *SubscriptionService) SendConfirmationEmail(ctx context.Context, pool *p
 		return fmt.Errorf("send subscription confirm email: %w", err)
 	}
 
+	// One entry per subscription, so each one's timeline shows it was told.
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		return s.audit.Record(ctx, tx, audit.AuditEntry{
-			ActorType:    domain.AuditActorTypeSystem,
-			ActorName:    "subscription_confirm_worker",
-			Action:       audit.AuditEmailSubscriptionConfirmed,
-			ResourceType: "subscription",
-			ResourceID:   sub.ID,
-		})
+		for _, sub := range subs {
+			if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    "subscription_confirm_worker",
+				Action:       audit.AuditEmailSubscriptionConfirmed,
+				ResourceType: "subscription",
+				ResourceID:   sub.ID,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return fmt.Errorf("audit subscription confirm sent: %w", err)
 	}

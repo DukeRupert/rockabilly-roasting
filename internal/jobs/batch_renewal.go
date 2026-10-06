@@ -63,7 +63,12 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		// anyone. A subscription that was cancelled between scheduling and
 		// running is the system working, and a declined charge is dunning's
 		// business, not an outage.
-		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
+		// ErrRenewalNotDue is the same outcome from the other side: something
+		// else renewed it first, so there is nothing left for this job to do.
+		// ErrRenewalInFlight is not here on purpose — another renewal holds a
+		// member, and River's retry is what brings this one back once it settles.
+		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) ||
+			errors.Is(err, app.ErrRenewalNotDue) {
 			metrics.TrackJobCancelled(w.metrics, "batch_renewal", start)
 			slog.WarnContext(ctx, "background job batch_renewal cancelled: subscription no longer renewable",
 				"job_kind", "batch_renewal",

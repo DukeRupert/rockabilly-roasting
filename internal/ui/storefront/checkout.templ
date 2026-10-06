@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/utils"
 )
 
 type CheckoutAnalyticsItem struct {
@@ -43,7 +44,7 @@ func checkoutAnalyticsScript(a *CheckoutAnalytics) string {
 
 templ CheckoutContent(props CheckoutPageProps) {
 	<div id="checkout-app" data-cart-id={ props.CartID } data-stripe-key={ props.StripeKey }></div>
-	<script type="module" src="/static/checkout/checkout.js"></script>
+	<script type="module" src={ utils.ScriptURL("/static/checkout/checkout.js") }></script>
 	if props.Analytics != nil {
 		@templ.Raw(checkoutAnalyticsScript(props.Analytics))
 		<script>

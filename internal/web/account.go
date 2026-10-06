@@ -374,17 +374,14 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	props := storefront.AccountSubscriptionsProps{
-		Customer:  customer,
-		Rows:      rows,
-		CartCount: d.cartItemCountFromCookie(r),
-		// Asked of the service rather than derived here, so the card quotes the
-		// same arithmetic the resume runs. Advisory, not a booking: this is the
-		// window as of *now*, and a card sat on across the anchor hour will name
-		// one that has passed by the time it is clicked.
-		ResumeOrderOn: d.SubscriptionService.ResumeOrderDate(time.Now()),
-		MerchantTZ:    d.MerchantTZ,
-	}
+	// Grouped into the boxes they ship in; see BuildAccountSubscriptionsProps.
+	props := storefront.BuildAccountSubscriptionsProps(customer, rows, d.MerchantTZ)
+	props.CartCount = d.cartItemCountFromCookie(r)
+	// Asked of the service rather than derived here, so the card quotes the
+	// same arithmetic the resume runs. Advisory, not a booking: this is the
+	// window as of *now*, and a card sat on across the anchor hour will name
+	// one that has passed by the time it is clicked.
+	props.ResumeOrderOn = d.SubscriptionService.ResumeOrderDate(time.Now())
 
 	if IsHTMX(r) {
 		storefront.AccountSubscriptionsContent(props).Render(ctx, w) //nolint:errcheck

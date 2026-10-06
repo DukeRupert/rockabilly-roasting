@@ -1,0 +1,17 @@
+Subscription Started
+
+Hi Jane,
+
+Your Bonneville Blend 12oz subscription is set. Here are the details:
+
+Product:     Bonneville Blend 12oz
+Plan:        Every 30 Days
+Quantity:    2
+Ships:       Every 30 days
+Next charge: May 15, 2026
+
+Update your shipping address or payment method, or pause or cancel, any time:
+https://example.com/account/subscriptions
+
+Test Store
+https://example.com

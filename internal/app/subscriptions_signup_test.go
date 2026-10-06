@@ -26,21 +26,6 @@ func newSubscriptionService() *app.SubscriptionService {
 	)
 }
 
-func TestSubscriptionSignupMetadata_RoundTrip(t *testing.T) {
-	planID := uuid.New()
-	meta := app.SubscriptionSignupOrderMetadata(planID, "pi_test_123")
-
-	got, ok := app.SubscriptionSignupPlanID(meta)
-	require.True(t, ok)
-	assert.Equal(t, planID, got)
-
-	// A plain retail order's metadata must not read as a signup.
-	_, ok = app.SubscriptionSignupPlanID(map[string]any{"cart_id": uuid.NewString()})
-	assert.False(t, ok)
-	_, ok = app.SubscriptionSignupPlanID(nil)
-	assert.False(t, ok)
-}
-
 func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 	pool := testPool
 	ctx := context.Background()
@@ -73,14 +58,18 @@ func TestSubscriptionService_ActivateFromSignupOrder(t *testing.T) {
 			// 1800 less the plan's 10%. The service does that arithmetic — the
 			// unit price here is what it must agree with, not a number this
 			// test invented.
-			Items:           []app.CartItem{{VariantID: variant.ID, Quantity: 2, UnitPrice: 1620}},
-			PlanDiscountPct: plan.DiscountPct,
-			Metadata:        app.SubscriptionSignupOrderMetadata(plan.ID, "pi_test_activate"),
+			Items: []app.CartItem{{
+				VariantID: variant.ID, Quantity: 2, UnitPrice: 1620, PlanDiscountPct: plan.DiscountPct,
+				SubscriptionPlanID: &plan.ID,
+			}},
+			Metadata: app.SubscriptionSignupOrderMetadata("pi_test_activate"),
 		}, actor)
 		require.NoError(t, err)
 
-		sub, err := subs.ActivateFromSignupOrder(ctx, tx, order, actor)
+		activated, err := subs.ActivateFromSignupOrder(ctx, tx, order, actor)
 		require.NoError(t, err)
+		require.Len(t, activated, 1)
+		sub := activated[0]
 		assert.Equal(t, customer.ID, sub.CustomerID)
 		assert.Equal(t, plan.ID, sub.PlanID)
 		assert.Equal(t, variant.ID, sub.VariantID)

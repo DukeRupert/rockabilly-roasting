@@ -322,17 +322,44 @@ type VerifyEmailData struct {
 	StoreURL     string
 }
 
-// SubscriptionConfirmData holds data for the subscription confirmation email.
+// SubscriptionConfirmData holds data for the subscription confirmation email:
+// one email per signup, listing every subscription it started.
+//
+// The top-level item fields describe one line — the one charged first, ties
+// broken by product name — and are kept so a fork's template written before
+// Lines existed still renders. Retire them once no template reads them.
 type SubscriptionConfirmData struct {
 	CustomerName string
 	PlanName     string
 	ProductName  string
 	Quantity     int
 	IntervalDays int       // billing cadence in days (e.g. 30 for "every 30 days")
-	NextChargeOn time.Time // when the next renewal payment will run
-	StoreName    string
-	StoreURL     string
-	AccountURL   string
+	NextChargeOn time.Time // the earliest next charge among the lines
+	// Lines is every subscription the signup started, earliest charge first.
+	Lines      []SubscriptionConfirmLine
+	StoreName  string
+	StoreURL   string
+	AccountURL string
+}
+
+// SubscriptionConfirmLine is one subscription in a confirmation email.
+type SubscriptionConfirmLine struct {
+	ProductName  string
+	PlanName     string
+	Quantity     int
+	IntervalDays int
+	NextChargeOn time.Time
+}
+
+// SeparateRenewals reports whether the lines renew at different times, so the
+// email has to say that they will not all be charged together.
+func (d SubscriptionConfirmData) SeparateRenewals() bool {
+	for _, l := range d.Lines {
+		if !l.NextChargeOn.Equal(d.Lines[0].NextChargeOn) {
+			return true
+		}
+	}
+	return false
 }
 
 // PasswordSetupData holds data for the admin-triggered password setup / reset

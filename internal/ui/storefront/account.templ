@@ -524,12 +524,27 @@ type AccountSubscriptionRow struct {
 	Variant      *domain.Variant
 	ThumbnailURL string
 	UnitPrice    *int
+	// ShipsSeparately marks a member of a box that is renewed on its own (it
+	// carries a dead-card record), so it is its own order with its own shipping
+	// even though it is due with the box.
+	ShipsSeparately bool
 }
 
 type AccountSubscriptionsProps struct {
-	Customer  *domain.Customer
-	Rows      []AccountSubscriptionRow
-	CartCount int
+	Customer *domain.Customer
+	// Boxes are the active and past-due subscriptions, grouped by the run and
+	// address they ship in. Rows are the rest — paused, cancelled, expired —
+	// which have no upcoming run and so no box. Build both with
+	// BuildAccountSubscriptionsProps.
+	Boxes []AccountSubscriptionBox
+	Rows  []AccountSubscriptionRow
+	// SeparateChargesNotice is set when one address has more than one
+	// shipment coming, each with its own shipping charge. CanLineUpBySkipping
+	// adds the suggestion to skip one into line, which only works when the
+	// items share a plan.
+	SeparateChargesNotice bool
+	CanLineUpBySkipping   bool
+	CartCount             int
 	// ResumeOrderOn is when an order would be placed if a paused subscription
 	// were resumed right now — the next renewal window, which is the next
 	// pre-dawn run. Paused cards name it before the customer commits, because
@@ -655,7 +670,7 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 	@accountLayout("/account/subscriptions", props.Customer) {
 		@accountPageHeading("The daily grind", "Your subscriptions")
-		if len(props.Rows) == 0 {
+		if len(props.Rows) == 0 && len(props.Boxes) == 0 {
 			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
 				<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
 				<p class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">No subscriptions</p>
@@ -683,13 +698,91 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 					</form>
 				</div>
 			}
-			<div class="space-y-4">
-				for _, row := range props.Rows {
-					@accountSubscriptionCard(row, props.MerchantTZ, props.ResumeOrderOn)
+			if props.SeparateChargesNotice {
+				<!-- A skip is offered only when the items share a plan: a weekly
+				     and a monthly drift apart again whatever day they are moved to. -->
+				<div class="mb-4 border-2 border-ink bg-paper p-4" role="note">
+					<p class="font-oswald text-ink text-sm" style="letter-spacing:0.04em;">
+						These go out on different days — each shipment carries its own shipping charge.
+						if props.CanLineUpBySkipping {
+							Skip one to line them up, or give the shop a shout.
+						} else {
+							Want them riding together? Give the shop a shout.
+						}
+					</p>
+				</div>
+			}
+			<div class="space-y-8">
+				for _, box := range props.Boxes {
+					@accountSubscriptionBox(box, props.MerchantTZ, props.ResumeOrderOn)
+				}
+				if len(props.Rows) > 0 {
+					<div class="space-y-4">
+						if len(props.Boxes) > 0 {
+							<h2 class="font-oswald font-bold text-chrome-deep text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Not shipping right now</h2>
+						}
+						for _, row := range props.Rows {
+							@accountSubscriptionCard(row, props.MerchantTZ, props.ResumeOrderOn)
+						}
+					</div>
 				}
 			</div>
 		}
 	}
+}
+
+// accountSubscriptionBox is one box: a heading naming the ship day, with the
+// whole-box skip and pause, over the members' own cards. The forms name the box
+// by its key, address and instant, because a box is derived and has no id.
+templ accountSubscriptionBox(box AccountSubscriptionBox, tz *time.Location, resumeOrderOn time.Time) {
+	{{ boxInstant := box.Key.NextOrderAt.UTC().Format(time.RFC3339Nano) }}
+	{{ boxInputID := "box-skip-" + box.Key.ShippingAddressID.String() + box.Key.NextOrderAt.UTC().Format("20060102150405") }}
+	<section class="space-y-3" data-subscription-box={ box.Key.ShippingAddressID.String() + "@" + boxInstant }>
+		<div class="border-2 border-ink bg-paper p-4 flex flex-wrap items-center justify-between gap-3" x-data="{ confirming: '' }">
+			<div>
+				<h2 class="font-slab uppercase text-ink text-lg leading-[1.0]">Ships { formatDateIn(box.Day, tz) }</h2>
+				if len(box.Rows) > 1 {
+					<p class="font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">
+						{ fmt.Sprintf("%d items in one shipment", len(box.Rows)) }
+					</p>
+				}
+			</div>
+			if box.CanSkip || box.CanPauseAll {
+				<div class="flex flex-wrap items-center gap-2">
+					if box.CanSkip {
+						<button type="button" x-show="confirming !== 'skip'" x-on:click="confirming = 'skip'" class="font-oswald font-bold text-[11px] border-2 border-ink bg-cream-hi text-ink px-4 py-2 hover:bg-paper-warm transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Skip this shipment</button>
+					}
+					if box.CanPauseAll {
+						<button type="button" x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'" class="font-oswald font-bold text-[11px] border-2 border-ink bg-cream-hi text-ink px-4 py-2 hover:bg-paper-warm transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Pause all</button>
+					}
+				</div>
+				if box.CanSkip {
+					<form x-show="confirming === 'skip'" x-cloak method="POST" action="/account/subscriptions/box/skip" class="w-full flex flex-wrap items-end gap-2">
+						<input type="hidden" name="address_id" value={ box.Key.ShippingAddressID.String() }/>
+						<input type="hidden" name="next_order_at" value={ boxInstant }/>
+						<div>
+							<label for={ boxInputID } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Ship everything on</label>
+							<input id={ boxInputID } type="date" name="resume_on" required value={ box.SkipDefault } min={ box.SkipMin } max={ box.SkipMax } class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2"/>
+						</div>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Skip</button>
+						<button type="button" x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+					</form>
+				}
+				if box.CanPauseAll {
+					<form x-show="confirming === 'pause'" x-cloak method="POST" action="/account/subscriptions/box/pause" class="w-full flex flex-wrap items-center gap-2">
+						<input type="hidden" name="address_id" value={ box.Key.ShippingAddressID.String() }/>
+						<input type="hidden" name="next_order_at" value={ boxInstant }/>
+						<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Pause everything in this shipment?</span>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, pause all</button>
+						<button type="button" x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+					</form>
+				}
+			}
+		</div>
+		for _, row := range box.Rows {
+			@accountSubscriptionCard(row, tz, resumeOrderOn)
+		}
+	</section>
 }
 
 templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, resumeOrderOn time.Time) {
@@ -738,6 +831,11 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					</div>
 					@subscriptionStatusBadge(sub.Status)
 				</div>
+				if row.ShipsSeparately {
+					<p class="font-oswald text-ink-soft text-sm mt-2" style="letter-spacing:0.04em;">
+						Ships and is charged on its own until your card is sorted, with its own shipping.
+					</p>
+				}
 			</div>
 		</div>
 		<!-- Next order / status line -->

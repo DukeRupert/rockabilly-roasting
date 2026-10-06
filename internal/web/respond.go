@@ -162,6 +162,13 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, routing.ErrTooManyStops):
 		return http.StatusConflict, "too many stops for one route — split the run"
 
+	// Renewals run in workers and neither reaches a handler today. Mapped for
+	// the day one does: a renewal already in progress, or one already made,
+	// is the world having moved rather than a bad request.
+	case errors.Is(err, app.ErrRenewalInFlight),
+		errors.Is(err, app.ErrRenewalNotDue):
+		return http.StatusConflict, err.Error()
+
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"
 

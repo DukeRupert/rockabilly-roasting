@@ -353,6 +353,28 @@ func canEditOrderLineItemsView(o *domain.Order) bool {
 	return true
 }
 
+// orderSubscriptionIDs is every subscription an order started or renewed: the
+// one stamped on orders.subscription_id first, then any linked through
+// subscription_orders, without repeats. An order covering several leaves the
+// stamp null and has only the links; an older or imported order may have the
+// stamp and no link row.
+func (d *Deps) orderSubscriptionIDs(ctx context.Context, tx pgx.Tx, order *domain.Order) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	if order.SubscriptionID != nil {
+		ids = append(ids, *order.SubscriptionID)
+	}
+	linked, err := d.SubscriptionService.ListSubscriptionsByOrder(ctx, tx, order.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list order subscriptions: %w", err)
+	}
+	for _, sub := range linked {
+		if !slices.Contains(ids, sub.ID) {
+			ids = append(ids, sub.ID)
+		}
+	}
+	return ids, nil
+}
+
 func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -376,6 +398,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var couponCode string
 	var activity []domain.AuditEntry
 	var localDeliveryEnabled, localPickupEnabled, shipToIsLocal bool
+	var subscriptionIDs []uuid.UUID
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -396,6 +419,11 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		latestLabelAttempt, txErr = d.FulfillmentService.GetLatestLabelAttempt(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+
+		subscriptionIDs, txErr = d.orderSubscriptionIDs(ctx, tx, order)
 		if txErr != nil {
 			return txErr
 		}
@@ -629,6 +657,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		LocalDeliveryEnabled: localDeliveryEnabled,
 		LocalPickupEnabled:   localPickupEnabled,
 		ShipToIsLocal:        shipToIsLocal,
+		SubscriptionIDs:      subscriptionIDs,
 
 		PaymentDueAt: orderPaymentDueAt(order, customer, d.MerchantTZ),
 		Activity:     activity,

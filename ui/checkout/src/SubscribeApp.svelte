@@ -243,9 +243,15 @@
 
       totals = piResponse;
       // Nothing computed in the browser: every line's price shown from here
-      // on is the server's, matched by variant, never position.
+      // on is the server's. Matched on plan and variant together — the key the
+      // server merges lines on — because one variant can be in the box on two
+      // plans at two prices.
       for (const priced of piResponse.lines) {
-        const line = lines.find((l) => l.variant_id === priced.variant_id);
+        const line = lines.find(
+          (l) =>
+            l.plan_id === priced.plan_id &&
+            l.variant_id === priced.variant_id,
+        );
         if (line) line.unit_price = priced.unit_price;
       }
       clientSecret = piResponse.client_secret;

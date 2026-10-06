@@ -142,8 +142,11 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   `TestRenewBatch_OneSignupRenewsAsOneOrderWithOneShippingCharge`.
 - **Activation is all or nothing.** Every line's plan is read before any
   subscription is written, and the whole signup is one transaction.
-- **Never assume line order.** Order lines come back sorted by a random UUID;
-  match by variant.
+- **Never assume line order, and match on the whole key.** Order lines come
+  back sorted by a random UUID. Match a line on everything that makes it one
+  line — plan and variant, the key signup lines are merged on. One variant can
+  be in a box on two plans at two prices; matched by variant alone, both prices
+  land on one line. `TestSubscribePaymentIntent_EachPricedLineNamesItsPlan`.
 - **A renewal claims its subscriptions.** `renewal_claimed_at` (migration 090)
   is taken, all or nothing, before phase 1 and released after phase 3; a second
   entrant gets `ErrRenewalInFlight` and River retries it. Under the claim, an

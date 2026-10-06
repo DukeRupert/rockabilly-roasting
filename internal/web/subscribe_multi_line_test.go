@@ -515,3 +515,28 @@ func TestPaymentIntentSucceededWebhook_ActivatesEveryLine(t *testing.T) {
 	require.Len(t, jobs, 1)
 	assert.ElementsMatch(t, subs, jobs[0])
 }
+
+// One variant on two plans is two lines — the merge key includes the plan, and
+// the picker builds exactly this box. Each priced line names its plan, so the
+// form can put each price on the line it belongs to; matched by variant alone,
+// both prices land on the first line and the second shows none.
+func TestSubscribePaymentIntent_EachPricedLineNamesItsPlan(t *testing.T) {
+	f := newMultiLineFixture(t)
+	d, _ := newSubscribePaymentDeps(t)
+
+	w := postSubscribePaymentIntent(t, d, multiLineBody([]map[string]any{
+		{"plan_id": f.weekly.ID.String(), "variant_id": f.first.String(), "quantity": 1},
+		{"plan_id": f.monthly.ID.String(), "variant_id": f.first.String(), "quantity": 1},
+	}))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	byPlan := map[string]int{}
+	for _, l := range decodeSubscribeIntentResponse(t, w).Lines {
+		assert.Equal(t, f.first.String(), l.VariantID)
+		byPlan[l.PlanID] = l.UnitPrice
+	}
+	assert.Equal(t, map[string]int{
+		f.weekly.ID.String():  1620, // 10% off 1800
+		f.monthly.ID.String(): 1710, // 5% off 1800
+	}, byPlan)
+}

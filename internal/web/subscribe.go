@@ -230,13 +230,15 @@ func (l signupLine) cartItem(unitPrice int) app.CartItem {
 
 // subscribePaymentIntentResponse is the retail breakdown plus each line's
 // price, so the form can show what every item costs after repricing. The form
-// matches a line by variant.
+// matches a line by plan and variant together: one variant on two plans is
+// two lines, and matched by variant alone both prices land on one.
 type subscribePaymentIntentResponse struct {
 	checkoutPaymentIntentResponse
 	Lines []subscribeLineResponse `json:"lines"`
 }
 
 type subscribeLineResponse struct {
+	PlanID    string `json:"plan_id"`
 	VariantID string `json:"variant_id"`
 	UnitPrice int    `json:"unit_price"`
 	Quantity  int    `json:"quantity"`
@@ -894,6 +896,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	lineResp := make([]subscribeLineResponse, len(priced.Items))
 	for i, item := range priced.Items {
 		lineResp[i] = subscribeLineResponse{
+			// priced.Items is in the order signup was priced in, so index i is
+			// the same line on both.
+			PlanID:    signup[i].plan.ID.String(),
 			VariantID: item.VariantID.String(),
 			UnitPrice: item.UnitPrice,
 			Quantity:  item.Quantity,

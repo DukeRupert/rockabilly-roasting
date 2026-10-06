@@ -27,10 +27,11 @@ export interface SubscribePaymentIntentRequest {
 
 // SubscribeLinePriced is what one line of the box actually costs, read back
 // from the server rather than computed here: nothing is priced in the
-// browser. Matched to a SubscribeLineRequest by variant_id, never by
-// position: the order's lines are not
-// returned in request order.
+// browser. Matched to a box line by plan_id and variant_id together: one
+// variant on two plans is two lines at two prices, and a match on the variant
+// alone puts both prices on one of them.
 export interface SubscribeLinePriced {
+  plan_id: string;
   variant_id: string;
   unit_price: number;
   quantity: number;

@@ -153,8 +153,14 @@ func TestSignupLines(t *testing.T) {
 			"payment_intent_id":    "pi_mixed",
 		})
 
-		_, err := app.SignupLines(order, items)
-		assert.Error(t, err)
+		// Both orders of the lines, not whichever the database returned: a
+		// reader that looked only at the first line would pass half the time.
+		planless := lineFor(t, items, f.second.ID)
+		planned := lineFor(t, items, f.first.ID)
+		for _, ordered := range [][]domain.LineItem{{planless, planned}, {planned, planless}} {
+			_, err := app.SignupLines(order, ordered)
+			assert.Error(t, err)
+		}
 	})
 
 	t.Run("no lines is an error", func(t *testing.T) {

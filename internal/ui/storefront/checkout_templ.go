@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/utils"
 )
 
 type CheckoutAnalyticsItem struct {
@@ -77,7 +78,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.CartID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 45, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 46, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -90,13 +91,26 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.StripeKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 45, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 46, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"></div><script type=\"module\" src=\"/static/checkout/checkout.js\"></script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"></div><script type=\"module\" src=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(utils.ScriptURL("/static/checkout/checkout.js"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 47, Col: 76}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"></script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -105,7 +119,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-checkout-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('begin_checkout', {\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-checkout-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('begin_checkout', {\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -130,12 +144,12 @@ func CheckoutPage(props CheckoutPageProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -156,7 +170,7 @@ func CheckoutPage(props CheckoutPageProps) templ.Component {
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
 			Title:     "Checkout",
 			CartCount: props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

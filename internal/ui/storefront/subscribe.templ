@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/utils"
 	"github.com/google/uuid"
 )
 
@@ -93,7 +94,7 @@ templ SubscribeContent(props SubscribePageProps) {
 				data-lines={ props.LinesJSON }
 				data-stripe-key={ props.StripeKey }
 			></div>
-			<script type="module" src="/static/checkout/subscribe.js"></script>
+			<script type="module" src={ utils.ScriptURL("/static/checkout/subscribe.js") }></script>
 		</div>
 	</section>
 }

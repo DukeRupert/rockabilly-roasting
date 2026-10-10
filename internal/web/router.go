@@ -335,8 +335,8 @@ func NewRouter(deps *Deps) http.Handler {
 	accountMux.HandleFunc("POST /account/addresses/{id}/delete", deps.handleAccountAddressDelete)
 	accountMux.HandleFunc("POST /account/addresses/{id}/default", deps.handleAccountAddressSetDefault)
 	accountMux.HandleFunc("GET /account/security", deps.handleAccountSecurity)
-	mux.Handle("GET /account/{path...}", deps.requireRetailCustomer(accountMux))
-	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(accountMux))
+	mux.Handle("GET /account/{path...}", deps.requireRetailCustomer(metrics.RecordRoute(accountMux)))
+	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(metrics.RecordRoute(accountMux)))
 
 	// Wholesale auth routes (password, no session required)
 	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
@@ -408,7 +408,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// withModules puts the instance's enabled set on the context so the portal
 	// nav can decide whether the Equipment row exists at all. It costs one read
 	// of the app-layer cache, and without it the row is hidden everywhere.
-	portal := deps.withModules(deps.requireApprovedWholesale(wholesaleMux))
+	portal := deps.withModules(deps.requireApprovedWholesale(metrics.RecordRoute(wholesaleMux)))
 	mux.Handle("GET /wholesale/reorder", portal)
 	mux.Handle("GET /wholesale/portal", portal)
 	mux.Handle("GET /wholesale/portal/", portal)
@@ -435,7 +435,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// URLs that were never built, to a signed-out visitor as much as to a
 	// signed-in one.
 	servicePortal := deps.withModules(deps.requireModule(domain.ModuleEquipmentService,
-		deps.requireApprovedWholesale(wholesaleMux)))
+		deps.requireApprovedWholesale(metrics.RecordRoute(wholesaleMux))))
 	mux.Handle("GET /wholesale/account/equipment", servicePortal)
 	mux.Handle("POST /wholesale/account/equipment/{id}/report", servicePortal)
 
@@ -847,12 +847,12 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 
 	// Mount admin mux behind session middleware
-	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
-	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
+	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(metrics.RecordRoute(adminMux)))))
+	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(metrics.RecordRoute(adminMux)))))
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
-	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
+	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(metrics.RecordRoute(adminMux)))))
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
@@ -865,7 +865,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /", deps.handleNotFoundPage)
 
 	// Apply middleware stack (outermost runs first)
-	var handler http.Handler = mux
+	var handler http.Handler = metrics.RecordRoute(mux)
 	handler = deps.optionalCustomerSession(handler)
 	handler = crossOriginProtection(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/

@@ -398,7 +398,7 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 ### Observability
 
 - **`/metrics` listens on `127.0.0.1:9090` by default**, not the public port. Metrics expose webhook counts, queue depth, DB pool stats — leaking publicly is real information disclosure. Production exposes via reverse proxy with IP allowlist + basic auth.
-- **URL paths are normalized for metrics labels.** `/orders/{id}` is the label, not `/orders/abc-123`. Without this every UUID creates a new Prometheus time series and cardinality explodes.
+- **Metrics label by matched route, never raw path.** `path_pattern` is the ServeMux pattern the request matched (`/orders/{id}`), recorded by wrapping every mux in `metrics.RecordRoute`; requests no mux matched share the label `unmatched`. Labelling by raw path gave every scanner probe its own series — 84k series and a 10 MB `/metrics` after 8 days, enough to time out Prometheus scrapes. A new sub-mux must be wrapped too, or its routes report the pattern that mounted it.
 - **`request_id` is the bridge between metrics and logs.** Alert fires on error rate → filter Loki by the time window and `level=ERROR` → grab the `request_id` → see the full request trace.
 - **Promtail label promotion: `level`, `request_id`, `actor_id` only.** Promoting `order_id` / `customer_id` would index-bloat Loki — keep those as JSON line content and filter via `| json | order_id="..."`.
 - **Metrics are incremented at the service layer, not the handler.** The service is where the business event happens and has access to label values (amount, currency, plan, …).

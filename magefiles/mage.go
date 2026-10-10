@@ -64,6 +64,13 @@ func Checkout() error {
 	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")
 }
 
+// TestCheckout runs the checkout bundle's unit tests: plain TypeScript under
+// `node --test`, which strips the types itself (Node 22.18+), so there is no
+// test runner to install.
+func TestCheckout() error {
+	return sh.RunV("npm", "test", "--prefix", "ui/checkout")
+}
+
 // Seed creates an admin staff user. Set SEED_EMAIL, SEED_PASSWORD, and optionally SEED_NAME.
 func Seed() error {
 	return sh.RunV("go", "run", "./cmd/seed")
@@ -99,7 +106,8 @@ func Clean() error {
 	return os.Remove("server")
 }
 
-// Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
+// Check runs lint, scoping check, admin UI lint, and the Go and checkout tests
+// together (CI-style gate).
 //
 // CheckTemplSync goes first and alone. It is the one target here that *writes*
 // — it runs `templ generate` and compares the result — while Lint and Test both
@@ -110,7 +118,7 @@ func Clean() error {
 // with identical bytes.
 func Check() {
 	mg.SerialDeps(CheckTemplSync)
-	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
+	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test, TestCheckout)
 }
 
 // CheckTemplSync fails if any *_templ.go on disk differs from what templ

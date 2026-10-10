@@ -9,7 +9,7 @@ import (
 )
 
 // unmatchedRoute labels every request no mux matched — scanner probes, and
-// requests rejected by middleware before routing (rate limit, CSRF, body size).
+// requests rejected by middleware before routing (global rate limit, CSRF).
 const unmatchedRoute = "unmatched"
 
 // statusRecorder captures the HTTP status code written by the handler.

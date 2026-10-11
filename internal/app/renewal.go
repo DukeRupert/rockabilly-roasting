@@ -397,6 +397,29 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	return nil
 }
 
+// recordRenewalFailures writes a failed renewal down for every subscription it
+// charged, in one transaction, or returns why it could not.
+//
+// The error matters more than it looks. This write is what moves a subscription
+// off "due now": lost, nothing schedules the next attempt, nothing tells the
+// customer, and the next scheduler tick charges the card again. So it is
+// returned on its own — never wrapped in ErrRenewalPaymentDeclined, which the
+// workers cancel on — and River retries the renewal until it lands.
+func (s *RenewalService) recordRenewalFailures(ctx context.Context, pool *pgxpool.Pool, subs []*domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		for _, sub := range subs {
+			if err := s.recordRenewalFailure(ctx, tx, sub, customerID, paymentMethodID, cause); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("record renewal failure: %w", err)
+	}
+	s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+	return nil
+}
+
 // renewalClaimLease is how long a renewal's claim on its subscriptions holds
 // before another renewal may take it over. Far longer than a renewal takes —
 // the Stripe call is the slow part and times out in well under a minute — so
@@ -557,10 +580,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, err
 	}
 	if paymentMethodID == "" {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, "", nil)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		if err := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, "", nil); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
@@ -582,10 +604,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// off, and leaving it off would have the admin promise a charge attempt
 		// that is never going to run.
 		sub.LatchDunningHardDeclineMeta()
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, nil)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		if err := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, paymentMethodID, nil); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
 	}
 
@@ -631,10 +652,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// Payment declined — advance dunning state (retry or expire). err
 		// carries the decline code, which decides whether we ever charge this
 		// card again.
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, err)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		if rfErr := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, paymentMethodID, err); rfErr != nil {
+			return nil, fmt.Errorf("%w (after the charge failed: %v)", rfErr, err)
+		}
 		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
 	}
 
@@ -948,16 +968,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		return nil, err
 	}
+	members := make([]*domain.Subscription, len(items))
+	for i, item := range items {
+		members[i] = item.Sub
+	}
 	if paymentMethodID == "" {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			for _, item := range items {
-				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, "", nil); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		if err := s.recordRenewalFailures(ctx, pool, members, customer.ID, "", nil); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
@@ -988,15 +1006,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		},
 	})
 	if err != nil {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			for _, item := range items {
-				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, paymentMethodID, err); rfErr != nil {
-					return rfErr
-				}
-			}
-			return nil
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		if rfErr := s.recordRenewalFailures(ctx, pool, members, customer.ID, paymentMethodID, err); rfErr != nil {
+			return nil, fmt.Errorf("%w (after the charge failed: %v)", rfErr, err)
+		}
 		return nil, fmt.Errorf("create batch renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
 	}
 

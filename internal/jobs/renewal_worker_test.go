@@ -200,3 +200,37 @@ func TestBatchRenewalWorker_RetriesAWriteFailureAfterTheCharge(t *testing.T) {
 	assert.Equal(t, 1, provider.ChargeCount())
 	assert.Empty(t, renewalOrders(t, ids))
 }
+
+// failingPastDue is the renewal's mail, failing the past-due notice: the last
+// write of a failed renewal's transaction.
+type failingPastDue struct{ app.JobEnqueuer }
+
+func (failingPastDue) EnqueuePastDueNotice(context.Context, pgx.Tx, uuid.UUID, uuid.UUID, int) error {
+	return errors.New("failingPastDue: enqueue failed")
+}
+
+// A decline whose dunning write was lost is not yet a recorded decline. The
+// job has to come back and write it; cancelled, the subscription stays due
+// and the scheduler charges it again on the next tick (critique item 6).
+func TestSubscriptionRenewalWorker_RetriesAFailedDunningWrite(t *testing.T) {
+	ids := dueSubscriptions(t, 1)
+	provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
+	w := jobs.NewSubscriptionRenewalWorker(payingRenewalService(provider, failingPastDue{}), testPool(t), metrics.NewRegistry())
+
+	err := w.Work(context.Background(), soloJob(ids[0]))
+	require.Error(t, err)
+	var cancel *river.JobCancelError
+	assert.False(t, errors.As(err, &cancel), "left for River to retry: %v", err)
+	assert.Equal(t, domain.SubscriptionStatusActive, subscriptionStatus(t, ids[0]))
+}
+
+func TestBatchRenewalWorker_RetriesAFailedDunningWrite(t *testing.T) {
+	ids := dueSubscriptions(t, 2)
+	provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
+	w := jobs.NewBatchRenewalWorker(payingRenewalService(provider, failingPastDue{}), testPool(t), metrics.NewRegistry())
+
+	err := w.Work(context.Background(), batchJob(ids))
+	require.Error(t, err)
+	var cancel *river.JobCancelError
+	assert.False(t, errors.As(err, &cancel), "left for River to retry: %v", err)
+}

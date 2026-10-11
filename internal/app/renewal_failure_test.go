@@ -263,3 +263,89 @@ func TestRenewSubscription_AWriteFailureAfterTheChargeIsReturnedForRetry(t *test
 	assert.Zero(t, customerOrderCount(t, sub.CustomerID), "the write phase rolled back whole")
 	assert.True(t, readSub(t, sub.ID).NextOrderAt.Equal(sub.NextOrderAt), "the period did not advance")
 }
+
+// --- Critique item 6: a failure write that fails is returned, not dropped ---
+//
+// The write that records a failed renewal is what moves the subscription off
+// "due now". If it is lost, nothing schedules the next attempt, nothing tells
+// the customer, and the next scheduler tick charges the card again. So a lost
+// write must come back as an error River retries — never as a decline, which
+// the worker cancels.
+
+func assertFailedWriteReturned(t *testing.T, err error) {
+	t.Helper()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errEnqueue, "the write's own error comes back")
+	assert.NotErrorIs(t, err, app.ErrRenewalPaymentDeclined,
+		"not a decline: the worker would cancel the job and nothing would retry the write")
+}
+
+func TestRenewSubscription_AFailedDunningWriteIsReturned(t *testing.T) {
+	provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
+	svc, enq := newFailureRenewalService(provider)
+	enq.failPastDue = 1
+	sub, _ := dueBox(t, domain.SubscriptionStatusActive)
+
+	_, err := svc.RenewSubscription(context.Background(), testPool, sub.ID)
+	assertFailedWriteReturned(t, err)
+	got := readSub(t, sub.ID)
+	assert.Equal(t, domain.SubscriptionStatusActive, got.Status, "the write rolled back whole")
+	assert.Zero(t, got.DunningAttempt())
+}
+
+func TestRenewSubscription_AFailedDunningWriteWithNoCardIsReturned(t *testing.T) {
+	provider := paymentstest.New()
+	provider.DefaultPaymentMethod = ""
+	svc, enq := newFailureRenewalService(provider)
+	enq.failPastDue = 1
+	sub, _ := dueBox(t, domain.SubscriptionStatusActive)
+
+	_, err := svc.RenewSubscription(context.Background(), testPool, sub.ID)
+	assertFailedWriteReturned(t, err)
+}
+
+func TestRenewSubscription_AFailedDunningWriteOnTheDeadCardPathIsReturned(t *testing.T) {
+	ctx := context.Background()
+	provider := paymentstest.New()
+	svc, enq := newFailureRenewalService(provider)
+	sub, _ := dueBox(t, domain.SubscriptionStatusActive)
+
+	// Two attempts behind it and the card on file known dead: the next rung
+	// walks on without Stripe and mails the reminder.
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	subs := store.NewSubscriptionStore(nil)
+	require.NoError(t, subs.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Minute), 2))
+	require.NoError(t, subs.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", []string{paymentstest.DefaultCard}))
+	require.NoError(t, tx.Commit(ctx))
+	enq.failPastDue = 1
+
+	_, err = svc.RenewSubscription(ctx, testPool, sub.ID)
+	assertFailedWriteReturned(t, err)
+	assert.Empty(t, provider.Requests(), "the dead card is still not charged")
+	assert.Equal(t, 2, readSub(t, sub.ID).DunningAttempt())
+}
+
+func TestRenewBatch_AFailedDunningWriteIsReturned(t *testing.T) {
+	t.Run("declined", func(t *testing.T) {
+		provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
+		svc, enq := newFailureRenewalService(provider)
+		enq.failPastDue = 1
+		a, b := dueBox(t, domain.SubscriptionStatusActive)
+
+		_, err := svc.RenewBatch(context.Background(), testPool, []uuid.UUID{a.ID, b.ID})
+		assertFailedWriteReturned(t, err)
+		assert.Zero(t, readSub(t, a.ID).DunningAttempt())
+		assert.Zero(t, readSub(t, b.ID).DunningAttempt(), "the box's writes are one transaction")
+	})
+	t.Run("no card", func(t *testing.T) {
+		provider := paymentstest.New()
+		provider.DefaultPaymentMethod = ""
+		svc, enq := newFailureRenewalService(provider)
+		enq.failPastDue = 1
+		a, b := dueBox(t, domain.SubscriptionStatusActive)
+
+		_, err := svc.RenewBatch(context.Background(), testPool, []uuid.UUID{a.ID, b.ID})
+		assertFailedWriteReturned(t, err)
+	})
+}

@@ -22,13 +22,16 @@ import (
 // lost. The idempotency key does — paymentstest keeps keys the way Stripe
 // does, so these assert what the customer's statement would show.
 //
-// The key is the subscription, its period end and its dunning attempt. The
+// The key is the subscription, its period end, its dunning attempt and a
+// generation that only a refund moves. The
 // attempt is in it because the period does not move while a subscription is
 // past due: without it, a Retry after a decline would replay the decline, or
 // be refused for naming a different card.
 
+// soloKey is a solo renewal's key at a dunning attempt. The last part is the
+// key generation, which only a refund moves (renewal_orphan_test.go).
 func soloKey(sub *domain.Subscription, attempt int) string {
-	return fmt.Sprintf("renewal:%s:%d:%d", sub.ID, sub.CurrentPeriodEnd.Unix(), attempt)
+	return fmt.Sprintf("renewal:%s:%d:%d:0", sub.ID, sub.CurrentPeriodEnd.Unix(), attempt)
 }
 
 func TestRenewSubscription_TheChargeCarriesAKeyForTheSubscriptionAndPeriod(t *testing.T) {

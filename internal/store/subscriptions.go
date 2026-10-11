@@ -954,23 +954,26 @@ func planFromRow(r sqlcgen.SubscriptionPlan) *domain.SubscriptionPlan {
 
 func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 	return &domain.Subscription{
-		ID:                    r.ID,
-		CustomerID:            r.CustomerID,
-		PlanID:                r.PlanID,
-		VariantID:             r.VariantID,
-		Quantity:              int(r.Quantity),
-		Status:                domain.SubscriptionStatus(r.Status),
-		ShippingAddressID:     r.ShippingAddressID,
-		StripePaymentMethodID: r.StripePaymentMethodID,
-		CurrentPeriodStart:    r.CurrentPeriodStart,
-		CurrentPeriodEnd:      r.CurrentPeriodEnd,
-		NextOrderAt:           r.NextOrderAt,
-		EndsAt:                timestampFromPG(r.EndsAt),
-		CancelledAt:           timestampFromPG(r.CancelledAt),
-		PauseUntil:            timestampFromPG(r.PauseUntil),
-		Metadata:              metadataFromJSON(r.Metadata),
-		CreatedAt:             r.CreatedAt,
-		UpdatedAt:             r.UpdatedAt,
+		ID:                     r.ID,
+		CustomerID:             r.CustomerID,
+		PlanID:                 r.PlanID,
+		VariantID:              r.VariantID,
+		Quantity:               int(r.Quantity),
+		Status:                 domain.SubscriptionStatus(r.Status),
+		ShippingAddressID:      r.ShippingAddressID,
+		StripePaymentMethodID:  r.StripePaymentMethodID,
+		CurrentPeriodStart:     r.CurrentPeriodStart,
+		CurrentPeriodEnd:       r.CurrentPeriodEnd,
+		NextOrderAt:            r.NextOrderAt,
+		EndsAt:                 timestampFromPG(r.EndsAt),
+		CancelledAt:            timestampFromPG(r.CancelledAt),
+		PauseUntil:             timestampFromPG(r.PauseUntil),
+		RenewalPaymentIntentID: r.RenewalPaymentIntentID,
+		RenewalRefunding:       r.RenewalRefunding,
+		RenewalKeyGeneration:   int(r.RenewalKeyGeneration),
+		Metadata:               metadataFromJSON(r.Metadata),
+		CreatedAt:              r.CreatedAt,
+		UpdatedAt:              r.UpdatedAt,
 	}
 }
 
@@ -1067,6 +1070,40 @@ func (s *SubscriptionStore) ClaimRenewal(ctx context.Context, tx pgx.Tx, ids []u
 		return false, fmt.Errorf("claim renewal commit savepoint: %w", err)
 	}
 	return true, nil
+}
+
+// SetRenewalPaymentIntent records the charge a renewal has just made on every
+// subscription it covers, before the order is written. See migration 091.
+func (s *SubscriptionStore) SetRenewalPaymentIntent(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, paymentIntentID string) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.set_renewal_payment_intent", time.Now(), &err)
+	if err := sqlcgen.New(tx).SetSubscriptionRenewalPaymentIntent(ctx, sqlcgen.SetSubscriptionRenewalPaymentIntentParams{
+		Ids:             ids,
+		PaymentIntentID: paymentIntentID,
+	}); err != nil {
+		return fmt.Errorf("set renewal payment intent: %w", err)
+	}
+	return nil
+}
+
+// ClearRenewalPaymentIntent settles a renewal charge on every subscription
+// carrying it, and returns which they were.
+func (s *SubscriptionStore) ClearRenewalPaymentIntent(ctx context.Context, tx pgx.Tx, paymentIntentID string) (_ []uuid.UUID, err error) {
+	defer trackQuery(s.metrics, "subscriptions.clear_renewal_payment_intent", time.Now(), &err)
+	ids, err := sqlcgen.New(tx).ClearSubscriptionRenewalPaymentIntent(ctx, paymentIntentID)
+	if err != nil {
+		return nil, fmt.Errorf("clear renewal payment intent: %w", err)
+	}
+	return ids, nil
+}
+
+// MarkRenewalRefunding records that a renewal charge is about to be refunded,
+// on every subscription carrying it, and moves their key generation on.
+func (s *SubscriptionStore) MarkRenewalRefunding(ctx context.Context, tx pgx.Tx, paymentIntentID string) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.mark_renewal_refunding", time.Now(), &err)
+	if err := sqlcgen.New(tx).MarkSubscriptionRenewalRefunding(ctx, paymentIntentID); err != nil {
+		return fmt.Errorf("mark renewal refunding: %w", err)
+	}
+	return nil
 }
 
 // ReleaseRenewalClaim releases a renewal's claim on ids.

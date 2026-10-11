@@ -40,8 +40,11 @@ type Provider struct {
 	DefaultPaymentMethod string
 	// Attached is what ListPaymentMethods reports.
 	Attached []payments.PaymentMethod
-	// RefundErr, when set, fails every refund.
+	// RefundErr, when set, fails every refund before it is made.
 	RefundErr error
+	// LoseRefundResponses makes every refund go through and then report
+	// ErrTimeout: the refund a client cannot tell from one that failed.
+	LoseRefundResponses bool
 	// OnCreate, when set, runs inside CreatePaymentIntent before the outcome
 	// is decided — the moment between a renewal's charge and its write. It is
 	// called with the mutex released, so it may read back through the
@@ -57,6 +60,8 @@ type Provider struct {
 	refunds  []payments.RefundRequest
 	canceled []string
 	refunded map[string]bool
+	// refundKeys is what Stripe stores under a refund's idempotency key.
+	refundKeys map[string]payments.RefundResult
 	// keyed is what Stripe stores under an idempotency key: the request that
 	// first used it and the answer it got.
 	keyed map[string]keyedResult
@@ -223,6 +228,10 @@ func (p *Provider) Refund(_ context.Context, req payments.RefundRequest) (*payme
 	if p.RefundErr != nil {
 		return nil, p.RefundErr
 	}
+	if prior, ok := p.refundKeys[req.IdempotencyKey]; ok && req.IdempotencyKey != "" {
+		got := prior
+		return &got, nil
+	}
 	// As Stripe: only a charged intent can be refunded, and only once.
 	if pi, ok := p.intents[req.PaymentIntentID]; !ok || pi.Status != payments.PaymentIntentStatusSucceeded {
 		return nil, errors.New("paymentstest: no charge to refund on " + req.PaymentIntentID)
@@ -235,11 +244,21 @@ func (p *Provider) Refund(_ context.Context, req payments.RefundRequest) (*payme
 	}
 	p.refunded[req.PaymentIntentID] = true
 	p.refunds = append(p.refunds, req)
-	return &payments.RefundResult{
+	result := payments.RefundResult{
 		ID:          "re_test_" + uuid.NewString(),
 		Status:      payments.RefundStatusSucceeded,
 		AmountCents: req.AmountCents,
-	}, nil
+	}
+	if req.IdempotencyKey != "" {
+		if p.refundKeys == nil {
+			p.refundKeys = map[string]payments.RefundResult{}
+		}
+		p.refundKeys[req.IdempotencyKey] = result
+	}
+	if p.LoseRefundResponses {
+		return nil, ErrTimeout
+	}
+	return &result, nil
 }
 
 func (p *Provider) CancelPaymentIntent(_ context.Context, id string) error {
@@ -259,6 +278,14 @@ func (p *Provider) Requests() []payments.CreatePaymentIntentRequest {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]payments.CreatePaymentIntentRequest(nil), p.requests...)
+}
+
+// ExpireKeys forgets every stored idempotency key, as Stripe does after 24
+// hours. What a renewal does past that point cannot lean on the key.
+func (p *Provider) ExpireKeys() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.keyed = nil
 }
 
 // Executed is how many creates reached the card network — a charge or a

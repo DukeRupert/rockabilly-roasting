@@ -2,7 +2,6 @@ package app_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/payments/paymentstest"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/testutil"
 )
@@ -29,36 +29,6 @@ import (
 // charged it, it is neither. Concurrent: each renewal claims its subscriptions
 // before reading them and holds the claim until it has written the result, and
 // a second entrant is refused.
-
-// chargeRecorder is the payment provider as a renewal sees it. The embedded
-// interface is nil, so any call a renewal was not meant to make panics.
-type chargeRecorder struct {
-	payments.Provider
-
-	mu      sync.Mutex
-	charges []int64
-}
-
-func (p *chargeRecorder) GetCustomer(_ context.Context, id string) (*payments.Customer, error) {
-	return &payments.Customer{ID: id, DefaultPaymentMethodID: "pm_card_visa"}, nil
-}
-
-func (p *chargeRecorder) CreatePaymentIntent(_ context.Context, req payments.CreatePaymentIntentRequest) (*payments.PaymentIntent, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.charges = append(p.charges, req.AmountCents)
-	return &payments.PaymentIntent{
-		ID:          "pi_renewal_" + uuid.NewString(),
-		Status:      payments.PaymentIntentStatusSucceeded,
-		AmountCents: req.AmountCents,
-	}, nil
-}
-
-func (p *chargeRecorder) count() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return len(p.charges)
-}
 
 func newClaimRenewalService(provider payments.Provider) *app.RenewalService {
 	return app.NewRenewalService(
@@ -118,7 +88,7 @@ func dueBox(t *testing.T, status domain.SubscriptionStatus) (a, b *domain.Subscr
 
 func TestRenewal_ARetryAfterTheBatchChargedDoesNotChargeAgain(t *testing.T) {
 	ctx := context.Background()
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := dueBox(t, domain.SubscriptionStatusPastDue)
 
@@ -126,30 +96,30 @@ func TestRenewal_ARetryAfterTheBatchChargedDoesNotChargeAgain(t *testing.T) {
 	order, err := svc.RenewBatch(ctx, testPool, []uuid.UUID{a.ID, b.ID})
 	require.NoError(t, err)
 	require.NotNil(t, order)
-	require.Equal(t, 1, provider.count())
+	require.Equal(t, 1, provider.ChargeCount())
 
 	// Then the Retry the customer clicked while it was queued.
 	_, err = svc.RenewSubscription(ctx, testPool, a.ID)
 	assert.ErrorIs(t, err, app.ErrRenewalNotDue)
-	assert.Equal(t, 1, provider.count(), "the member the batch just renewed is not charged again")
+	assert.Equal(t, 1, provider.ChargeCount(), "the member the batch just renewed is not charged again")
 }
 
 func TestRenewal_ABatchAfterARetryChargedChargesOnlyTheRest(t *testing.T) {
 	ctx := context.Background()
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := dueBox(t, domain.SubscriptionStatusPastDue)
 
 	// The Retry runs first and renews one member.
 	_, err := svc.RenewSubscription(ctx, testPool, a.ID)
 	require.NoError(t, err)
-	require.Equal(t, 1, provider.count())
+	require.Equal(t, 1, provider.ChargeCount())
 
 	// Then the batch, which still names both.
 	order, err := svc.RenewBatch(ctx, testPool, []uuid.UUID{a.ID, b.ID})
 	require.NoError(t, err)
 	require.NotNil(t, order)
-	require.Equal(t, 2, provider.count())
+	require.Equal(t, 2, provider.ChargeCount())
 
 	tx := testutil.NewTestTx(t, testPool)
 	lines, err := store.NewOrderStore(nil).ListLineItems(ctx, tx, order.ID)
@@ -205,7 +175,7 @@ func TestRenewal_ASecondEntrantIsRefusedWhileTheFirstHoldsTheClaim(t *testing.T)
 
 func TestRenewal_TheClaimIsReleasedAfterwards(t *testing.T) {
 	ctx := context.Background()
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := dueBox(t, domain.SubscriptionStatusPastDue)
 

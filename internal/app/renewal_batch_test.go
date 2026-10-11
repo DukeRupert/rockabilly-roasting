@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/payments/paymentstest"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/testutil"
 )
@@ -108,7 +109,7 @@ func readSub(t *testing.T, id uuid.UUID) *domain.Subscription {
 
 func TestRenewBatch_OneSignupRenewsAsOneOrderWithOneShippingCharge(t *testing.T) {
 	withRenewalFlatShipping(t)
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := signedUpBox(t)
 
@@ -121,8 +122,8 @@ func TestRenewBatch_OneSignupRenewsAsOneOrderWithOneShippingCharge(t *testing.T)
 	assert.Equal(t, renewalFlatRate, stored.ShippingTotal, "shipping once, for the box")
 	assert.Nil(t, stored.SubscriptionID, "several subscriptions: linked through subscription_orders")
 
-	require.Equal(t, 1, provider.count(), "one charge")
-	assert.Equal(t, int64(stored.Total), provider.charges[0], "for the order's total")
+	require.Equal(t, 1, provider.ChargeCount(), "one charge")
+	assert.Equal(t, int64(stored.Total), provider.Charges()[0].AmountCents, "for the order's total")
 
 	tx := testutil.NewTestTx(t, testPool)
 	linked, err := store.NewSubscriptionStore(nil).ListByOrder(context.Background(), tx, order.ID)
@@ -140,7 +141,7 @@ func TestRenewBatch_OneSignupRenewsAsOneOrderWithOneShippingCharge(t *testing.T)
 // merges them is a deliberate one.
 func TestRenewSubscription_TwoSoloRenewalsCarryShippingEach(t *testing.T) {
 	withRenewalFlatShipping(t)
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := signedUpBox(t)
 
@@ -151,7 +152,7 @@ func TestRenewSubscription_TwoSoloRenewalsCarryShippingEach(t *testing.T) {
 		_, stored := orderLines(t, order.ID)
 		assert.Equal(t, renewalFlatRate, stored.ShippingTotal)
 	}
-	assert.Equal(t, 2, provider.count())
+	assert.Equal(t, 2, provider.ChargeCount())
 }
 
 // A past-due member is retried at its next_order_at, and anything else due at
@@ -159,7 +160,7 @@ func TestRenewSubscription_TwoSoloRenewalsCarryShippingEach(t *testing.T) {
 // their box.
 func TestRenewBatch_APastDueMemberBatchesWithTheActiveOne(t *testing.T) {
 	withRenewalFlatShipping(t)
-	provider := &chargeRecorder{}
+	provider := paymentstest.New()
 	svc := newClaimRenewalService(provider)
 	a, b := signedUpBox(t)
 	setStatus(t, testPool, b.ID, domain.SubscriptionStatusPastDue)
@@ -170,7 +171,7 @@ func TestRenewBatch_APastDueMemberBatchesWithTheActiveOne(t *testing.T) {
 	lines, stored := orderLines(t, order.ID)
 	assert.Len(t, lines, 2)
 	assert.Equal(t, renewalFlatRate, stored.ShippingTotal)
-	assert.Equal(t, 1, provider.count())
+	assert.Equal(t, 1, provider.ChargeCount())
 	assert.Equal(t, domain.SubscriptionStatusActive, readSub(t, b.ID).Status, "paid, so active again")
 }
 

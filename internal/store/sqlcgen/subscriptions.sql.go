@@ -61,12 +61,42 @@ func (q *Queries) ClaimSubscriptionRenewal(ctx context.Context, arg ClaimSubscri
 	return items, nil
 }
 
+const clearSubscriptionRenewalPaymentIntent = `-- name: ClearSubscriptionRenewalPaymentIntent :many
+UPDATE subscriptions
+SET renewal_payment_intent_id = NULL, renewal_refunding = false
+WHERE renewal_payment_intent_id = $1::text
+RETURNING id
+`
+
+// Cleared by intent rather than by subscription: a batch's charge covers
+// every member, and settling it — by an order or a refund — settles all of
+// them, including a member that has since left the box.
+func (q *Queries) ClearSubscriptionRenewalPaymentIntent(ctx context.Context, paymentIntentID string) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, clearSubscriptionRenewalPaymentIntent, paymentIntentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, ends_at,
                            stripe_payment_method_id, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
 `
 
 type CreateSubscriptionParams struct {
@@ -121,6 +151,9 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }
@@ -187,7 +220,7 @@ func (q *Queries) CreateSubscriptionPlan(ctx context.Context, arg CreateSubscrip
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at FROM subscriptions WHERE id = $1
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions WHERE id = $1
 `
 
 func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
@@ -212,12 +245,15 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }
 
 const getSubscriptionByIDAndCustomer = `-- name: GetSubscriptionByIDAndCustomer :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at FROM subscriptions WHERE id = $1 AND customer_id = $2
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions WHERE id = $1 AND customer_id = $2
 `
 
 type GetSubscriptionByIDAndCustomerParams struct {
@@ -247,6 +283,9 @@ func (q *Queries) GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSub
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }
@@ -334,7 +373,7 @@ func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan
 }
 
 const listSubscriptionsByCustomer = `-- name: ListSubscriptionsByCustomer :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions
 WHERE customer_id = $1
 ORDER BY created_at DESC
 `
@@ -367,6 +406,9 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 			&i.EndsAt,
 			&i.StripePaymentMethodID,
 			&i.RenewalClaimedAt,
+			&i.RenewalPaymentIntentID,
+			&i.RenewalRefunding,
+			&i.RenewalKeyGeneration,
 		); err != nil {
 			return nil, err
 		}
@@ -379,7 +421,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 }
 
 const listSubscriptionsByOrder = `-- name: ListSubscriptionsByOrder :many
-SELECT s.id, s.customer_id, s.plan_id, s.status, s.shipping_address_id, s.current_period_start, s.current_period_end, s.next_order_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at, s.variant_id, s.quantity, s.ends_at, s.stripe_payment_method_id, s.renewal_claimed_at FROM subscriptions s
+SELECT s.id, s.customer_id, s.plan_id, s.status, s.shipping_address_id, s.current_period_start, s.current_period_end, s.next_order_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at, s.variant_id, s.quantity, s.ends_at, s.stripe_payment_method_id, s.renewal_claimed_at, s.renewal_payment_intent_id, s.renewal_refunding, s.renewal_key_generation FROM subscriptions s
 JOIN subscription_orders so ON so.subscription_id = s.id
 WHERE so.order_id = $1
 ORDER BY s.created_at, s.id
@@ -415,6 +457,9 @@ func (q *Queries) ListSubscriptionsByOrder(ctx context.Context, orderID uuid.UUI
 			&i.EndsAt,
 			&i.StripePaymentMethodID,
 			&i.RenewalClaimedAt,
+			&i.RenewalPaymentIntentID,
+			&i.RenewalRefunding,
+			&i.RenewalKeyGeneration,
 		); err != nil {
 			return nil, err
 		}
@@ -427,7 +472,7 @@ func (q *Queries) ListSubscriptionsByOrder(ctx context.Context, orderID uuid.UUI
 }
 
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions
 WHERE status IN ('active', 'past_due') AND next_order_at <= now()
   AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC
@@ -465,6 +510,9 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 			&i.EndsAt,
 			&i.StripePaymentMethodID,
 			&i.RenewalClaimedAt,
+			&i.RenewalPaymentIntentID,
+			&i.RenewalRefunding,
+			&i.RenewalKeyGeneration,
 		); err != nil {
 			return nil, err
 		}
@@ -476,6 +524,20 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 	return items, nil
 }
 
+const markSubscriptionRenewalRefunding = `-- name: MarkSubscriptionRenewalRefunding :exec
+UPDATE subscriptions
+SET renewal_key_generation = renewal_key_generation + CASE WHEN renewal_refunding THEN 0 ELSE 1 END,
+    renewal_refunding = true
+WHERE renewal_payment_intent_id = $1::text
+`
+
+// The key generation moves once per refund, however many times a failed
+// refund is retried.
+func (q *Queries) MarkSubscriptionRenewalRefunding(ctx context.Context, paymentIntentID string) error {
+	_, err := q.db.Exec(ctx, markSubscriptionRenewalRefunding, paymentIntentID)
+	return err
+}
+
 const releaseSubscriptionRenewalClaim = `-- name: ReleaseSubscriptionRenewalClaim :exec
 UPDATE subscriptions
 SET renewal_claimed_at = NULL
@@ -484,6 +546,22 @@ WHERE id = ANY($1::uuid[])
 
 func (q *Queries) ReleaseSubscriptionRenewalClaim(ctx context.Context, ids []uuid.UUID) error {
 	_, err := q.db.Exec(ctx, releaseSubscriptionRenewalClaim, ids)
+	return err
+}
+
+const setSubscriptionRenewalPaymentIntent = `-- name: SetSubscriptionRenewalPaymentIntent :exec
+UPDATE subscriptions
+SET renewal_payment_intent_id = $1::text
+WHERE id = ANY($2::uuid[])
+`
+
+type SetSubscriptionRenewalPaymentIntentParams struct {
+	PaymentIntentID string      `json:"payment_intent_id"`
+	Ids             []uuid.UUID `json:"ids"`
+}
+
+func (q *Queries) SetSubscriptionRenewalPaymentIntent(ctx context.Context, arg SetSubscriptionRenewalPaymentIntentParams) error {
+	_, err := q.db.Exec(ctx, setSubscriptionRenewalPaymentIntent, arg.PaymentIntentID, arg.Ids)
 	return err
 }
 
@@ -533,7 +611,7 @@ SET plan_id = $2,
     next_order_at = $4,
     updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
 `
 
 type UpdateSubscriptionPlanParams struct {
@@ -570,6 +648,9 @@ func (q *Queries) UpdateSubscriptionPlan(ctx context.Context, arg UpdateSubscrip
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }
@@ -606,7 +687,7 @@ const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
 `
 
 type UpdateSubscriptionStatusParams struct {
@@ -636,6 +717,9 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }
@@ -660,7 +744,7 @@ const updateSubscriptionVariant = `-- name: UpdateSubscriptionVariant :one
 UPDATE subscriptions
 SET variant_id = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
 `
 
 type UpdateSubscriptionVariantParams struct {
@@ -690,6 +774,9 @@ func (q *Queries) UpdateSubscriptionVariant(ctx context.Context, arg UpdateSubsc
 		&i.EndsAt,
 		&i.StripePaymentMethodID,
 		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
 	)
 	return i, err
 }

@@ -23,6 +23,10 @@ type Querier interface {
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
+	// Cleared by intent rather than by subscription: a batch's charge covers
+	// every member, and settling it — by an order or a refund — settles all of
+	// them, including a member that has since left the box.
+	ClearSubscriptionRenewalPaymentIntent(ctx context.Context, paymentIntentID string) ([]uuid.UUID, error)
 	CountActiveStaffByRole(ctx context.Context, role string) (int64, error)
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
@@ -250,6 +254,9 @@ type Querier interface {
 	MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	MarkResetTokenUsed(ctx context.Context, id uuid.UUID) error
+	// The key generation moves once per refund, however many times a failed
+	// refund is retried.
+	MarkSubscriptionRenewalRefunding(ctx context.Context, paymentIntentID string) error
 	MarkWebhookEventFailed(ctx context.Context, arg MarkWebhookEventFailedParams) error
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
 	NextInvoiceNumber(ctx context.Context) (int32, error)
@@ -275,6 +282,7 @@ type Querier interface {
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
+	SetSubscriptionRenewalPaymentIntent(ctx context.Context, arg SetSubscriptionRenewalPaymentIntentParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
 	// Moves a local-delivery order to pickup and drops the delivery promise in one

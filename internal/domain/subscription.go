@@ -76,10 +76,18 @@ type Subscription struct {
 	NextOrderAt           time.Time
 	EndsAt                *time.Time
 	CancelledAt           *time.Time
-	PauseUntil            *time.Time
-	Metadata              map[string]any
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	// RenewalPaymentIntentID is a renewal charge made and not yet written
+	// down as an order. Nil except between a renewal's charge and its write.
+	RenewalPaymentIntentID *string
+	// RenewalRefunding is true while that charge is being refunded instead.
+	RenewalRefunding bool
+	// RenewalKeyGeneration is raised by every refund of a renewal charge and
+	// is part of the renewal's idempotency key.
+	RenewalKeyGeneration int
+	PauseUntil           *time.Time
+	Metadata             map[string]any
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // RenewalBlocked reports whether this subscription looks live but can never be

@@ -2,10 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -397,6 +400,263 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	return nil
 }
 
+// recordRenewalFailures writes a failed renewal down for every subscription it
+// charged, in one transaction, or returns why it could not.
+//
+// The error matters more than it looks. This write is what moves a subscription
+// off "due now": lost, nothing schedules the next attempt, nothing tells the
+// customer, and the next scheduler tick charges the card again. So it is
+// returned on its own — never wrapped in ErrRenewalPaymentDeclined, which the
+// workers cancel on — and River retries the renewal until it lands.
+func (s *RenewalService) recordRenewalFailures(ctx context.Context, pool *pgxpool.Pool, subs []*domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		for _, sub := range subs {
+			if err := s.recordRenewalFailure(ctx, tx, sub, customerID, paymentMethodID, cause); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("record renewal failure: %w", err)
+	}
+	s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+	return nil
+}
+
+// renewalIdempotencyKey names the charge a renewal is about to make, so that
+// trying the create again returns the first intent instead of charging twice.
+// OffSession sets Confirm, so the create is the charge: a timeout after Stripe
+// charged is otherwise answered by charging again.
+//
+// Each member contributes its id, its period end, its dunning attempt and its
+// key generation. The period end makes a new period a new charge. The attempt is there because the
+// period does not move while a subscription is past due, and Stripe stores a
+// decline under its key for 24 hours too: without it a Retry after a decline
+// would replay the decline, or be refused for naming a different card.
+// recordRenewalFailure raises the attempt on every recorded decline, so the next
+// try after one is a fresh key; anything that records nothing — a timeout, an
+// outage, a write that failed after the charge — keeps the key, and its retry
+// gets Stripe's first answer. The generation moves on with every refund of a
+// renewal charge: Stripe replays a refunded charge's response as succeeded, so
+// the charge after a refund must never send that charge's key.
+//
+// A batch is hashed, sorted by subscription: a box can hold more members than
+// Stripe's 255-character limit has room for, and the order the scheduler lists
+// them in must not make a different charge. Each member's own period end, not
+// one for the box — a box shares next_order_at, which is anchored, and a
+// past-due member batches with an active one.
+func renewalIdempotencyKey(subs []*domain.Subscription) string {
+	line := func(sub *domain.Subscription) string {
+		return fmt.Sprintf("%s:%d:%d:%d", sub.ID, sub.CurrentPeriodEnd.Unix(), sub.DunningAttempt(), sub.RenewalKeyGeneration)
+	}
+	if len(subs) == 1 {
+		return "renewal:" + line(subs[0])
+	}
+	lines := make([]string, len(subs))
+	for i, sub := range subs {
+		lines[i] = line(sub)
+	}
+	slices.Sort(lines)
+	sum := sha256.Sum256([]byte(strings.Join(lines, "\n")))
+	return "renewal-batch:" + hex.EncodeToString(sum[:])
+}
+
+// asRenewalDecline reports whether a create failed because the card was
+// declined. Only that is dunning's business. Anything else — a timeout, an
+// outage, a refused key — says nothing about the card, and Stripe may even
+// have charged it; the renewal returns it for River to retry under the same
+// key, and the ladder does not move.
+func asRenewalDecline(err error) bool {
+	var decline *payments.DeclineError
+	return errors.As(err, &decline)
+}
+
+// renewalWriteTimeout bounds the writes that follow a renewal's charge, which
+// run detached from the job's own deadline; see afterChargeContext.
+const renewalWriteTimeout = 30 * time.Second
+
+// afterChargeContext is the context for everything a renewal does once the
+// card has been charged: recording the charge, writing the order, refunding.
+//
+// Detached from the caller's cancellation, because River's job timeout is a
+// minute and the Stripe call before this is the slow part. A deadline that
+// fires during the charge would otherwise take the write down with it and
+// leave money taken with no order. Bounded on its own, so a hung database
+// still lets the job finish and River retry.
+func afterChargeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), renewalWriteTimeout)
+}
+
+// recordRenewalCharge writes a charge down on the subscriptions it covers, in
+// its own transaction, the moment Stripe answers — before the order. Until the
+// order's transaction clears it, this is the only record in the database that
+// the money moved, and what a retry finishes or refunds. See migration 091.
+//
+// When even this write fails there is nothing durable left to reconcile from,
+// so it is logged at Error as well as returned: the intent id has to reach a
+// person now, not after River's last attempt. It is not refunded. The retry
+// sends the same idempotency key and gets this intent back from Stripe, and a
+// refund here would hand that retry a charge already given back.
+func (s *RenewalService) recordRenewalCharge(ctx context.Context, pool *pgxpool.Pool, subs []*domain.Subscription, pi *payments.PaymentIntent) error {
+	ctx, cancel := afterChargeContext(ctx)
+	defer cancel()
+
+	ids := make([]uuid.UUID, len(subs))
+	for i, sub := range subs {
+		ids[i] = sub.ID
+	}
+	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		if err := s.subscriptions.SetRenewalPaymentIntent(ctx, tx, ids, pi.ID); err != nil {
+			return err
+		}
+		for _, sub := range subs {
+			if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    "subscription_renewal",
+				Action:       audit.AuditSubscriptionRenewalCharged,
+				ResourceType: "subscription",
+				ResourceID:   sub.ID,
+				Metadata: map[string]any{
+					"payment_intent_id": pi.ID,
+					"amount_cents":      pi.AmountCents,
+				},
+			}); err != nil {
+				return fmt.Errorf("audit renewal charge: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "renewal charged the card and could not record it",
+			"payment_intent_id", pi.ID, "amount_cents", pi.AmountCents,
+			"subscription_ids", ids, "error", err)
+		return fmt.Errorf("record renewal charge %s: %w", pi.ID, err)
+	}
+	return nil
+}
+
+// settlePendingCharge deals with a charge an earlier attempt made and did not
+// write an order for, before this attempt charges anything.
+//
+// charging is what this attempt is about to charge for; dropped is what it
+// read and will not charge for. When the one charge on record covers exactly
+// charging, nothing in dropped, is not already being refunded, and is for
+// totalCents, it is returned and the caller writes its order on it — finishing the earlier attempt rather than
+// charging again. Any other charge on record is refunded: the subscription is
+// no longer to be renewed, the box changed under it, or the price moved. Then
+// it returns nil and the caller charges afresh.
+//
+// A charge that cannot be read or refunded is returned as an error and left on
+// record, for River's retry. That error never wraps a sentinel the workers
+// cancel on.
+func (s *RenewalService) settlePendingCharge(ctx context.Context, pool *pgxpool.Pool, charging, dropped []*domain.Subscription, totalCents int) (*payments.PaymentIntent, error) {
+	var pending []string
+	for _, sub := range slices.Concat(charging, dropped) {
+		if id := sub.RenewalPaymentIntentID; id != nil && !slices.Contains(pending, *id) {
+			pending = append(pending, *id)
+		}
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+
+	carries := func(sub *domain.Subscription) bool {
+		return sub.RenewalPaymentIntentID != nil && *sub.RenewalPaymentIntentID == pending[0]
+	}
+	refunding := func(sub *domain.Subscription) bool { return sub.RenewalRefunding }
+	reason := "not_renewed"
+	if len(charging) > 0 {
+		reason = "box_changed"
+	}
+	if len(pending) == 1 && len(charging) > 0 &&
+		!slices.ContainsFunc(charging, func(sub *domain.Subscription) bool { return !carries(sub) }) &&
+		!slices.ContainsFunc(dropped, carries) &&
+		!slices.ContainsFunc(charging, refunding) {
+		pi, err := s.payments.GetPaymentIntent(ctx, pending[0])
+		if err != nil {
+			return nil, fmt.Errorf("read pending renewal charge %s: %w", pending[0], err)
+		}
+		if pi.Status != payments.PaymentIntentStatusSucceeded {
+			return nil, fmt.Errorf("pending renewal charge %s is %s, not succeeded", pi.ID, pi.Status)
+		}
+		if pi.AmountCents == int64(totalCents) {
+			return pi, nil
+		}
+		reason = "amount_changed"
+	}
+
+	for _, id := range pending {
+		if err := s.refundOrphanedCharge(ctx, pool, id, reason); err != nil {
+			return nil, err
+		}
+		// The caller charges next from these same structs, so they have to
+		// say what the database now does: no charge on record, and a key
+		// generation moved on — once, by the refund that began here, not by
+		// one an earlier attempt already began.
+		for _, sub := range slices.Concat(charging, dropped) {
+			if sub.RenewalPaymentIntentID == nil || *sub.RenewalPaymentIntentID != id {
+				continue
+			}
+			if !sub.RenewalRefunding {
+				sub.RenewalKeyGeneration++
+			}
+			sub.RenewalPaymentIntentID = nil
+			sub.RenewalRefunding = false
+		}
+	}
+	return nil, nil
+}
+
+// refundOrphanedCharge gives back a renewal charge no order will be written
+// for, in three steps, each safe to repeat:
+//
+//  1. mark it refunding, which also moves the subscriptions' key generation
+//     on — from here no retry reuses the charge, and no new charge sends its
+//     key;
+//  2. refund it, under a key of its own, so a repeat is a no-op at Stripe;
+//  3. clear it from every subscription it covered, and audit each.
+//
+// A failure at any step leaves the charge on record and marked, and the retry
+// starts again from step 1.
+func (s *RenewalService) refundOrphanedCharge(ctx context.Context, pool *pgxpool.Pool, paymentIntentID, reason string) error {
+	ctx, cancel := afterChargeContext(ctx)
+	defer cancel()
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.subscriptions.MarkRenewalRefunding(ctx, tx, paymentIntentID)
+	}); err != nil {
+		return fmt.Errorf("mark renewal charge %s refunding: %w", paymentIntentID, err)
+	}
+	if _, err := s.payments.Refund(ctx, payments.RefundRequest{
+		PaymentIntentID: paymentIntentID,
+		IdempotencyKey:  "renewal-refund:" + paymentIntentID,
+	}); err != nil {
+		return fmt.Errorf("refund orphaned renewal charge %s: %w", paymentIntentID, err)
+	}
+	return store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		ids, err := s.subscriptions.ClearRenewalPaymentIntent(ctx, tx, paymentIntentID)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    "subscription_renewal",
+				Action:       audit.AuditSubscriptionRenewalOrphanedCharge,
+				ResourceType: "subscription",
+				ResourceID:   id,
+				Metadata: map[string]any{
+					"payment_intent_id": paymentIntentID,
+					"reason":            reason,
+				},
+			}); err != nil {
+				return fmt.Errorf("audit orphaned renewal charge: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
 // renewalClaimLease is how long a renewal's claim on its subscriptions holds
 // before another renewal may take it over. Far longer than a renewal takes —
 // the Stripe call is the slow part and times out in well under a minute — so
@@ -537,6 +797,15 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil
 	})
 	if err != nil {
+		// Not to be renewed after all — cancelled, paused or skipped while an
+		// earlier attempt's charge was waiting for its order. That charge goes
+		// back. Only on these two: any other read failure is retried, and the
+		// retry finds the charge where it was.
+		if sub != nil && (errors.Is(err, ErrSubscriptionNotActive) || errors.Is(err, ErrRenewalNotDue)) {
+			if _, sErr := s.settlePendingCharge(ctx, pool, nil, []*domain.Subscription{sub}, 0); sErr != nil {
+				return nil, sErr
+			}
+		}
 		return nil, fmt.Errorf("renewal read phase: %w", err)
 	}
 
@@ -546,97 +815,21 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
 
-	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
-
-	// Prefer the customer's default payment method (set when they update their
-	// card via Stripe Billing Portal). Fall back to the first attached method
-	// for legacy customers without a default. ListPaymentMethods returns every
-	// attached PM regardless of type, which is required for Stripe Link users.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethods())
+	// A charge an earlier attempt made and did not write down is finished, not
+	// repeated; see settlePendingCharge.
+	pi, err := s.settlePendingCharge(ctx, pool, []*domain.Subscription{sub}, nil, totalCents)
 	if err != nil {
 		return nil, err
 	}
-	if paymentMethodID == "" {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, "", nil)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
-	}
-
-	// A card the issuer permanently blocked must never be charged again — the
-	// networks fine per attempt, and retrying a dead number sours the issuer on
-	// this customer's next legitimate charge. So walk the rest of the ladder
-	// without touching Stripe: the emails still go out and the deadline still
-	// runs, which is what gives the customer a chance to fix it.
-	//
-	// The gate has to sit *after* the payment method is resolved, because the
-	// method is what releases it. Checking the latch alone before this point
-	// would make it permanent: no charge attempted means no charge can succeed,
-	// and success is the only thing that calls ClearDunning.
-	if sub.DunningChargeBlocked(paymentMethodID) {
-		// Re-assert the latch. We are refusing to charge, and the latch is what
-		// every reader — the admin badge and status line, the reminder email's
-		// copy, the update-card page — takes to mean exactly that. A release
-		// followed by the replacement card going away lands here with the latch
-		// off, and leaving it off would have the admin promise a charge attempt
-		// that is never going to run.
-		sub.LatchDunningHardDeclineMeta()
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, nil)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
-	}
-
-	// A different card than the one that died: drop the latch before charging so
-	// a decline on the new card starts its own verdict rather than inheriting
-	// the old one. If this card is dead too, the charge below re-latches it
-	// against the new number.
-	if sub.DunningHardDeclined() {
-		if relErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.subscriptions.ReleaseDunningHardDecline(ctx, tx, sub.ID)
-		}); relErr != nil {
-			return nil, fmt.Errorf("release hard-decline latch: %w", relErr)
+	if pi == nil {
+		if pi, err = s.chargeRenewal(ctx, pool, sub, customer, addr, totalCents); err != nil {
+			return nil, err
 		}
-		// The in-memory copy has to drop it too. recordRenewalFailure below
-		// reads the latch back off this struct, so leaving it set here would
-		// re-latch the *replacement* card on an ordinary soft decline —
-		// insufficient funds would be recorded as "the bank blocked this card
-		// for good" and no further attempt would be made.
-		sub.ReleaseDunningHardDeclineLatch()
 	}
 
-	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents:     int64(totalCents),
-		Currency:        "usd",
-		CustomerID:      *customer.StripeCustomerID,
-		PaymentMethodID: paymentMethodID,
-		OffSession:      true,
-		Metadata: map[string]string{
-			"subscription_id": sub.ID.String(),
-			"customer_id":     customer.ID.String(),
-		},
-		ShippingAddress: &payments.ShippingAddress{
-			Name:       addr.FirstName + " " + addr.LastName,
-			Line1:      addr.Line1,
-			Line2:      ptrVal(addr.Line2),
-			City:       addr.City,
-			State:      addr.State,
-			PostalCode: addr.PostalCode,
-			Country:    addr.CountryCode,
-		},
-	})
-	if err != nil {
-		// Payment declined — advance dunning state (retry or expire). err
-		// carries the decline code, which decides whether we ever charge this
-		// card again.
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, err)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
-	}
+	// Once the money has moved, writing it down outranks the job's deadline.
+	ctx, cancel := afterChargeContext(ctx)
+	defer cancel()
 
 	// --- Phase 3: create order + link + advance period (single tx) ---
 	var order *domain.Order
@@ -697,6 +890,10 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		if txErr != nil {
 			return fmt.Errorf("set stripe payment intent: %w", txErr)
 		}
+		// The charge is an order now, in the same transaction.
+		if _, txErr = s.subscriptions.ClearRenewalPaymentIntent(ctx, tx, pi.ID); txErr != nil {
+			return txErr
+		}
 
 		// Link order to subscription
 		newStart := sub.CurrentPeriodEnd
@@ -756,6 +953,109 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	return order, nil
 }
 
+// chargeRenewal is phase 2 of RenewSubscription: it picks the card, walks the
+// dunning gates, charges, and records the charge before anything else
+// happens. A decline is written to the ladder here and returned as
+// ErrRenewalPaymentDeclined.
+func (s *RenewalService) chargeRenewal(ctx context.Context, pool *pgxpool.Pool, sub *domain.Subscription, customer *domain.Customer, addr *domain.Address, totalCents int) (*payments.PaymentIntent, error) {
+	// Prefer the customer's default payment method (set when they update their
+	// card via Stripe Billing Portal). Fall back to the first attached method
+	// for legacy customers without a default. ListPaymentMethods returns every
+	// attached PM regardless of type, which is required for Stripe Link users.
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethods())
+	if err != nil {
+		return nil, err
+	}
+	if paymentMethodID == "" {
+		if err := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, "", nil); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A card the issuer permanently blocked must never be charged again — the
+	// networks fine per attempt, and retrying a dead number sours the issuer on
+	// this customer's next legitimate charge. So walk the rest of the ladder
+	// without touching Stripe: the emails still go out and the deadline still
+	// runs, which is what gives the customer a chance to fix it.
+	//
+	// The gate has to sit *after* the payment method is resolved, because the
+	// method is what releases it. Checking the latch alone before this point
+	// would make it permanent: no charge attempted means no charge can succeed,
+	// and success is the only thing that calls ClearDunning.
+	if sub.DunningChargeBlocked(paymentMethodID) {
+		// Re-assert the latch. We are refusing to charge, and the latch is what
+		// every reader — the admin badge and status line, the reminder email's
+		// copy, the update-card page — takes to mean exactly that. A release
+		// followed by the replacement card going away lands here with the latch
+		// off, and leaving it off would have the admin promise a charge attempt
+		// that is never going to run.
+		sub.LatchDunningHardDeclineMeta()
+		if err := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, paymentMethodID, nil); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A different card than the one that died: drop the latch before charging so
+	// a decline on the new card starts its own verdict rather than inheriting
+	// the old one. If this card is dead too, the charge below re-latches it
+	// against the new number.
+	if sub.DunningHardDeclined() {
+		if relErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.subscriptions.ReleaseDunningHardDecline(ctx, tx, sub.ID)
+		}); relErr != nil {
+			return nil, fmt.Errorf("release hard-decline latch: %w", relErr)
+		}
+		// The in-memory copy has to drop it too. recordRenewalFailure below
+		// reads the latch back off this struct, so leaving it set here would
+		// re-latch the *replacement* card on an ordinary soft decline —
+		// insufficient funds would be recorded as "the bank blocked this card
+		// for good" and no further attempt would be made.
+		sub.ReleaseDunningHardDeclineLatch()
+	}
+
+	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
+		AmountCents:     int64(totalCents),
+		Currency:        "usd",
+		CustomerID:      *customer.StripeCustomerID,
+		PaymentMethodID: paymentMethodID,
+		OffSession:      true,
+		IdempotencyKey:  renewalIdempotencyKey([]*domain.Subscription{sub}),
+		Metadata: map[string]string{
+			"subscription_id": sub.ID.String(),
+			"customer_id":     customer.ID.String(),
+		},
+		ShippingAddress: &payments.ShippingAddress{
+			Name:       addr.FirstName + " " + addr.LastName,
+			Line1:      addr.Line1,
+			Line2:      ptrVal(addr.Line2),
+			City:       addr.City,
+			State:      addr.State,
+			PostalCode: addr.PostalCode,
+			Country:    addr.CountryCode,
+		},
+	})
+	if err != nil && !asRenewalDecline(err) {
+		return nil, fmt.Errorf("create renewal payment intent: %w", err)
+	}
+	if err != nil {
+		// Payment declined — advance dunning state (retry or expire). err
+		// carries the decline code, which decides whether we ever charge this
+		// card again.
+		if rfErr := s.recordRenewalFailures(ctx, pool, []*domain.Subscription{sub}, customer.ID, paymentMethodID, err); rfErr != nil {
+			return nil, fmt.Errorf("%w (after the charge failed: %v)", rfErr, err)
+		}
+		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
+	}
+
+	if err := s.recordRenewalCharge(ctx, pool, []*domain.Subscription{sub}, pi); err != nil {
+		return nil, err
+	}
+	return pi, nil
+
+}
+
 // subscriptionLineItem holds computed pricing for one subscription in a batch.
 type subscriptionLineItem struct {
 	Sub        *domain.Subscription
@@ -797,6 +1097,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	now := time.Now()
 	var deadCardDropped int
+	// read is every member phase 1 got as far as reading; the ones not in
+	// items are dropped from this charge.
+	var read []*domain.Subscription
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var customerID uuid.UUID
 		var addressID uuid.UUID
@@ -806,6 +1109,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			if txErr != nil {
 				return fmt.Errorf("get subscription %s: %w", subID, txErr)
 			}
+			read = append(read, sub)
 
 			if sub.Status != domain.SubscriptionStatusActive && sub.Status != domain.SubscriptionStatusPastDue {
 				return fmt.Errorf("subscription %s: %w", subID, ErrSubscriptionNotActive)
@@ -916,7 +1220,31 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil
 	})
 	if err != nil {
+		// A member no longer active fails the box. Any charge an earlier
+		// attempt left waiting for its order covered that member, so it goes
+		// back, and the scheduler regroups what is left.
+		if errors.Is(err, ErrSubscriptionNotActive) {
+			if _, sErr := s.settlePendingCharge(ctx, pool, nil, read, 0); sErr != nil {
+				return nil, sErr
+			}
+		}
 		return nil, fmt.Errorf("batch renewal read phase: %w", err)
+	}
+
+	members := make([]*domain.Subscription, len(items))
+	for i, item := range items {
+		members[i] = item.Sub
+	}
+	var dropped []*domain.Subscription
+	for _, sub := range read {
+		if !slices.ContainsFunc(members, func(m *domain.Subscription) bool { return m.ID == sub.ID }) {
+			dropped = append(dropped, sub)
+		}
+	}
+	orderTotal = subtotalCents + shippingCents + taxCents
+	pi, err := s.settlePendingCharge(ctx, pool, members, dropped, orderTotal)
+	if err != nil {
+		return nil, err
 	}
 
 	// Every subscription left was hard-declined and skipped above. There is no
@@ -934,31 +1262,8 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil, nil
 	}
 
-	orderTotal = subtotalCents + shippingCents + taxCents
-
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
-	}
-
-	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
-
-	// No cards to avoid: every subscription with a dead-card record is filtered
-	// out above, so nothing in this group has one.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, nil)
-	if err != nil {
-		return nil, err
-	}
-	if paymentMethodID == "" {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			for _, item := range items {
-				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, "", nil); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
 	// Build subscription ID list for metadata
@@ -967,38 +1272,15 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		subIDStrs[i] = item.Sub.ID.String()
 	}
 
-	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents:     int64(orderTotal),
-		Currency:        "usd",
-		CustomerID:      *customer.StripeCustomerID,
-		PaymentMethodID: paymentMethodID,
-		OffSession:      true,
-		Metadata: map[string]string{
-			"batch_renewal": "true",
-			"customer_id":   customer.ID.String(),
-		},
-		ShippingAddress: &payments.ShippingAddress{
-			Name:       addr.FirstName + " " + addr.LastName,
-			Line1:      addr.Line1,
-			Line2:      ptrVal(addr.Line2),
-			City:       addr.City,
-			State:      addr.State,
-			PostalCode: addr.PostalCode,
-			Country:    addr.CountryCode,
-		},
-	})
-	if err != nil {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			for _, item := range items {
-				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, paymentMethodID, err); rfErr != nil {
-					return rfErr
-				}
-			}
-			return nil
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("create batch renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
+	if pi == nil {
+		if pi, err = s.chargeBatchRenewal(ctx, pool, members, customer, addr, orderTotal); err != nil {
+			return nil, err
+		}
 	}
+
+	// Once the money has moved, writing it down outranks the job's deadline.
+	ctx, cancel := afterChargeContext(ctx)
+	defer cancel()
 
 	// --- Phase 3: create order + link + advance periods (single tx) ---
 	var order *domain.Order
@@ -1089,6 +1371,10 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		if txErr != nil {
 			return fmt.Errorf("set stripe payment intent: %w", txErr)
 		}
+		// The charge is an order now, in the same transaction.
+		if _, txErr = s.subscriptions.ClearRenewalPaymentIntent(ctx, tx, pi.ID); txErr != nil {
+			return txErr
+		}
 
 		// Audit
 		if txErr = s.audit.Record(ctx, tx, audit.AuditEntry{
@@ -1121,6 +1407,61 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	s.metrics.SubscriptionRenewals.WithLabelValues("success").Inc()
 	return order, nil
+}
+
+// chargeBatchRenewal is phase 2 of RenewBatch; see chargeRenewal. One card for
+// the whole box, with nothing to avoid: a member with a dead-card record never
+// reaches here.
+func (s *RenewalService) chargeBatchRenewal(ctx context.Context, pool *pgxpool.Pool, members []*domain.Subscription, customer *domain.Customer, addr *domain.Address, orderTotal int) (*payments.PaymentIntent, error) {
+	// No cards to avoid: every subscription with a dead-card record is filtered
+	// out above, so nothing in this group has one.
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, nil)
+	if err != nil {
+		return nil, err
+	}
+	if paymentMethodID == "" {
+		if err := s.recordRenewalFailures(ctx, pool, members, customer.ID, "", nil); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
+	}
+
+	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
+		AmountCents:     int64(orderTotal),
+		Currency:        "usd",
+		CustomerID:      *customer.StripeCustomerID,
+		PaymentMethodID: paymentMethodID,
+		OffSession:      true,
+		IdempotencyKey:  renewalIdempotencyKey(members),
+		Metadata: map[string]string{
+			"batch_renewal": "true",
+			"customer_id":   customer.ID.String(),
+		},
+		ShippingAddress: &payments.ShippingAddress{
+			Name:       addr.FirstName + " " + addr.LastName,
+			Line1:      addr.Line1,
+			Line2:      ptrVal(addr.Line2),
+			City:       addr.City,
+			State:      addr.State,
+			PostalCode: addr.PostalCode,
+			Country:    addr.CountryCode,
+		},
+	})
+	if err != nil && !asRenewalDecline(err) {
+		return nil, fmt.Errorf("create batch renewal payment intent: %w", err)
+	}
+	if err != nil {
+		if rfErr := s.recordRenewalFailures(ctx, pool, members, customer.ID, paymentMethodID, err); rfErr != nil {
+			return nil, fmt.Errorf("%w (after the charge failed: %v)", rfErr, err)
+		}
+		return nil, fmt.Errorf("create batch renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
+	}
+
+	if err := s.recordRenewalCharge(ctx, pool, members, pi); err != nil {
+		return nil, err
+	}
+	return pi, nil
+
 }
 
 func ptrVal(s *string) string {

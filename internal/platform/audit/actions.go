@@ -145,6 +145,12 @@ const (
 	AuditSubscriptionPlanChanged           = "subscription.plan_changed"
 	AuditSubscriptionSkipped               = "subscription.skipped"
 	AuditSubscriptionSkipUndone            = "subscription.skip_undone"
+	// A renewal charged the card and has not yet written the order: the
+	// durable record that the money moved. Followed by subscription.renewed,
+	// or by renewal_orphaned_charge when it is refunded instead.
+	AuditSubscriptionRenewalCharged = "subscription.renewal_charged"
+	// A renewal charge refunded because no order will be written for it.
+	AuditSubscriptionRenewalOrphanedCharge = "subscription.renewal_orphaned_charge"
 	AuditPlanCreated                       = "subscription_plan.created"
 	AuditPlanDeactivated                   = "subscription_plan.deactivated"
 	AuditPlanActivated                     = "subscription_plan.activated"

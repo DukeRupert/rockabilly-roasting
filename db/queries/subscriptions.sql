@@ -59,6 +59,28 @@ UPDATE subscriptions
 SET renewal_claimed_at = NULL
 WHERE id = ANY(@ids::uuid[]);
 
+-- name: SetSubscriptionRenewalPaymentIntent :exec
+UPDATE subscriptions
+SET renewal_payment_intent_id = @payment_intent_id::text
+WHERE id = ANY(@ids::uuid[]);
+
+-- name: ClearSubscriptionRenewalPaymentIntent :many
+-- Cleared by intent rather than by subscription: a batch's charge covers
+-- every member, and settling it — by an order or a refund — settles all of
+-- them, including a member that has since left the box.
+UPDATE subscriptions
+SET renewal_payment_intent_id = NULL, renewal_refunding = false
+WHERE renewal_payment_intent_id = @payment_intent_id::text
+RETURNING id;
+
+-- name: MarkSubscriptionRenewalRefunding :exec
+-- The key generation moves once per refund, however many times a failed
+-- refund is retried.
+UPDATE subscriptions
+SET renewal_key_generation = renewal_key_generation + CASE WHEN renewal_refunding THEN 0 ELSE 1 END,
+    renewal_refunding = true
+WHERE renewal_payment_intent_id = @payment_intent_id::text;
+
 -- name: UpdateSubscriptionPauseUntil :exec
 UPDATE subscriptions
 SET pause_until = $2, updated_at = now()

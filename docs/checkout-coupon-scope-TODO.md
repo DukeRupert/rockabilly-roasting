@@ -177,10 +177,10 @@ status-shaped assertion while leaving the customer worse off.
 
 ## Related, smaller, same area
 
-- **Nothing passes a Stripe idempotency key.** `SetIdempotencyKey` appears
-  nowhere in the repo and `payments.CreatePaymentIntentRequest`
-  (`internal/platform/payments/provider.go:29`) has no field for one, so every
-  re-run mints a fresh PaymentIntent. A key derived from cart ID plus a totals
+- **The checkout passes no Stripe idempotency key.** Renewals do since October
+  2026, and `payments.CreatePaymentIntentRequest` has an `IdempotencyKey`
+  field; the checkout leaves it empty, so every re-run mints a fresh
+  PaymentIntent. A key derived from cart ID plus a totals
   hash would collapse the churn. Independent of the coupon fix.
 - **`POST /api/checkout/payment-intent` has no per-IP limit.** It is registered
   with a bare `mux.HandleFunc` (`internal/web/router.go:227`) under the global

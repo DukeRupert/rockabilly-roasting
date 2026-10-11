@@ -854,24 +854,27 @@ type StoreSetting struct {
 }
 
 type Subscription struct {
-	ID                    uuid.UUID          `json:"id"`
-	CustomerID            uuid.UUID          `json:"customer_id"`
-	PlanID                uuid.UUID          `json:"plan_id"`
-	Status                string             `json:"status"`
-	ShippingAddressID     uuid.UUID          `json:"shipping_address_id"`
-	CurrentPeriodStart    time.Time          `json:"current_period_start"`
-	CurrentPeriodEnd      time.Time          `json:"current_period_end"`
-	NextOrderAt           time.Time          `json:"next_order_at"`
-	CancelledAt           pgtype.Timestamptz `json:"cancelled_at"`
-	PauseUntil            pgtype.Timestamptz `json:"pause_until"`
-	Metadata              json.RawMessage    `json:"metadata"`
-	CreatedAt             time.Time          `json:"created_at"`
-	UpdatedAt             time.Time          `json:"updated_at"`
-	VariantID             uuid.UUID          `json:"variant_id"`
-	Quantity              int32              `json:"quantity"`
-	EndsAt                pgtype.Timestamptz `json:"ends_at"`
-	StripePaymentMethodID *string            `json:"stripe_payment_method_id"`
-	RenewalClaimedAt      pgtype.Timestamptz `json:"renewal_claimed_at"`
+	ID                     uuid.UUID          `json:"id"`
+	CustomerID             uuid.UUID          `json:"customer_id"`
+	PlanID                 uuid.UUID          `json:"plan_id"`
+	Status                 string             `json:"status"`
+	ShippingAddressID      uuid.UUID          `json:"shipping_address_id"`
+	CurrentPeriodStart     time.Time          `json:"current_period_start"`
+	CurrentPeriodEnd       time.Time          `json:"current_period_end"`
+	NextOrderAt            time.Time          `json:"next_order_at"`
+	CancelledAt            pgtype.Timestamptz `json:"cancelled_at"`
+	PauseUntil             pgtype.Timestamptz `json:"pause_until"`
+	Metadata               json.RawMessage    `json:"metadata"`
+	CreatedAt              time.Time          `json:"created_at"`
+	UpdatedAt              time.Time          `json:"updated_at"`
+	VariantID              uuid.UUID          `json:"variant_id"`
+	Quantity               int32              `json:"quantity"`
+	EndsAt                 pgtype.Timestamptz `json:"ends_at"`
+	StripePaymentMethodID  *string            `json:"stripe_payment_method_id"`
+	RenewalClaimedAt       pgtype.Timestamptz `json:"renewal_claimed_at"`
+	RenewalPaymentIntentID *string            `json:"renewal_payment_intent_id"`
+	RenewalRefunding       bool               `json:"renewal_refunding"`
+	RenewalKeyGeneration   int32              `json:"renewal_key_generation"`
 }
 
 type SubscriptionOrder struct {

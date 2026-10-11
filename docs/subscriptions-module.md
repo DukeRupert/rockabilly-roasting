@@ -154,6 +154,18 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   active subscription that is not due has already been renewed and is refused
   (`ErrRenewalNotDue`) or dropped from a batch. This is what stops a Retry
   double-charging a batch member. `internal/app/renewal_claim_test.go`.
+- **A renewal's charge carries an idempotency key** of its subscriptions, their
+  period ends, their dunning attempts and a generation every refund moves on
+  (`renewalIdempotencyKey`). A retry
+  after a timeout gets Stripe's first answer rather than a second charge; a
+  retry after a recorded decline is a fresh attempt. Only a card decline moves
+  the ladder — an outage is retried. `renewal_idempotency_test.go`.
+- **A charge is written down before its order.** The intent id goes on the
+  renewed subscriptions (`renewal_payment_intent_id`) the moment Stripe
+  answers, and the order's transaction clears it. A retry finishes a charge on
+  record rather than making another, or refunds it if the subscription is no
+  longer to be renewed; the writes after a charge run detached from the job's
+  deadline. `renewal_orphan_test.go`.
 - **Renewal insert options are one function.** `jobs.RenewalInsertOpts`, never
   a literal: options that differ hash to different unique keys and deduplicate
   against nothing.
@@ -191,9 +203,10 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
 ## Known risks, not fixed by the port
 
 hiri-core's review of its renewal code found these, and this shop's renewal
-code is the same code. Only the Retry double charge (above) was fixed here.
+code is the same code. The Retry double charge and the charge with no order
+(both above) were fixed here, along with the swallowed failure writes; these
+remain.
 
-- A renewal can charge the card and then fail to write the order.
 - A subscription more than one interval overdue is billed for each missed
   period back to back rather than once.
 - A declined batch runs one dunning ladder per member.

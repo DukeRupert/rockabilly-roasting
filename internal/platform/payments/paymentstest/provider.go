@@ -10,6 +10,7 @@ package paymentstest
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 
 	"github.com/google/uuid"
@@ -56,6 +57,18 @@ type Provider struct {
 	refunds  []payments.RefundRequest
 	canceled []string
 	refunded map[string]bool
+	// keyed is what Stripe stores under an idempotency key: the request that
+	// first used it and the answer it got.
+	keyed map[string]keyedResult
+	// executed counts the creates that reached the card network rather than
+	// being answered from a stored key.
+	executed int
+}
+
+type keyedResult struct {
+	req payments.CreatePaymentIntentRequest
+	pi  *payments.PaymentIntent
+	err error
 }
 
 // New returns a Provider whose customer has DefaultCard on file and whose
@@ -95,6 +108,10 @@ func ChargeThenFail(err error) Outcome { return Outcome{charge: true, err: err} 
 // ErrTimeout is the error ChargeThenFail and Fail are most often given.
 var ErrTimeout = errors.New("paymentstest: request timed out")
 
+// ErrIdempotencyMismatch is Stripe refusing a key reused with different
+// parameters. Like Stripe's, it is not a card error.
+var ErrIdempotencyMismatch = errors.New("paymentstest: idempotency key reused with different parameters")
+
 // Then queues outcomes for the next CreatePaymentIntent calls, in order. Once
 // the queue is empty every call succeeds.
 func (p *Provider) Then(outcomes ...Outcome) *Provider {
@@ -121,6 +138,24 @@ func (p *Provider) CreatePaymentIntent(_ context.Context, req payments.CreatePay
 	defer p.mu.Unlock()
 	p.requests = append(p.requests, req)
 
+	// Stripe answers a key it has seen from what it stored, without charging
+	// and without consuming anything: the same parameters replay the first
+	// answer, success or decline; different ones are refused. Only a request
+	// that executed is stored — one that never reached Stripe, or failed
+	// before it charged, leaves the key free.
+	if req.IdempotencyKey != "" {
+		if prior, ok := p.keyed[req.IdempotencyKey]; ok {
+			if !reflect.DeepEqual(prior.req, req) {
+				return nil, ErrIdempotencyMismatch
+			}
+			if prior.err != nil {
+				return nil, prior.err
+			}
+			got := *prior.pi
+			return &got, nil
+		}
+	}
+
 	outcome := Succeed()
 	if len(p.script) > 0 {
 		outcome, p.script = p.script[0], p.script[1:]
@@ -144,6 +179,24 @@ func (p *Provider) CreatePaymentIntent(_ context.Context, req payments.CreatePay
 		}
 		p.intents[pi.ID] = pi
 	}
+	var declined *payments.DeclineError
+	executed := outcome.charge || errors.As(outcome.err, &declined)
+	if executed {
+		p.executed++
+		if req.IdempotencyKey != "" {
+			if p.keyed == nil {
+				p.keyed = map[string]keyedResult{}
+			}
+			// A charge whose response was lost is stored as the success it
+			// was: a retry under the same key gets the intent back.
+			stored := keyedResult{req: req, pi: pi}
+			if !outcome.charge {
+				stored.err = outcome.err
+			}
+			p.keyed[req.IdempotencyKey] = stored
+		}
+	}
+
 	if outcome.err != nil {
 		return nil, outcome.err
 	}
@@ -206,6 +259,15 @@ func (p *Provider) Requests() []payments.CreatePaymentIntentRequest {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]payments.CreatePaymentIntentRequest(nil), p.requests...)
+}
+
+// Executed is how many creates reached the card network — a charge or a
+// decline — rather than being answered from a stored idempotency key. A
+// retry that replays the first answer does not ask the issuer again.
+func (p *Provider) Executed() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.executed
 }
 
 // Charges is every intent that moved money, in order. This, not Requests, is

@@ -2,10 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -420,6 +423,52 @@ func (s *RenewalService) recordRenewalFailures(ctx context.Context, pool *pgxpoo
 	return nil
 }
 
+// renewalIdempotencyKey names the charge a renewal is about to make, so that
+// trying the create again returns the first intent instead of charging twice.
+// OffSession sets Confirm, so the create is the charge: a timeout after Stripe
+// charged is otherwise answered by charging again.
+//
+// Each member contributes its id, its period end and its dunning attempt. The
+// period end makes a new period a new charge. The attempt is there because the
+// period does not move while a subscription is past due, and Stripe stores a
+// decline under its key for 24 hours too: without it a Retry after a decline
+// would replay the decline, or be refused for naming a different card.
+// recordRenewalFailure raises the attempt on every recorded decline, so the next
+// try after one is a fresh key; anything that records nothing — a timeout, an
+// outage, a write that failed after the charge — keeps the key, and its retry
+// gets Stripe's first answer.
+//
+// A batch is hashed, sorted by subscription: a box can hold more members than
+// Stripe's 255-character limit has room for, and the order the scheduler lists
+// them in must not make a different charge. Each member's own period end, not
+// one for the box — a box shares next_order_at, which is anchored, and a
+// past-due member batches with an active one.
+func renewalIdempotencyKey(subs []*domain.Subscription) string {
+	line := func(sub *domain.Subscription) string {
+		return fmt.Sprintf("%s:%d:%d", sub.ID, sub.CurrentPeriodEnd.Unix(), sub.DunningAttempt())
+	}
+	if len(subs) == 1 {
+		return "renewal:" + line(subs[0])
+	}
+	lines := make([]string, len(subs))
+	for i, sub := range subs {
+		lines[i] = line(sub)
+	}
+	slices.Sort(lines)
+	sum := sha256.Sum256([]byte(strings.Join(lines, "\n")))
+	return "renewal-batch:" + hex.EncodeToString(sum[:])
+}
+
+// asRenewalDecline reports whether a create failed because the card was
+// declined. Only that is dunning's business. Anything else — a timeout, an
+// outage, a refused key — says nothing about the card, and Stripe may even
+// have charged it; the renewal returns it for River to retry under the same
+// key, and the ladder does not move.
+func asRenewalDecline(err error) bool {
+	var decline *payments.DeclineError
+	return errors.As(err, &decline)
+}
+
 // renewalClaimLease is how long a renewal's claim on its subscriptions holds
 // before another renewal may take it over. Far longer than a renewal takes —
 // the Stripe call is the slow part and times out in well under a minute — so
@@ -634,6 +683,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		CustomerID:      *customer.StripeCustomerID,
 		PaymentMethodID: paymentMethodID,
 		OffSession:      true,
+		IdempotencyKey:  renewalIdempotencyKey([]*domain.Subscription{sub}),
 		Metadata: map[string]string{
 			"subscription_id": sub.ID.String(),
 			"customer_id":     customer.ID.String(),
@@ -648,6 +698,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			Country:    addr.CountryCode,
 		},
 	})
+	if err != nil && !asRenewalDecline(err) {
+		return nil, fmt.Errorf("create renewal payment intent: %w", err)
+	}
 	if err != nil {
 		// Payment declined — advance dunning state (retry or expire). err
 		// carries the decline code, which decides whether we ever charge this
@@ -991,6 +1044,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		CustomerID:      *customer.StripeCustomerID,
 		PaymentMethodID: paymentMethodID,
 		OffSession:      true,
+		IdempotencyKey:  renewalIdempotencyKey(members),
 		Metadata: map[string]string{
 			"batch_renewal": "true",
 			"customer_id":   customer.ID.String(),
@@ -1005,6 +1059,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			Country:    addr.CountryCode,
 		},
 	})
+	if err != nil && !asRenewalDecline(err) {
+		return nil, fmt.Errorf("create batch renewal payment intent: %w", err)
+	}
 	if err != nil {
 		if rfErr := s.recordRenewalFailures(ctx, pool, members, customer.ID, paymentMethodID, err); rfErr != nil {
 			return nil, fmt.Errorf("%w (after the charge failed: %v)", rfErr, err)

@@ -154,6 +154,11 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   active subscription that is not due has already been renewed and is refused
   (`ErrRenewalNotDue`) or dropped from a batch. This is what stops a Retry
   double-charging a batch member. `internal/app/renewal_claim_test.go`.
+- **A renewal's charge carries an idempotency key** of its subscriptions, their
+  period ends and their dunning attempts (`renewalIdempotencyKey`). A retry
+  after a timeout gets Stripe's first answer rather than a second charge; a
+  retry after a recorded decline is a fresh attempt. Only a card decline moves
+  the ladder — an outage is retried. `renewal_idempotency_test.go`.
 - **Renewal insert options are one function.** `jobs.RenewalInsertOpts`, never
   a literal: options that differ hash to different unique keys and deduplicate
   against nothing.

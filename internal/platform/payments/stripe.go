@@ -27,6 +27,17 @@ func NewStripeProvider(apiKey, webhookSecret string) *StripeProvider {
 }
 
 func (p *StripeProvider) CreatePaymentIntent(_ context.Context, req CreatePaymentIntentRequest) (*PaymentIntent, error) {
+	pi, err := p.client.PaymentIntents.New(paymentIntentParams(req))
+	if err != nil {
+		return nil, fmt.Errorf("create payment intent: %w", asDeclineError(err))
+	}
+
+	return paymentIntentFromStripe(pi), nil
+}
+
+// paymentIntentParams is the Stripe request CreatePaymentIntent sends, built
+// apart from the call so a test can read it without reaching Stripe.
+func paymentIntentParams(req CreatePaymentIntentRequest) *stripe.PaymentIntentParams {
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(req.AmountCents),
 		Currency: stripe.String(req.Currency),
@@ -67,12 +78,11 @@ func (p *StripeProvider) CreatePaymentIntent(_ context.Context, req CreatePaymen
 		params.AddMetadata(k, v)
 	}
 
-	pi, err := p.client.PaymentIntents.New(params)
-	if err != nil {
-		return nil, fmt.Errorf("create payment intent: %w", asDeclineError(err))
+	if req.IdempotencyKey != "" {
+		params.SetIdempotencyKey(req.IdempotencyKey)
 	}
 
-	return paymentIntentFromStripe(pi), nil
+	return params
 }
 
 // asDeclineError converts a Stripe card error into a *DeclineError so callers
@@ -108,6 +118,20 @@ func (p *StripeProvider) CancelPaymentIntent(_ context.Context, paymentIntentID 
 }
 
 func (p *StripeProvider) Refund(_ context.Context, req RefundRequest) (*RefundResult, error) {
+	r, err := p.client.Refunds.New(refundParams(req))
+	if err != nil {
+		return nil, fmt.Errorf("create refund: %w", err)
+	}
+
+	return &RefundResult{
+		ID:          r.ID,
+		Status:      RefundStatus(r.Status),
+		AmountCents: r.Amount,
+	}, nil
+}
+
+// refundParams is the Stripe request Refund sends; see paymentIntentParams.
+func refundParams(req RefundRequest) *stripe.RefundParams {
 	params := &stripe.RefundParams{
 		PaymentIntent: stripe.String(req.PaymentIntentID),
 	}
@@ -120,16 +144,11 @@ func (p *StripeProvider) Refund(_ context.Context, req RefundRequest) (*RefundRe
 		params.Reason = stripe.String(req.Reason)
 	}
 
-	r, err := p.client.Refunds.New(params)
-	if err != nil {
-		return nil, fmt.Errorf("create refund: %w", err)
+	if req.IdempotencyKey != "" {
+		params.SetIdempotencyKey(req.IdempotencyKey)
 	}
 
-	return &RefundResult{
-		ID:          r.ID,
-		Status:      RefundStatus(r.Status),
-		AmountCents: r.Amount,
-	}, nil
+	return params
 }
 
 func (p *StripeProvider) CreateCustomer(_ context.Context, req CreateCustomerRequest) (*Customer, error) {

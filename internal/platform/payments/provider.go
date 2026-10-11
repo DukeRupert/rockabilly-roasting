@@ -35,6 +35,11 @@ type CreatePaymentIntentRequest struct {
 	OffSession       bool              // true for subscription renewals
 	SetupFutureUsage string            // "off_session" to save PM for later charges
 	ShippingAddress  *ShippingAddress  // for automatic tax calculation
+
+	// IdempotencyKey, when set, makes a retried create return the first
+	// intent instead of minting another. Built from what the request is for,
+	// never a random value per attempt. Empty sends no key.
+	IdempotencyKey string
 }
 
 // ShippingAddress is the address passed to Stripe for tax calculation.
@@ -64,6 +69,7 @@ type RefundRequest struct {
 	PaymentIntentID string
 	AmountCents     int64  // 0 = full refund
 	Reason          string // duplicate, fraudulent, requested_by_customer
+	IdempotencyKey  string // see CreatePaymentIntentRequest; empty sends none
 }
 
 // RefundResult represents the result of a refund operation.

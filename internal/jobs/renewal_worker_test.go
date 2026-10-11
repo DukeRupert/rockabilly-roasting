@@ -234,3 +234,17 @@ func TestBatchRenewalWorker_RetriesAFailedDunningWrite(t *testing.T) {
 	var cancel *river.JobCancelError
 	assert.False(t, errors.As(err, &cancel), "left for River to retry: %v", err)
 }
+
+// A Stripe outage or a timeout says nothing about the card. The job retries,
+// under the same idempotency key, rather than cancelling as a decline would.
+func TestSubscriptionRenewalWorker_RetriesATransportError(t *testing.T) {
+	ids := dueSubscriptions(t, 1)
+	provider := paymentstest.New().Then(paymentstest.Fail(paymentstest.ErrTimeout))
+	w := jobs.NewSubscriptionRenewalWorker(payingRenewalService(provider, nil), testPool(t), metrics.NewRegistry())
+
+	err := w.Work(context.Background(), soloJob(ids[0]))
+	require.Error(t, err)
+	var cancel *river.JobCancelError
+	assert.False(t, errors.As(err, &cancel), "left for River to retry: %v", err)
+	assert.Equal(t, domain.SubscriptionStatusActive, subscriptionStatus(t, ids[0]), "the ladder did not move")
+}

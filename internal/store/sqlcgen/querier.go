@@ -12,6 +12,11 @@ import (
 
 type Querier interface {
 	AdjustStockQuantity(ctx context.Context, arg AdjustStockQuantityParams) (StockLevel, error)
+	// A renewal's period advance. Only a subscription still active or past due,
+	// and still due when the renewal read it, advances: one cancelled, paused or
+	// skipped during the charge reports zero rows, and the renewal refunds rather
+	// than writes.
+	AdvanceRenewedSubscriptionPeriod(ctx context.Context, arg AdvanceRenewedSubscriptionPeriodParams) (int64, error)
 	ApproveWholesaleCustomer(ctx context.Context, arg ApproveWholesaleCustomerParams) (Customer, error)
 	ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error

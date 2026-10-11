@@ -79,7 +79,8 @@ var (
 	ErrRenewalPaymentDeclined = errors.New("renewal payment declined")
 	// ErrRenewalNotDue signals that a subscription reached a renewal while it
 	// is neither past due nor due: something else already renewed it — a batch,
-	// or a Retry that ran first. Terminal for the job; there is nothing to do.
+	// or a Retry that ran first — or it was skipped, before or during the charge
+	// (refunded then). Terminal for the job; there is nothing to do.
 	ErrRenewalNotDue = errors.New("subscription is not due for renewal")
 	// ErrRenewalInFlight signals that another renewal holds one of the
 	// subscriptions between its read and its write. Retryable: once that

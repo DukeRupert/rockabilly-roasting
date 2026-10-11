@@ -459,6 +459,25 @@ func (s *SubscriptionStore) UpdatePeriod(ctx context.Context, tx pgx.Tx, id uuid
 	return nil
 }
 
+// AdvanceRenewedPeriod advances a renewed subscription's period, and reports
+// false when nothing was written: it is no longer active or past due, or its
+// next_order_at is no longer readNextOrderAt — cancelled, paused or skipped
+// while the renewal was charging.
+func (s *SubscriptionStore) AdvanceRenewedPeriod(ctx context.Context, tx pgx.Tx, id uuid.UUID, readNextOrderAt, periodStart, periodEnd, nextOrderAt time.Time) (_ bool, err error) {
+	defer trackQuery(s.metrics, "subscriptions.advance_renewed_period", time.Now(), &err)
+	n, err := sqlcgen.New(tx).AdvanceRenewedSubscriptionPeriod(ctx, sqlcgen.AdvanceRenewedSubscriptionPeriodParams{
+		ID:              id,
+		ReadNextOrderAt: readNextOrderAt,
+		PeriodStart:     periodStart,
+		PeriodEnd:       periodEnd,
+		NextOrderAt:     nextOrderAt,
+	})
+	if err != nil {
+		return false, fmt.Errorf("advance renewed subscription period: %w", err)
+	}
+	return n == 1, nil
+}
+
 // UpdateVariant changes a subscription's variant and returns the updated row.
 func (s *SubscriptionStore) UpdateVariant(ctx context.Context, tx pgx.Tx, id, variantID uuid.UUID) (_ *domain.Subscription, err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_variant", time.Now(), &err)

@@ -203,9 +203,10 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
 ## Known risks, not fixed by the port
 
 hiri-core's review of its renewal code found these, and this shop's renewal
-code is the same code. Only the Retry double charge (above) was fixed here.
+code is the same code. The Retry double charge and the charge with no order
+(both above) were fixed here, along with the swallowed failure writes; these
+remain.
 
-- A renewal can charge the card and then fail to write the order.
 - A subscription more than one interval overdue is billed for each missed
   period back to back rather than once.
 - A declined batch runs one dunning ladder per member.

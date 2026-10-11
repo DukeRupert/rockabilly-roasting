@@ -657,6 +657,22 @@ func (s *RenewalService) refundOrphanedCharge(ctx context.Context, pool *pgxpool
 	})
 }
 
+// errRenewalStatusChanged is a write phase finding a subscription it charged
+// for no longer active or past due: cancelled or paused during the charge
+// (critique item 4). The write rolls back and the charge is refunded.
+var errRenewalStatusChanged = errors.New("subscription status changed during the renewal charge")
+
+// refundForStatusChange refunds a charge whose subscription ended during it,
+// and reports the subscription not active, which the workers cancel on. If
+// the refund fails the charge stays on record and the error is a retryable
+// one: the retry's read finds the subscription not active and refunds then.
+func (s *RenewalService) refundForStatusChange(ctx context.Context, pool *pgxpool.Pool, paymentIntentID string, cause error) error {
+	if err := s.refundOrphanedCharge(ctx, pool, paymentIntentID, "not_renewed"); err != nil {
+		return fmt.Errorf("%v: %w", cause, err)
+	}
+	return fmt.Errorf("renewal write phase: %v: %w", cause, ErrSubscriptionNotActive)
+}
+
 // renewalClaimLease is how long a renewal's claim on its subscriptions holds
 // before another renewal may take it over. Far longer than a renewal takes —
 // the Stripe call is the slow part and times out in well under a minute — so
@@ -906,9 +922,12 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// Advance billing period. The period boundary stays exact; only the
 		// charge trigger is anchored to the renewal window so the next order
 		// lands pre-dawn for morning fulfillment.
-		txErr = s.subscriptions.UpdatePeriod(ctx, tx, sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
+		advanced, txErr := s.subscriptions.AdvanceRenewedPeriod(ctx, tx, sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
 		if txErr != nil {
 			return fmt.Errorf("advance period: %w", txErr)
+		}
+		if !advanced {
+			return fmt.Errorf("subscription %s: %w", sub.ID, errRenewalStatusChanged)
 		}
 
 		// If subscription was past_due, restore to active and clear the
@@ -945,6 +964,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 		return nil
 	})
+	if errors.Is(err, errRenewalStatusChanged) {
+		return nil, s.refundForStatusChange(ctx, pool, pi.ID, err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("renewal write phase: %w", err)
 	}
@@ -1429,9 +1451,12 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			// Advance billing period. Period boundary stays exact; only the
 			// charge trigger is anchored to the renewal window so the next order
 			// lands pre-dawn for morning fulfillment.
-			txErr = s.subscriptions.UpdatePeriod(ctx, tx, item.Sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
+			advanced, txErr := s.subscriptions.AdvanceRenewedPeriod(ctx, tx, item.Sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
 			if txErr != nil {
 				return fmt.Errorf("advance period for %s: %w", item.Sub.ID, txErr)
+			}
+			if !advanced {
+				return fmt.Errorf("subscription %s: %w", item.Sub.ID, errRenewalStatusChanged)
 			}
 
 			// Restore past_due subscriptions to active and clear dunning state.
@@ -1478,6 +1503,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 		return nil
 	})
+	if errors.Is(err, errRenewalStatusChanged) {
+		return nil, s.refundForStatusChange(ctx, pool, pi.ID, err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("batch renewal write phase: %w", err)
 	}

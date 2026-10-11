@@ -166,6 +166,10 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   record rather than making another, or refunds it if the subscription is no
   longer to be renewed; the writes after a charge run detached from the job's
   deadline. `renewal_orphan_test.go`.
+- **A subscription that ends during its charge is refunded, not renewed.** The
+  period advance only touches a subscription still active or past due; one
+  cancelled or paused while Stripe was charging rolls the write back and its
+  charge is refunded. `renewal_status_recheck_test.go`.
 - **A renewal more than one interval behind restarts the schedule.** On time,
   however late the anchor ran it, the new period starts at the old end, so the
   schedule never drifts. More than a whole interval behind — dunning recovered,

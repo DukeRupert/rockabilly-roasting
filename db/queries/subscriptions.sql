@@ -39,6 +39,15 @@ SET status = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: AdvanceRenewedSubscriptionPeriod :execrows
+-- A renewal's period advance. Only a subscription still active or past due
+-- advances: one cancelled or paused during the charge reports zero rows, and
+-- the renewal refunds rather than writes.
+UPDATE subscriptions
+SET current_period_start = @period_start, current_period_end = @period_end,
+    next_order_at = @next_order_at, updated_at = now()
+WHERE id = @id AND status IN ('active', 'past_due');
+
 -- name: UpdateSubscriptionPeriod :exec
 UPDATE subscriptions
 SET current_period_start = $2, current_period_end = $3, next_order_at = $4, updated_at = now()

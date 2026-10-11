@@ -14,6 +14,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const advanceRenewedSubscriptionPeriod = `-- name: AdvanceRenewedSubscriptionPeriod :execrows
+UPDATE subscriptions
+SET current_period_start = $1, current_period_end = $2,
+    next_order_at = $3, updated_at = now()
+WHERE id = $4 AND status IN ('active', 'past_due')
+`
+
+type AdvanceRenewedSubscriptionPeriodParams struct {
+	PeriodStart time.Time `json:"period_start"`
+	PeriodEnd   time.Time `json:"period_end"`
+	NextOrderAt time.Time `json:"next_order_at"`
+	ID          uuid.UUID `json:"id"`
+}
+
+// A renewal's period advance. Only a subscription still active or past due
+// advances: one cancelled or paused during the charge reports zero rows, and
+// the renewal refunds rather than writes.
+func (q *Queries) AdvanceRenewedSubscriptionPeriod(ctx context.Context, arg AdvanceRenewedSubscriptionPeriodParams) (int64, error) {
+	result, err := q.db.Exec(ctx, advanceRenewedSubscriptionPeriod,
+		arg.PeriodStart,
+		arg.PeriodEnd,
+		arg.NextOrderAt,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const cancelSubscription = `-- name: CancelSubscription :exec
 UPDATE subscriptions
 SET status = 'cancelled', cancelled_at = now(), updated_at = now()

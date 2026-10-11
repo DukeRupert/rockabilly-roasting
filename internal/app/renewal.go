@@ -840,6 +840,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		subID := sub.ID
 		renewalPlacedAt := time.Now()
 		renewalPromised, renewalRun := scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ)
+		newStart, newEnd, skipped := s.renewalPeriod(sub, plan, renewalPlacedAt)
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
@@ -865,7 +866,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			PlacedAt:              renewalPlacedAt,
 			Metadata: map[string]any{
 				"subscription_renewal": true,
-				"period_start":         sub.CurrentPeriodEnd.Format(time.RFC3339),
+				"period_start":         newStart.Format(time.RFC3339),
 			},
 		})
 		if txErr != nil {
@@ -896,8 +897,6 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		}
 
 		// Link order to subscription
-		newStart := sub.CurrentPeriodEnd
-		newEnd := nextPeriodEnd(newStart, plan.Interval, plan.IntervalCount)
 
 		txErr = s.subscriptions.CreateSubscriptionOrder(ctx, tx, sub.ID, order.ID, newStart, newEnd)
 		if txErr != nil {
@@ -932,6 +931,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			ResourceType: "subscription",
 			ResourceID:   sub.ID,
 			After:        order,
+			Metadata:     skippedPeriodsMeta(sub, skipped),
 		}); txErr != nil {
 			return fmt.Errorf("audit renewal: %w", txErr)
 		}
@@ -1054,6 +1054,82 @@ func (s *RenewalService) chargeRenewal(ctx context.Context, pool *pgxpool.Pool, 
 	}
 	return pi, nil
 
+}
+
+// renewalPeriod is the period a renewal starts, and how many periods ended
+// unbilled before it (critique item 2).
+//
+// On time — however many hours late the anchor ran it — the new period starts
+// where the old one ended, so the schedule does not drift by a renewal's own
+// lateness. More than one whole interval behind, advancing from the old end
+// would leave the subscription due again on the next tick, and the next, once
+// per missed period: a weekly plan back from two weeks of dunning, or a
+// month-long worker outage. So it starts afresh from the renewal window
+// it runs in, is charged once, and is next due one interval out. The missed
+// periods are not billed; they are counted for the audit entry.
+//
+// The renewal window rather than the raw clock, because the anchor only rounds
+// forward: a period started at 4:01 would next fall due a day late, out of the
+// box its on-time box-mates are still in.
+//
+// A schedule picks up after dunning or an outage (a resumed pause is always on
+// time) from the run that renews it, not from the period it missed.
+func (s *RenewalService) renewalPeriod(sub *domain.Subscription, plan *domain.SubscriptionPlan, now time.Time) (start, end time.Time, skipped int) {
+	start = sub.CurrentPeriodEnd
+	end = nextPeriodEnd(start, plan.Interval, plan.IntervalCount)
+	if end.After(now) {
+		return start, end, 0
+	}
+	// Bounded: an interval nextPeriodEnd did not advance would otherwise spin.
+	for e := end; !e.After(now) && skipped < 10000; e = nextPeriodEnd(e, plan.Interval, plan.IntervalCount) {
+		skipped++
+	}
+	if window := s.renewalWindow(now); window.After(start) {
+		start = window
+	}
+	return start, nextPeriodEnd(start, plan.Interval, plan.IntervalCount), skipped
+}
+
+// renewalWindow is the latest renewal anchor at or before t, or t itself when
+// no anchor is wired. Walked forward from two days back rather than computed,
+// so a 23- or 25-hour DST day cannot skip one.
+func (s *RenewalService) renewalWindow(t time.Time) time.Time {
+	if s.renewalLoc == nil {
+		return t
+	}
+	w := s.anchorRenewal(t.Add(-48 * time.Hour))
+	for {
+		next := s.anchorRenewal(w.Add(time.Second))
+		if next.After(t) {
+			return w
+		}
+		w = next
+	}
+}
+
+// skippedPeriodsMeta is the audit metadata for a renewal that restarted a
+// missed schedule, or nil for one on time.
+func skippedPeriodsMeta(sub *domain.Subscription, skipped int) map[string]any {
+	if skipped == 0 {
+		return nil
+	}
+	return map[string]any{
+		"periods_skipped":     skipped,
+		"previous_period_end": sub.CurrentPeriodEnd.Format(time.RFC3339),
+	}
+}
+
+// batchRenewalMeta is a batch renewal's audit metadata; members that restarted
+// a missed schedule are named with how many periods each skipped.
+func batchRenewalMeta(size int, subscriptionIDs []string, periodsSkipped map[string]int) map[string]any {
+	meta := map[string]any{
+		"batch_size":       size,
+		"subscription_ids": subscriptionIDs,
+	}
+	if len(periodsSkipped) > 0 {
+		meta["periods_skipped"] = periodsSkipped
+	}
+	return meta
 }
 
 // subscriptionLineItem holds computed pricing for one subscription in a batch.
@@ -1324,6 +1400,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		}
 
 		// Create line items and advance each subscription
+		periodsSkipped := map[string]int{}
 		for _, item := range items {
 			_, txErr = s.orders.CreateLineItem(ctx, tx, store.CreateLineItemParams{
 				OrderID:   order.ID,
@@ -1337,9 +1414,12 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				return fmt.Errorf("create line item for %s: %w", item.Sub.ID, txErr)
 			}
 
-			// Link order to subscription
-			newStart := item.Sub.CurrentPeriodEnd
-			newEnd := nextPeriodEnd(newStart, item.Plan.Interval, item.Plan.IntervalCount)
+			// Link order to subscription. One clock reading for the whole box,
+			// so members that restart a missed schedule restart it together.
+			newStart, newEnd, skipped := s.renewalPeriod(item.Sub, item.Plan, renewalPlacedAt)
+			if skipped > 0 {
+				periodsSkipped[item.Sub.ID.String()] = skipped
+			}
 
 			txErr = s.subscriptions.CreateSubscriptionOrder(ctx, tx, item.Sub.ID, order.ID, newStart, newEnd)
 			if txErr != nil {
@@ -1384,10 +1464,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			ResourceType: "order",
 			ResourceID:   order.ID,
 			After:        order,
-			Metadata: map[string]any{
-				"batch_size":       len(items),
-				"subscription_ids": subIDStrs,
-			},
+			Metadata:     batchRenewalMeta(len(items), subIDStrs, periodsSkipped),
 		}); txErr != nil {
 			return fmt.Errorf("audit batch renewal: %w", txErr)
 		}

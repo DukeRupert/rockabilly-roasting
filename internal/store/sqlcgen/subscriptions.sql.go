@@ -19,24 +19,28 @@ UPDATE subscriptions
 SET current_period_start = $1, current_period_end = $2,
     next_order_at = $3, updated_at = now()
 WHERE id = $4 AND status IN ('active', 'past_due')
+  AND next_order_at = $5
 `
 
 type AdvanceRenewedSubscriptionPeriodParams struct {
-	PeriodStart time.Time `json:"period_start"`
-	PeriodEnd   time.Time `json:"period_end"`
-	NextOrderAt time.Time `json:"next_order_at"`
-	ID          uuid.UUID `json:"id"`
+	PeriodStart     time.Time `json:"period_start"`
+	PeriodEnd       time.Time `json:"period_end"`
+	NextOrderAt     time.Time `json:"next_order_at"`
+	ID              uuid.UUID `json:"id"`
+	ReadNextOrderAt time.Time `json:"read_next_order_at"`
 }
 
-// A renewal's period advance. Only a subscription still active or past due
-// advances: one cancelled or paused during the charge reports zero rows, and
-// the renewal refunds rather than writes.
+// A renewal's period advance. Only a subscription still active or past due,
+// and still due when the renewal read it, advances: one cancelled, paused or
+// skipped during the charge reports zero rows, and the renewal refunds rather
+// than writes.
 func (q *Queries) AdvanceRenewedSubscriptionPeriod(ctx context.Context, arg AdvanceRenewedSubscriptionPeriodParams) (int64, error) {
 	result, err := q.db.Exec(ctx, advanceRenewedSubscriptionPeriod,
 		arg.PeriodStart,
 		arg.PeriodEnd,
 		arg.NextOrderAt,
 		arg.ID,
+		arg.ReadNextOrderAt,
 	)
 	if err != nil {
 		return 0, err

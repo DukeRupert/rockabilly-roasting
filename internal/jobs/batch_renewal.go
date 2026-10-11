@@ -64,7 +64,8 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		// running is the system working, and a declined charge is dunning's
 		// business, not an outage.
 		// ErrRenewalNotDue is the same outcome from the other side: something
-		// else renewed it first, so there is nothing left for this job to do.
+		// else renewed it first, or a member was skipped (refunded if
+		// mid-charge), so there is nothing left for this job to do.
 		// ErrRenewalInFlight is not here on purpose — another renewal holds a
 		// member, and River's retry is what brings this one back once it settles.
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) ||

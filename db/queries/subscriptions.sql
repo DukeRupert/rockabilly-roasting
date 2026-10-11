@@ -40,13 +40,15 @@ WHERE id = $1
 RETURNING *;
 
 -- name: AdvanceRenewedSubscriptionPeriod :execrows
--- A renewal's period advance. Only a subscription still active or past due
--- advances: one cancelled or paused during the charge reports zero rows, and
--- the renewal refunds rather than writes.
+-- A renewal's period advance. Only a subscription still active or past due,
+-- and still due when the renewal read it, advances: one cancelled, paused or
+-- skipped during the charge reports zero rows, and the renewal refunds rather
+-- than writes.
 UPDATE subscriptions
 SET current_period_start = @period_start, current_period_end = @period_end,
     next_order_at = @next_order_at, updated_at = now()
-WHERE id = @id AND status IN ('active', 'past_due');
+WHERE id = @id AND status IN ('active', 'past_due')
+  AND next_order_at = @read_next_order_at;
 
 -- name: UpdateSubscriptionPeriod :exec
 UPDATE subscriptions

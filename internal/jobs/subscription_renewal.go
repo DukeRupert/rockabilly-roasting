@@ -67,7 +67,7 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 		case errors.Is(err, app.ErrSubscriptionNotActive), errors.Is(err, app.ErrSubscriptionNotFound),
 			errors.Is(err, app.ErrRenewalNotDue):
 			// Not due is a Retry arriving after a batch (or the batch's own
-			// retry) already charged it. ErrRenewalInFlight is deliberately
+			// retry) already charged it, or a skip, refunded if mid-charge. ErrRenewalInFlight is deliberately
 			// absent: another renewal holds it, and River's retry comes back
 			// once that renewal settles.
 			metrics.TrackJobCancelled(w.metrics, "subscription_renewal", start)

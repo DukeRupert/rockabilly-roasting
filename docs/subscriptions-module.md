@@ -166,6 +166,14 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   record rather than making another, or refunds it if the subscription is no
   longer to be renewed; the writes after a charge run detached from the job's
   deadline. `renewal_orphan_test.go`.
+- **A renewal more than one interval behind restarts the schedule.** On time,
+  however late the anchor ran it, the new period starts at the old end, so the
+  schedule never drifts. More than a whole interval behind — dunning recovered,
+  a worker outage — it starts from the renewal window
+  the run is in: charged once, next due one interval out, missed periods not
+  billed and recorded as `periods_skipped`. The window, not the clock, so a
+  recovered member lands on the same next instant as its on-time box-mates.
+  `renewal_missed_periods_test.go`.
 - **Renewal insert options are one function.** `jobs.RenewalInsertOpts`, never
   a literal: options that differ hash to different unique keys and deduplicate
   against nothing.
@@ -203,12 +211,14 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
 ## Known risks, not fixed by the port
 
 hiri-core's review of its renewal code found these, and this shop's renewal
-code is the same code. The Retry double charge and the charge with no order
-(both above) were fixed here, along with the swallowed failure writes; these
-remain.
+code is the same code. The Retry double charge, the charge with no order, the
+missed periods billed back to back (all above) and the swallowed failure writes
+were fixed here; these remain.
 
-- A subscription more than one interval overdue is billed for each missed
-  period back to back rather than once.
+- A box can split after a spring-forward DST change. A period end on the anchor
+  hour (a resume, or a renewal that restarted a missed schedule) is advanced in
+  UTC; across spring-forward the next renewal falls a day after its box-mates',
+  and one box ships as two orders.
 - A declined batch runs one dunning ladder per member.
 - Dunning state lives in `metadata` rather than in columns.
 

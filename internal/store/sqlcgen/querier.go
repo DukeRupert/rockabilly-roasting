@@ -365,6 +365,9 @@ type Querier interface {
 	UpdateSubscriptionPlan(ctx context.Context, arg UpdateSubscriptionPlanParams) (Subscription, error)
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
+	// A status change, only from the status the caller read. A change that landed
+	// in between (a cancel while a resume was deciding) leaves no row, so the
+	// later write cannot undo the earlier one.
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
 	UpdateSubscriptionStripePaymentMethodID(ctx context.Context, arg UpdateSubscriptionStripePaymentMethodIDParams) error
 	UpdateSubscriptionVariant(ctx context.Context, arg UpdateSubscriptionVariantParams) (Subscription, error)

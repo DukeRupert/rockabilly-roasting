@@ -229,12 +229,15 @@ func (s *SubscriptionStore) ListByOrder(ctx context.Context, tx pgx.Tx, orderID 
 	return subs, nil
 }
 
-// UpdateStatus updates a subscription's status and returns it.
-func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.SubscriptionStatus) (_ *domain.Subscription, err error) {
+// UpdateStatus moves a subscription from the status the caller read to a new
+// one and returns it. pgx.ErrNoRows when the status is no longer from: another
+// change landed between the caller's read and this write.
+func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, from, status domain.SubscriptionStatus) (_ *domain.Subscription, err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_status", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateSubscriptionStatus(ctx, sqlcgen.UpdateSubscriptionStatusParams{
-		ID:     id,
-		Status: string(status),
+		ID:         id,
+		Status:     string(status),
+		FromStatus: string(from),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update subscription status: %w", err)
@@ -322,20 +325,25 @@ func (s *SubscriptionStore) ReleaseDunningHardDecline(ctx context.Context, tx pg
 // stamps the running attempt count in metadata. The attempt count drives both
 // the cap in the app layer (ExpireForDunning) and the escalating retry cadence.
 // The legacy acknowledgement key is stripped for the reason given in UpdateStatus.
+// Only a subscription still active or past due: pgx.ErrNoRows when the customer
+// paused or cancelled it while the failed charge was out.
 func (s *SubscriptionStore) SetDunningRetry(ctx context.Context, tx pgx.Tx, id uuid.UUID, nextRetryAt time.Time, attempt int) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.set_dunning_retry", time.Now(), &err)
-	_, err = tx.Exec(ctx,
+	tag, err := tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET status = 'past_due',
 		     next_order_at = $2,
 		     metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_attempt}', to_jsonb($3::int))
 		                 - 'dunning_acknowledged_at',
 		     updated_at = now()
-		 WHERE id = $1`,
+		 WHERE id = $1 AND status IN ('active', 'past_due')`,
 		id, nextRetryAt, attempt,
 	)
 	if err != nil {
 		return fmt.Errorf("set dunning retry: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("set dunning retry: %w", pgx.ErrNoRows)
 	}
 	return nil
 }
@@ -343,17 +351,21 @@ func (s *SubscriptionStore) SetDunningRetry(ctx context.Context, tx pgx.Tx, id u
 // ExpireForDunning ends a subscription whose dunning retries are exhausted:
 // status → expired, ends_at = now. This is involuntary churn (the card never
 // recovered), distinct from a customer-initiated cancel. The attempt count is
-// left in metadata as a record of why it ended.
+// left in metadata as a record of why it ended. pgx.ErrNoRows when it is no
+// longer active or past due: the customer stopped it first.
 func (s *SubscriptionStore) ExpireForDunning(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.expire_for_dunning", time.Now(), &err)
-	_, err = tx.Exec(ctx,
+	tag, err := tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET status = 'expired', ends_at = now(), updated_at = now()
-		 WHERE id = $1`,
+		 WHERE id = $1 AND status IN ('active', 'past_due')`,
 		id,
 	)
 	if err != nil {
 		return fmt.Errorf("expire for dunning: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("expire for dunning: %w", pgx.ErrNoRows)
 	}
 	return nil
 }

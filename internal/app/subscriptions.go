@@ -118,6 +118,18 @@ func canCancelSubscription(status domain.SubscriptionStatus) bool {
 		status == domain.SubscriptionStatusPastDue
 }
 
+// changeStatus moves a subscription from the status it was read in to another.
+// ErrSubscriptionChanged when that is no longer its status: a change that
+// landed between the read and this write — a cancel while a resume was
+// deciding — stands, rather than being overwritten by the later one.
+func changeStatus(ctx context.Context, tx pgx.Tx, subs *store.SubscriptionStore, id uuid.UUID, from, to domain.SubscriptionStatus) (*domain.Subscription, error) {
+	sub, err := subs.UpdateStatus(ctx, tx, id, from, to)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrSubscriptionChanged
+	}
+	return sub, err
+}
+
 func canEditSubscription(status domain.SubscriptionStatus) bool {
 	return status == domain.SubscriptionStatusActive ||
 		status == domain.SubscriptionStatusPaused ||
@@ -698,7 +710,7 @@ func (s *SubscriptionService) pauseSubscription(ctx context.Context, tx pgx.Tx, 
 		return nil, ErrSubscriptionNotPausable
 	}
 
-	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusPaused)
+	sub, err = changeStatus(ctx, tx, s.subscriptions, id, sub.Status, domain.SubscriptionStatusPaused)
 	if err != nil {
 		return nil, fmt.Errorf("pause subscription: %w", err)
 	}
@@ -765,7 +777,7 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	}
 	sub.EndsAt = nil
 
-	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusActive)
+	sub, err = changeStatus(ctx, tx, s.subscriptions, id, sub.Status, domain.SubscriptionStatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("resume subscription status: %w", err)
 	}
@@ -818,7 +830,7 @@ func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx,
 		return nil, ErrSubscriptionNotCancellable
 	}
 
-	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusCancelled)
+	sub, err = changeStatus(ctx, tx, s.subscriptions, id, sub.Status, domain.SubscriptionStatusCancelled)
 	if err != nil {
 		return nil, fmt.Errorf("cancel subscription status: %w", err)
 	}
@@ -1021,7 +1033,11 @@ func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uui
 		return nil, ErrSubscriptionNotActive
 	}
 
-	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusPastDue)
+	sub, err = changeStatus(ctx, tx, s.subscriptions, id, domain.SubscriptionStatusActive, domain.SubscriptionStatusPastDue)
+	if errors.Is(err, ErrSubscriptionChanged) {
+		// Paused or cancelled since the read: no longer active, as above.
+		return nil, ErrSubscriptionNotActive
+	}
 	if err != nil {
 		return nil, fmt.Errorf("mark subscription past_due: %w", err)
 	}
@@ -1096,7 +1112,7 @@ func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id u
 
 	// If subscription was past_due, restore to active on successful renewal
 	if sub.Status == domain.SubscriptionStatusPastDue {
-		sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusActive)
+		sub, err = changeStatus(ctx, tx, s.subscriptions, id, sub.Status, domain.SubscriptionStatusActive)
 		if err != nil {
 			return nil, fmt.Errorf("restore active status: %w", err)
 		}

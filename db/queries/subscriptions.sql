@@ -34,9 +34,12 @@ WHERE customer_id = $1
 ORDER BY created_at DESC;
 
 -- name: UpdateSubscriptionStatus :one
+-- A status change, only from the status the caller read. A change that landed
+-- in between (a cancel while a resume was deciding) leaves no row, so the
+-- later write cannot undo the earlier one.
 UPDATE subscriptions
-SET status = $2, updated_at = now()
-WHERE id = $1
+SET status = sqlc.arg(status), updated_at = now()
+WHERE id = sqlc.arg(id) AND status = sqlc.arg(from_status)
 RETURNING *;
 
 -- name: AdvanceRenewedSubscriptionPeriod :execrows

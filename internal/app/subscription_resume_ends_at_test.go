@@ -52,7 +52,7 @@ func TestResumeSubscriptionClearsEndsAt(t *testing.T) {
 	// Put it in the state a dunning expiry leaves behind, then pause it, which
 	// is the only status resume accepts.
 	require.NoError(t, subStore.ExpireForDunning(ctx, tx, sub.ID))
-	_, err = subStore.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPaused)
+	_, err = subStore.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusExpired, domain.SubscriptionStatusPaused)
 	require.NoError(t, err)
 
 	before, err := subStore.GetByIDAsStaff(ctx, tx, sub.ID)

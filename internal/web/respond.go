@@ -312,6 +312,12 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrPriceMoved):
 		return http.StatusConflict, app.ErrPriceMoved.Error()
 
+	// A subscription status change that lost to another landing first: a
+	// cancel while a resume was deciding. Conflict, and the sentinel's advice
+	// rather than the service step the wrap names.
+	case errors.Is(err, app.ErrSubscriptionChanged):
+		return http.StatusConflict, app.ErrSubscriptionChanged.Error()
+
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotPayable),
 		errors.Is(err, app.ErrOrderNotCancellable),

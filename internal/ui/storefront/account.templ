@@ -712,6 +712,9 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 					</p>
 				</div>
 			}
+			if props.hasControls() {
+				@subscriptionHelp()
+			}
 			<div class="space-y-8">
 				for _, box := range props.Boxes {
 					@accountSubscriptionBox(box, props.MerchantTZ, props.ResumeOrderOn)
@@ -1027,6 +1030,74 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 			</div>
 		}
 	</div>
+}
+
+// hasControls reports whether anything on the page can still be changed: a box
+// (active or past due) or a paused card. Cancelled and expired cards cannot.
+func (p AccountSubscriptionsProps) hasControls() bool {
+	if len(p.Boxes) > 0 {
+		return true
+	}
+	for _, row := range p.Rows {
+		if row.Subscription.Status == domain.SubscriptionStatusPaused {
+			return true
+		}
+	}
+	return false
+}
+
+// subscriptionHelpLabels are the button labels subscriptionHelp quotes in
+// <strong>. A test holds the list to exactly what the help quotes, and each
+// label to a button whose own text it still is, so renaming a button without
+// the help fails rather than sending customers looking for it.
+var subscriptionHelpLabels = []string{
+	"Skip a shipment", "Skip this shipment", "Undo skip",
+	"Pause", "Pause all", "Resume", "Cancel",
+	"Update payment method", "Retry payment",
+}
+
+// subscriptionHelp tells the customer what they can change on this page and
+// how, and what to ask the shop for instead. Closed by default: the summary
+// line says the controls are here, and a returning customer is not made to
+// scroll past the detail.
+templ subscriptionHelp() {
+	<details class="group mb-6 border-2 border-ink bg-paper" data-subscription-help>
+		<summary class="cursor-pointer p-4 flex items-start justify-between gap-3">
+			<span>
+				<span class="block font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Need to change something?</span>
+				<span class="block font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">Skip, pause, cancel or swap your card right here. Want a different bag size or schedule? Give the shop a shout.</span>
+			</span>
+			<svg class="size-4 shrink-0 mt-0.5 text-ink transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
+			</svg>
+		</summary>
+		<dl class="px-4 pb-4 space-y-3 font-oswald text-sm text-ink-soft" style="letter-spacing:0.04em;">
+			<div>
+				<dt class="font-bold text-ink">Skip a shipment</dt>
+				<dd>Still got beans? Press <strong>Skip a shipment</strong> on a coffee to push it back, or <strong>Skip this shipment</strong> above a shipment to move everything in it. Nothing is charged for a skipped shipment. Changed your mind? Press <strong>Undo skip</strong> on the coffee, or use the link in the email we send.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">Take a break</dt>
+				<dd><strong>Pause</strong> holds a coffee until you <strong>Resume</strong> it, and <strong>Pause all</strong> does the same for a whole shipment. Before you resume, we show the roasting run your next order goes out on.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">Stop for good</dt>
+				<dd><strong>Cancel</strong> ends it, no fee. A cancelled subscription can't be restarted, but you can start a new one any time.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">Your card</dt>
+				<dd><strong>Update payment method</strong> opens Stripe's secure page. If a payment didn't go through, update your card, then press <strong>Retry payment</strong>.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">Moving</dt>
+				<dd>Edit the address on your <a href="/account/addresses" class="text-rust underline underline-offset-2 hover:text-rust-deep">Addresses</a> page, and every coffee shipping there follows it.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">A different bag size or schedule</dt>
+				<dd>We'll switch it for you. After a different coffee, or more bags per shipment? We'll help you set that up. Email <a href="mailto:info@rockabillyroasting.com" class="text-rust underline underline-offset-2 hover:text-rust-deep">info@rockabillyroasting.com</a>.</dd>
+			</div>
+		</dl>
+	</details>
 }
 
 func subProductTitle(row AccountSubscriptionRow) string {

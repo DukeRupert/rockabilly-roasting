@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -121,4 +122,17 @@ func TestSubscriptionCardRendersDatesInTheMerchantZone(t *testing.T) {
 		assert.Contains(t, out, "Mar 12, 2027")
 		assert.NotContains(t, out, "Mar 13, 2027")
 	})
+}
+
+// A paused card offers Cancel as well as Resume. Without it a customer had to
+// resume, booking a charge on the next run, to reach the only Cancel button.
+func TestSubscriptionCard_PausedOffersCancel(t *testing.T) {
+	sub := domain.Subscription{ID: uuid.New(), Status: domain.SubscriptionStatusPaused, Quantity: 1}
+	html := renderSubscriptionCard(t, AccountSubscriptionRow{Subscription: sub}, time.UTC, time.Time{})
+	assert.Contains(t, html, `action="/account/subscriptions/`+sub.ID.String()+`/cancel"`)
+	assert.Contains(t, html, `action="/account/subscriptions/`+sub.ID.String()+`/resume"`)
+	// The forms sit in hidden confirmations; the buttons that open them are
+	// what the customer sees.
+	assert.Regexp(t, `x-on:click="confirming = 'cancel'"[^>]*>Cancel</button>`, html)
+	assert.Regexp(t, `x-on:click="confirming = 'resume'"[^>]*>\s*Resume`, html)
 }

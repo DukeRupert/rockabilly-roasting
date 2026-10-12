@@ -38,7 +38,7 @@ func TestAccountSubscriptions_HelpNamesWhatTheCustomerCanChange(t *testing.T) {
 	})
 
 	help := helpSection(t, html)
-	for _, want := range []string{"Skip", "Pause", "Resume", "Cancel", "Update payment method", "bag size or schedule"} {
+	for _, want := range []string{"Skip", "Pause", "Resume", "Cancel", "Update payment method", "grind or schedule"} {
 		assert.Contains(t, help, want)
 	}
 	assert.Contains(t, help, `href="/account/addresses"`, "a move is an address edit")

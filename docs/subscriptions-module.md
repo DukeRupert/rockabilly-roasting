@@ -171,6 +171,14 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   still on the schedule the renewal read; one cancelled, paused or skipped while
   Stripe was charging rolls the write back and its charge is refunded.
   `renewal_status_recheck_test.go`, `renewal_skip_during_charge_test.go`.
+- **A status change only moves from the status it read.** `UpdateStatus` takes
+  the status the caller read and changes nothing if it has moved, so of two
+  changes at once — Resume in one tab, Cancel in another — the first stands and
+  the second gets `ErrSubscriptionChanged` (409; on the boosted account forms,
+  a toast saying "take another look", with the card left as it was). The
+  dunning writes (`SetDunningRetry`, `ExpireForDunning`) only touch a
+  subscription still active or past due, so a decline never revives one the
+  customer cancelled during the charge. `subscription_status_race_test.go`.
 - **A renewal more than one interval behind restarts the schedule.** On time,
   however late the anchor ran it, the new period starts at the old end, so the
   schedule never drifts. More than a whole interval behind — dunning recovered,

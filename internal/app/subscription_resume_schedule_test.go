@@ -52,7 +52,7 @@ func TestResumeSubscriptionBillsAtNextAnchor(t *testing.T) {
 	require.NoError(t, err)
 
 	sub := createTestSubscription(t, tx, customer.ID, plan.ID, variant.ID, addr.ID)
-	_, err = subStore.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPaused)
+	_, err = subStore.UpdateStatus(ctx, tx, sub.ID, sub.Status, domain.SubscriptionStatusPaused)
 	require.NoError(t, err)
 
 	before := time.Now()

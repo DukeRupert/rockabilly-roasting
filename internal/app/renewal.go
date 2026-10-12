@@ -347,7 +347,9 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	}
 
 	if v.expire {
-		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); err != nil {
+		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); errors.Is(err, pgx.ErrNoRows) {
+			return nil // paused or cancelled during the charge: theirs stands
+		} else if err != nil {
 			return err
 		}
 		if s.enqueuer != nil {
@@ -373,7 +375,11 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	// fulfillment order, and we want that in the morning batch like any renewal.
 	// Anchoring is forward-only, so the retry is never sooner than the dunning gap.
 	nextRetry := s.anchorRenewal(time.Now().Add(v.wait))
-	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
+	// Only while it is still running. A customer who paused or cancelled while
+	// this charge was out has stopped it: no retry, and no card-failed mail.
+	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 	if v.hardDecline {
@@ -954,7 +960,12 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// If subscription was past_due, restore to active and clear the
 		// dunning counter so a future failure starts a fresh schedule.
 		if sub.Status == domain.SubscriptionStatusPastDue {
-			_, txErr = s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusActive)
+			// The advance above holds the row and found it active or past
+			// due, so a miss here means it is already active.
+			_, txErr = changeStatus(ctx, tx, s.subscriptions, sub.ID, domain.SubscriptionStatusPastDue, domain.SubscriptionStatusActive)
+			if errors.Is(txErr, ErrSubscriptionChanged) {
+				txErr = nil
+			}
 			if txErr != nil {
 				return fmt.Errorf("restore active: %w", txErr)
 			}
@@ -1482,7 +1493,12 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 			// Restore past_due subscriptions to active and clear dunning state.
 			if item.Sub.Status == domain.SubscriptionStatusPastDue {
-				_, txErr = s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusActive)
+				// The advance above holds the row and found it active or past
+				// due, so a miss here means it is already active.
+				_, txErr = changeStatus(ctx, tx, s.subscriptions, item.Sub.ID, domain.SubscriptionStatusPastDue, domain.SubscriptionStatusActive)
+				if errors.Is(txErr, ErrSubscriptionChanged) {
+					txErr = nil
+				}
 				if txErr != nil {
 					return fmt.Errorf("restore active for %s: %w", item.Sub.ID, txErr)
 				}

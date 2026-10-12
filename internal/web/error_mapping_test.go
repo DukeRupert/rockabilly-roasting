@@ -238,6 +238,9 @@ func TestPreviouslyUnmappedSentinels(t *testing.T) {
 		// through Error() now; these pin what it is allowed to say.
 		{app.ErrPriceMoved, http.StatusConflict},
 		{app.ErrPricingUnavailable, http.StatusServiceUnavailable},
+
+		// Two status changes at once: the one that lost is told to look again.
+		{app.ErrSubscriptionChanged, http.StatusConflict},
 	}
 
 	for _, tc := range cases {
@@ -303,4 +306,11 @@ func TestBrokenReferenceDoesNotCarryTheSentinel(t *testing.T) {
 func TestSentinelStillMapsWhenWrappedNormally(t *testing.T) {
 	status, _ := mapError(fmt.Errorf("load address: %w", app.ErrAddressNotFound))
 	assert.Equal(t, http.StatusNotFound, status)
+}
+
+// The wrap on a lost status change names the service step ("cancel subscription
+// status: …"); the customer is shown the sentinel's advice, not that.
+func TestMapError_SubscriptionChangedShowsTheAdvice(t *testing.T) {
+	_, msg := mapError(fmt.Errorf("resume subscription status: %w", app.ErrSubscriptionChanged))
+	assert.Equal(t, app.ErrSubscriptionChanged.Error(), msg)
 }

@@ -719,18 +719,22 @@ func (q *Queries) UpdateSubscriptionPlanDiscount(ctx context.Context, arg Update
 
 const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
-SET status = $2, updated_at = now()
-WHERE id = $1
+SET status = $1, updated_at = now()
+WHERE id = $2 AND status = $3
 RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
 `
 
 type UpdateSubscriptionStatusParams struct {
-	ID     uuid.UUID `json:"id"`
-	Status string    `json:"status"`
+	Status     string    `json:"status"`
+	ID         uuid.UUID `json:"id"`
+	FromStatus string    `json:"from_status"`
 }
 
+// A status change, only from the status the caller read. A change that landed
+// in between (a cancel while a resume was deciding) leaves no row, so the
+// later write cannot undo the earlier one.
 func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error) {
-	row := q.db.QueryRow(ctx, updateSubscriptionStatus, arg.ID, arg.Status)
+	row := q.db.QueryRow(ctx, updateSubscriptionStatus, arg.Status, arg.ID, arg.FromStatus)
 	var i Subscription
 	err := row.Scan(
 		&i.ID,

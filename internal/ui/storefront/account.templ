@@ -977,8 +977,8 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 			<!-- Resume books a charge on the next run, so it confirms like pause
 			     and cancel do, and the confirmation names the date rather than
 			     asking the customer to trust a generic "are you sure". -->
-			<div class="flex flex-wrap items-center gap-2" x-data="{ confirming: false }">
-				<button x-show="!confirming" x-on:click="confirming = true"
+			<div class="flex flex-wrap items-center gap-2" x-data="{ confirming: '' }">
+				<button x-show="confirming === ''" x-on:click="confirming = 'resume'"
 					class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]"
 					style="letter-spacing:0.16em; text-transform:uppercase;">
 					Resume
@@ -986,7 +986,7 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 					</svg>
 				</button>
-				<div x-show="confirming" x-cloak class="flex flex-wrap items-center gap-2">
+				<div x-show="confirming === 'resume'" x-cloak class="flex flex-wrap items-center gap-2">
 					<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
 						if resumeOrderOn.IsZero() {
 							Start this subscription back up?
@@ -997,7 +997,17 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>
 						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, resume</button>
 					</form>
-					<button x-on:click="confirming = false" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+				</div>
+				<!-- Cancel without resuming first: a paused subscription can end
+				     straight from here, with nothing booked on the way out. -->
+				<button x-show="confirming === ''" x-on:click="confirming = 'cancel'" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Cancel</button>
+				<div x-show="confirming === 'cancel'" x-cloak class="flex flex-wrap items-center gap-2">
+					<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Cancel this subscription?</span>
+					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel") }>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, cancel</button>
+					</form>
+					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 				</div>
 			</div>
 		}

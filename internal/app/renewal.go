@@ -270,11 +270,13 @@ type dunningVerdict struct {
 	emailStage int
 	// hardDecline is whether charging is stopped after this failure.
 	hardDecline bool
-	// declineCode names the issuer's reason and deadPMs every card we refuse to
-	// charge again. Both carry forward from the subscription when this failure
-	// says nothing new, because later rungs do not charge and so learn nothing.
+	// declineCode names the issuer's reason. It carries forward from the
+	// subscription when this failure says nothing new, because later rungs do
+	// not charge and so learn nothing.
 	declineCode string
-	deadPMs     []string
+	// deadPM is the card this failure showed to be dead, or "". It is recorded
+	// against the customer, where every later charge avoids it.
+	deadPM string
 }
 
 // dunningVerdictFor decides what a failed charge means. Pure: no clock, no
@@ -290,7 +292,6 @@ func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause e
 		// nothing new to say, and must not be read as an all-clear.
 		hardDecline: sub.DunningHardDeclined(),
 		declineCode: sub.DunningDeclineCode(),
-		deadPMs:     sub.DunningDeadPaymentMethods(),
 	}
 
 	var declineErr *payments.DeclineError
@@ -301,17 +302,9 @@ func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause e
 		if declineErr.Permanent() {
 			v.hardDecline = true
 			// Only a permanent decline names a dead card. A soft decline must
-			// not add the card that just failed recoverably — that card is still
-			// worth retrying.
-			//
-			// Added to the set, never replacing it: a customer who replaces a
-			// dead card with another dead one must not make the first one look
-			// chargeable again. Forgetting it had the ladder alternate between
-			// two cards that could never work, burning every remaining attempt
-			// and taking a network fine for each.
-			if paymentMethodID != "" && !slices.Contains(v.deadPMs, paymentMethodID) {
-				v.deadPMs = append(v.deadPMs, paymentMethodID)
-			}
+			// not name the card that just failed recoverably — that card is
+			// still worth retrying.
+			v.deadPM = paymentMethodID
 		}
 	}
 
@@ -344,6 +337,14 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	}
 	if v.declineCode != "" {
 		auditMeta["decline_code"] = v.declineCode
+	}
+
+	// First, and whatever became of the subscription: what the bank said is
+	// about the card, and the customer's other subscriptions charge it too.
+	if v.deadPM != "" {
+		if err := s.customers.RecordDeadPaymentMethod(ctx, tx, customerID, v.deadPM, v.declineCode); err != nil {
+			return err
+		}
 	}
 
 	if v.expire {
@@ -383,7 +384,7 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		return err
 	}
 	if v.hardDecline {
-		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode, v.deadPMs); err != nil {
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode); err != nil {
 			return fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
@@ -1016,7 +1017,11 @@ func (s *RenewalService) chargeRenewal(ctx context.Context, pool *pgxpool.Pool, 
 	// card via Stripe Billing Portal). Fall back to the first attached method
 	// for legacy customers without a default. ListPaymentMethods returns every
 	// attached PM regardless of type, which is required for Stripe Link users.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethods())
+	dead, err := s.deadPaymentMethods(ctx, pool, customer.ID)
+	if err != nil {
+		return nil, err
+	}
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, dead)
 	if err != nil {
 		return nil, err
 	}
@@ -1037,7 +1042,7 @@ func (s *RenewalService) chargeRenewal(ctx context.Context, pool *pgxpool.Pool, 
 	// method is what releases it. Checking the latch alone before this point
 	// would make it permanent: no charge attempted means no charge can succeed,
 	// and success is the only thing that calls ClearDunning.
-	if sub.DunningChargeBlocked(paymentMethodID) {
+	if dunningChargeBlocked(sub, dead, paymentMethodID) {
 		// Re-assert the latch. We are refusing to charge, and the latch is what
 		// every reader — the admin badge and status line, the reminder email's
 		// copy, the update-card page — takes to mean exactly that. A release
@@ -1258,20 +1263,19 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				}
 			}
 
-			// Any subscription carrying a dead-card record is kept out of batches,
-			// latched or not. Deciding whether its dead card is still the card on
-			// file means resolving the payment method against Stripe, which this
-			// transaction cannot do — and a batch resolves one payment method for
-			// the whole group with nothing to avoid. The scheduler routes these to
-			// individual renewals for that reason (see jobs/renewal_scheduler.go);
-			// reaching here means one picked up a dead card between being
-			// scheduled and being run.
+			// A latched subscription is kept out of batches. Its own renewal is
+			// what decides whether the card on file is still the dead one and
+			// lifts the latch when it is not; a batch charges the box's card
+			// for every member and has no latch of its own to lift. The
+			// scheduler routes these to individual renewals for that reason (see
+			// jobs/renewal_scheduler.go); reaching here means one was latched
+			// between being scheduled and being run.
 			//
-			// Drop it from the batch rather than let one dead card fail the whole
-			// box, and leave its ladder alone — the individual renewal the
-			// scheduler enqueues next time is where it gets a fair hearing.
-			// Advancing it here would burn a rung on a card we never tried.
-			if sub.DunningHasDeadCard() {
+			// Drop it from the batch rather than let it fail the whole box, and
+			// leave its ladder alone — the individual renewal the scheduler
+			// enqueues next time is where it gets a fair hearing. Advancing it
+			// here would burn a rung on a card we never tried.
+			if sub.DunningHardDeclined() {
 				deadCardDropped++
 				continue
 			}
@@ -1552,12 +1556,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 }
 
 // chargeBatchRenewal is phase 2 of RenewBatch; see chargeRenewal. One card for
-// the whole box, with nothing to avoid: a member with a dead-card record never
+// the whole box, avoiding the customer's dead cards. A latched member never
 // reaches here.
 func (s *RenewalService) chargeBatchRenewal(ctx context.Context, pool *pgxpool.Pool, members []*domain.Subscription, customer *domain.Customer, addr *domain.Address, orderTotal int) (*payments.PaymentIntent, error) {
-	// No cards to avoid: every subscription with a dead-card record is filtered
-	// out above, so nothing in this group has one.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, nil)
+	dead, err := s.deadPaymentMethods(ctx, pool, customer.ID)
+	if err != nil {
+		return nil, err
+	}
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, dead)
 	if err != nil {
 		return nil, err
 	}
@@ -1566,6 +1572,22 @@ func (s *RenewalService) chargeBatchRenewal(ctx context.Context, pool *pgxpool.P
 			return nil, err
 		}
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// Nothing on file but cards the bank refused for good, found by another of
+	// the customer's subscriptions. Not charged: every member walks the ladder
+	// latched, as the solo renewal of the one that found it does, so the
+	// customer is told and the admin promises no charge until a new card.
+	// No member is latched already — those renew alone — so there is nothing
+	// here to release.
+	if slices.Contains(dead, paymentMethodID) {
+		for _, m := range members {
+			m.LatchDunningHardDeclineMeta()
+		}
+		if err := s.recordRenewalFailures(ctx, pool, members, customer.ID, paymentMethodID, nil); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("customer %s has only hard-declined cards: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -1604,6 +1626,37 @@ func (s *RenewalService) chargeBatchRenewal(ctx context.Context, pool *pgxpool.P
 	}
 	return pi, nil
 
+}
+
+// deadPaymentMethods is every card the bank refused for good on this customer,
+// read just before a charge picks its card.
+func (s *RenewalService) deadPaymentMethods(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID) ([]string, error) {
+	var dead []string
+	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var txErr error
+		dead, txErr = s.customers.DeadPaymentMethods(ctx, tx, customerID)
+		return txErr
+	})
+	return dead, err
+}
+
+// dunningChargeBlocked reports whether a renewal must not charge
+// paymentMethodID: it is one of the customer's dead cards.
+//
+// The rule is about the card, not the latch. The latch comes off as soon as a
+// different card appears, and if that card later goes away the dead one must
+// still not be charged.
+//
+// A subscription latched while the customer has no dead card recorded — a row
+// from a build that latched before it tracked the card — stays blocked: we
+// cannot tell the old card from a new one, so we do not risk it. An empty
+// paymentMethodID (nothing on file) is not blocked here; it has its own
+// failure path upstream.
+func dunningChargeBlocked(sub *domain.Subscription, dead []string, paymentMethodID string) bool {
+	if len(dead) > 0 {
+		return slices.Contains(dead, paymentMethodID)
+	}
+	return sub.DunningHardDeclined()
 }
 
 func ptrVal(s *string) string {

@@ -23,7 +23,7 @@ type SubscriptionBoxKey struct {
 // SubscriptionBoxMember is one subscription in a box.
 type SubscriptionBoxMember struct {
 	Subscription Subscription
-	// ShipsSeparately is set for a member carrying a dead-card record. The
+	// ShipsSeparately is set for a member latched on a dead card. The
 	// scheduler routes it to a solo renewal and a batch drops it, so it is its
 	// own order with its own shipping, even though it is due with the box.
 	ShipsSeparately bool
@@ -92,7 +92,7 @@ func GroupIntoBoxes(subs []Subscription, tz *time.Location) []SubscriptionBox {
 		}
 		boxes[i].Members = append(boxes[i].Members, SubscriptionBoxMember{
 			Subscription:    sub,
-			ShipsSeparately: sub.DunningHasDeadCard(),
+			ShipsSeparately: sub.DunningHardDeclined(),
 		})
 	}
 	sort.SliceStable(boxes, func(i, j int) bool {

@@ -17,6 +17,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/payments/paymentstest"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/testutil"
 )
 
 // The renewal's failure paths, driven through the charge against a fake
@@ -101,6 +102,15 @@ func newFailureRenewalService(provider *paymentstest.Provider) (*app.RenewalServ
 	return newClaimRenewalService(provider).WithJobEnqueuer(enq), enq
 }
 
+// customerDeadCards is the customer's list of cards the bank refused for good.
+func customerDeadCards(t *testing.T, customerID uuid.UUID) []string {
+	t.Helper()
+	tx := testutil.NewTestTx(t, testPool)
+	dead, err := store.NewCustomerStore().DeadPaymentMethods(context.Background(), tx, customerID)
+	require.NoError(t, err)
+	return dead
+}
+
 // customerOrderCount is how many orders a customer has. Scoped by customer
 // because these tests commit and the table is shared.
 func customerOrderCount(t *testing.T, customerID uuid.UUID) int {
@@ -172,7 +182,8 @@ func TestRenewSubscription_AHardDeclineLatchesTheCard(t *testing.T) {
 	got := readSub(t, sub.ID)
 	assert.True(t, got.DunningHardDeclined())
 	assert.Equal(t, "stolen_card", got.DunningDeclineCode())
-	assert.Equal(t, []string{paymentstest.DefaultCard}, got.DunningDeadPaymentMethods())
+	assert.Equal(t, []string{paymentstest.DefaultCard}, customerDeadCards(t, sub.CustomerID),
+		"the card is recorded against the customer")
 
 	// The next rung, with the same card still all they have: the ladder walks
 	// on and Stripe is not asked again.
@@ -316,7 +327,8 @@ func TestRenewSubscription_AFailedDunningWriteOnTheDeadCardPathIsReturned(t *tes
 	require.NoError(t, err)
 	subs := store.NewSubscriptionStore(nil)
 	require.NoError(t, subs.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Minute), 2))
-	require.NoError(t, subs.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", []string{paymentstest.DefaultCard}))
+	require.NoError(t, subs.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card"))
+	require.NoError(t, store.NewCustomerStore().RecordDeadPaymentMethod(ctx, tx, sub.CustomerID, paymentstest.DefaultCard, "stolen_card"))
 	require.NoError(t, tx.Commit(ctx))
 	enq.failPastDue = 1
 

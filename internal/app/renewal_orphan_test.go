@@ -327,7 +327,8 @@ func TestRenewBatch_AMemberDroppedAfterTheChargeRefundsTheBox(t *testing.T) {
 	require.NoError(t, err)
 	subs := store.NewSubscriptionStore(nil)
 	require.NoError(t, subs.SetDunningRetry(ctx, tx, b.ID, time.Now().Add(-time.Minute), 1))
-	require.NoError(t, subs.SetDunningHardDecline(ctx, tx, b.ID, "stolen_card", []string{"pm_old"}))
+	require.NoError(t, subs.SetDunningHardDecline(ctx, tx, b.ID, "stolen_card"))
+	require.NoError(t, store.NewCustomerStore().RecordDeadPaymentMethod(ctx, tx, b.CustomerID, "pm_old", "stolen_card"))
 	require.NoError(t, tx.Commit(ctx))
 
 	order, err := svc.RenewBatch(ctx, testPool, []uuid.UUID{a.ID, b.ID})

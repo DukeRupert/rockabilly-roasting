@@ -67,19 +67,15 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		}
 
 		// Group by (customer_id, shipping_address_id), except for subscriptions
-		// carrying any memory of a permanently declined card. Whether that card is
-		// still the one on file is a Stripe question, and the batch path cannot
-		// ask it: it resolves one payment method for the whole group with nothing
-		// to avoid. The individual renewal path resolves the method against the
-		// dead card and can tell the two apart, so route them there.
-		//
-		// Keyed on the record rather than the latch on purpose. A subscription
-		// whose latch was released still has a dead card to avoid, and routing it
-		// back into a batch is precisely how that card gets charged again.
+		// latched on a permanently declined card. The individual renewal path is
+		// the one that decides whether a different card is now on file and lifts
+		// the latch; a batch has no latch to lift. Every charge, batch or solo,
+		// avoids the customer's dead cards, so a subscription whose latch was
+		// lifted batches again like any other.
 		batches := make(map[batchKey][]uuid.UUID)
 		var deadCard []uuid.UUID
 		for _, sub := range subs {
-			if sub.DunningHasDeadCard() {
+			if sub.DunningHardDeclined() {
 				deadCard = append(deadCard, sub.ID)
 				continue
 			}

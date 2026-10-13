@@ -100,13 +100,12 @@ func TestGroupIntoBoxes(t *testing.T) {
 		assert.True(t, boxes[2].Key.NextOrderAt.Equal(nextWeek))
 	})
 
-	t.Run("a dead-card member is in its box but ships separately", func(t *testing.T) {
+	t.Run("a member latched on a dead card is in its box but ships separately", func(t *testing.T) {
 		// The scheduler routes it to a solo renewal and RenewBatch drops it,
 		// so it is its own order with its own shipping.
 		healthy := boxSub(home, run, SubscriptionStatusActive)
 		dead := boxSub(home, run, SubscriptionStatusPastDue)
-		dead.Metadata = map[string]any{SubscriptionMetaDunningDeadPaymentMethods: []any{"pm_dead"}}
-		require.True(t, dead.DunningHasDeadCard(), "fixture: the dead-card record is what flags it")
+		dead.Metadata = map[string]any{SubscriptionMetaDunningHardDecline: true}
 
 		boxes := GroupIntoBoxes([]Subscription{healthy, dead}, denver)
 		require.Len(t, boxes, 1)

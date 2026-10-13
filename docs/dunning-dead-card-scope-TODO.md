@@ -1,4 +1,24 @@
-# TODO: dead-card records are per-subscription, but a card is per-customer
+# TODO: dead-card records are per-subscription, but a card is per-customer — fixed
+
+**Fixed in October 2026** (subscriptions critique item 5). The answers to the
+"To do" list below:
+
+1. **A table**, `customer_dead_payment_methods`, keyed by customer and Stripe
+   payment method id, with the decline code. Migration 092 copied every card
+   recorded in subscriptions' metadata, from both keys and any status.
+2. **Never cleared.** Stripe mints a new payment method id each time a card is
+   attached, so a customer re-adding the same card is charging a new id, and a
+   success on another card says nothing about the dead one.
+3. **The latch stays per subscription**, as argued below.
+4. **Narrowed, not removed.** The scheduler and `RenewBatch` now keep only
+   *latched* subscriptions out of batches (the solo renewal is what lifts a
+   latch). Everyone else batches, and the batch avoids the customer's dead
+   cards; with nothing else on file it charges nothing and latches its members.
+5. **Sibling stories** in `internal/app/renewal_customer_dead_card_test.go`.
+
+The rest of this file is the problem as it was written, kept for the
+reasoning.
+
 
 The automated dunning ladder (shipped in the `subscriptions/automated-dunning`
 branch, PR #9) refuses to re-charge a card the issuer permanently declined. It
@@ -97,6 +117,9 @@ into a *batch* charges through a path that has no avoid-list at all.
    code — revert the fix and confirm the new test fails before trusting it.
 
 ## Related, smaller, same area
+
+(As written before the fix. The first is gone with the table's
+`ON CONFLICT DO NOTHING`; routing now keys on the latch.)
 
 - **`SetDunningHardDecline` is last-write-wins on the set**
   (`internal/store/subscriptions.go:252`): the caller merges and the store

@@ -440,6 +440,49 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	return items, nil
 }
 
+const listDeadPaymentMethods = `-- name: ListDeadPaymentMethods :many
+SELECT payment_method_id FROM customer_dead_payment_methods
+WHERE customer_id = $1
+ORDER BY recorded_at, payment_method_id
+`
+
+func (q *Queries) ListDeadPaymentMethods(ctx context.Context, customerID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDeadPaymentMethods, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var payment_method_id string
+		if err := rows.Scan(&payment_method_id); err != nil {
+			return nil, err
+		}
+		items = append(items, payment_method_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordDeadPaymentMethod = `-- name: RecordDeadPaymentMethod :exec
+INSERT INTO customer_dead_payment_methods (customer_id, payment_method_id, decline_code)
+VALUES ($1, $2, $3)
+ON CONFLICT (customer_id, payment_method_id) DO NOTHING
+`
+
+type RecordDeadPaymentMethodParams struct {
+	CustomerID      uuid.UUID `json:"customer_id"`
+	PaymentMethodID string    `json:"payment_method_id"`
+	DeclineCode     string    `json:"decline_code"`
+}
+
+func (q *Queries) RecordDeadPaymentMethod(ctx context.Context, arg RecordDeadPaymentMethodParams) error {
+	_, err := q.db.Exec(ctx, recordDeadPaymentMethod, arg.CustomerID, arg.PaymentMethodID, arg.DeclineCode)
+	return err
+}
+
 const setDefaultAddress = `-- name: SetDefaultAddress :exec
 UPDATE addresses SET is_default = true WHERE id = $1 AND customer_id = $2
 `

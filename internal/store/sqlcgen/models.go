@@ -214,6 +214,13 @@ type Customer struct {
 	AnnouncementsEnabled      bool               `json:"announcements_enabled"`
 }
 
+type CustomerDeadPaymentMethod struct {
+	CustomerID      uuid.UUID `json:"customer_id"`
+	PaymentMethodID string    `json:"payment_method_id"`
+	DeclineCode     string    `json:"decline_code"`
+	RecordedAt      time.Time `json:"recorded_at"`
+}
+
 type CustomerUser struct {
 	ID                    uuid.UUID          `json:"id"`
 	CustomerID            uuid.UUID          `json:"customer_id"`

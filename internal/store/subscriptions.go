@@ -258,35 +258,24 @@ func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid
 }
 
 // SetDunningHardDecline marks a past-due subscription whose card the issuer has
-// permanently blocked, so no later renewal attempt charges that card again.
-// declineCode is the issuer's reason, kept for staff and for the customer-facing
-// copy; it may be empty when the provider gave a decline without one.
-// deadPaymentMethods is every card known to be dead on this run — recording them
-// is what lets the latch release when the customer puts a different one on file,
-// and keeping the whole set is what stops a second dead card from making the
-// first one look chargeable again.
+// permanently blocked, so no later renewal attempt charges it until a different
+// card is on file. declineCode is the issuer's reason, kept for staff and for
+// the customer-facing copy; it may be empty when the provider gave a decline
+// without one. The dead card itself is recorded against the customer
+// (CustomerStore.RecordDeadPaymentMethod), because the card is theirs.
 //
 // Scoped to status = 'past_due' so a race against a charge that succeeded in the
 // meantime cannot brand a now-active subscription as dead.
-func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode string, deadPaymentMethods []string) (err error) {
+func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode string) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.set_dunning_hard_decline", time.Now(), &err)
-	// deadPaymentMethods is written whole rather than appended to, because the
-	// caller has already merged the new card into the set it read. Doing the
-	// merge here would need a read-modify-write inside the same statement for no
-	// benefit — the caller is holding the subscription either way.
-	if deadPaymentMethods == nil {
-		deadPaymentMethods = []string{}
-	}
 	_, err = tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET metadata = jsonb_set(
-		         jsonb_set(
-		             jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_hard_decline}', 'true'::jsonb),
-		             '{dunning_decline_code}', to_jsonb($2::text)),
-		         '{dunning_dead_payment_methods}', to_jsonb($3::text[])),
+		         jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_hard_decline}', 'true'::jsonb),
+		         '{dunning_decline_code}', to_jsonb($2::text)),
 		     updated_at = now()
 		 WHERE id = $1 AND status = 'past_due'`,
-		id, declineCode, deadPaymentMethods,
+		id, declineCode,
 	)
 	if err != nil {
 		return fmt.Errorf("set dunning hard decline: %w", err)
@@ -299,11 +288,9 @@ func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx
 // died, so that charge is judged on its own merits — the attempt count and the
 // deadline keep running, because a new card is not yet a card that works.
 //
-// It removes the latch and nothing else. The dead card's ID and the issuer's
-// reason stay put: they are the record that stops us charging that card again,
-// and a release that erased them would let the very next rung fall back to it
-// once the replacement card went away. Only ClearDunning, on a charge that
-// actually succeeded, wipes the whole set.
+// It removes the latch and nothing else. The issuer's reason stays for staff,
+// and the dead card stays on the customer's list, which is what stops the next
+// rung falling back to it once the replacement card goes away.
 func (s *SubscriptionStore) ReleaseDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.release_dunning_hard_decline", time.Now(), &err)
 	_, err = tx.Exec(ctx,

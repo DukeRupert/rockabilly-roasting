@@ -115,3 +115,13 @@ DELETE FROM addresses WHERE id = $1 AND customer_id = $2;
 UPDATE customers
 SET order_reminders_enabled = $2, updated_at = now()
 WHERE id = $1;
+
+-- name: ListDeadPaymentMethods :many
+SELECT payment_method_id FROM customer_dead_payment_methods
+WHERE customer_id = $1
+ORDER BY recorded_at, payment_method_id;
+
+-- name: RecordDeadPaymentMethod :exec
+INSERT INTO customer_dead_payment_methods (customer_id, payment_method_id, decline_code)
+VALUES ($1, $2, $3)
+ON CONFLICT (customer_id, payment_method_id) DO NOTHING;

@@ -31,6 +31,12 @@ one shipping address. One row per item; there is no subscription-items table. It
 carries its schedule as `current_period_start`, `current_period_end` and
 `next_order_at`, and its dunning state in `metadata`.
 
+**A dead card** (`customer_dead_payment_methods`) is a card the bank refused
+for good, recorded against the customer, because the card is theirs: every
+renewal of any of their subscriptions avoids it. Never cleared — Stripe gives a
+card added again a new id. Each subscription keeps its own latch ("not charging
+this one until a new card"), attempt count and retry date.
+
 **A renewal** is an ordinary order and an ordinary off-session PaymentIntent. No
 Stripe Billing objects: the shop keeps control of retries, grace and dunning,
 and customers migrated in with saved payment methods rather than Billing tokens
@@ -98,8 +104,9 @@ means this one only.
 
 Two places the box and the scheduler disagree, accepted:
 
-- **A dead-card member** — one carrying a permanently declined card — is routed
-  to a solo renewal and dropped from any batch. The page shows it inside its box,
+- **A latched member** — one not being charged because only dead cards are on
+  file — is routed to a solo renewal and dropped from any batch; its solo
+  renewal is what lifts the latch. The page shows it inside its box,
   marked as shipping and charged separately, and counts it as a separate
   shipment for the notice.
 - **A backlog** (a worker outage) makes everything overdue due at one run, so
@@ -195,9 +202,10 @@ plan — a weekly and a monthly drift apart again whatever day they are moved to
   pre-dawn and a box is one instant. Resume places the next order at the next
   anchor, never a fresh interval out. `TestAnchorRenewalTimeAcrossDST`.
 - **The dunning ladder** retries on a fixed schedule with a one-click card link.
-  A permanently declined card is never charged again; the ladder walks on
-  without Stripe and releases only when a different card appears.
-  `renewal_dunning_test.go`.
+  A permanently declined card is never charged again, by any of the
+  customer's subscriptions, solo or batched; the ladder walks on without
+  Stripe and releases only when a different card appears.
+  `renewal_dunning_test.go`, `renewal_customer_dead_card_test.go`.
 
 ## 4. What happens when the catalog moves under it
 
@@ -257,6 +265,9 @@ were fixed here; these remain.
   day land on the same run anyway.
 - **One combined skip email per box.** Per-member emails are correct, just
   chatty.
-- **One dunning ladder per customer.**
+- **One dunning ladder per customer.** Decided against: each subscription
+  keeps its own, because subscriptions at different addresses fail on
+  different days, and merging them would move end dates customers have
+  already been sent.
 - **Admin list grouping by box.**
 - **Staff creating a subscription** from the admin. Still not possible.

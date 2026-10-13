@@ -211,6 +211,7 @@ type Querier interface {
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomerUsersByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListDeadPaymentMethods(ctx context.Context, customerID uuid.UUID) ([]string, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
 	ListFulfillmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Fulfillment, error)
 	ListInvoiceLinesByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceLine, error)
@@ -266,6 +267,7 @@ type Querier interface {
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
 	NextInvoiceNumber(ctx context.Context) (int32, error)
 	PruneExpiredSessions(ctx context.Context) (int64, error)
+	RecordDeadPaymentMethod(ctx context.Context, arg RecordDeadPaymentMethodParams) error
 	// Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
 	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)

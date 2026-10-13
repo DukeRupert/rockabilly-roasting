@@ -525,7 +525,7 @@ type AccountSubscriptionRow struct {
 	ThumbnailURL string
 	UnitPrice    *int
 	// ShipsSeparately marks a member of a box that is renewed on its own (it
-	// carries a dead-card record), so it is its own order with its own shipping
+	// is latched on a dead card), so it is its own order with its own shipping
 	// even though it is due with the box.
 	ShipsSeparately bool
 }

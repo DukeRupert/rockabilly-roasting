@@ -57,6 +57,30 @@ func (s *CustomerStore) GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*
 	return customerFromRow(row), nil
 }
 
+// DeadPaymentMethods is every card the bank has refused for good on this
+// customer, oldest first. A renewal never charges one of them.
+func (s *CustomerStore) DeadPaymentMethods(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) ([]string, error) {
+	ids, err := sqlcgen.New(tx).ListDeadPaymentMethods(ctx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("list dead payment methods for %s: %w", customerID, err)
+	}
+	return ids, nil
+}
+
+// RecordDeadPaymentMethod adds a card the bank refused for good. Recording one
+// already listed changes nothing, so two renewals that learn the same thing at
+// once cannot lose either.
+func (s *CustomerStore) RecordDeadPaymentMethod(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, paymentMethodID, declineCode string) error {
+	if err := sqlcgen.New(tx).RecordDeadPaymentMethod(ctx, sqlcgen.RecordDeadPaymentMethodParams{
+		CustomerID:      customerID,
+		PaymentMethodID: paymentMethodID,
+		DeclineCode:     declineCode,
+	}); err != nil {
+		return fmt.Errorf("record dead payment method for %s: %w", customerID, err)
+	}
+	return nil
+}
+
 // GetByEmail returns a customer by email address (used for login).
 func (s *CustomerStore) GetByEmail(ctx context.Context, tx pgx.Tx, email string) (*domain.Customer, error) {
 	row, err := sqlcgen.New(tx).GetCustomerByEmail(ctx, email)

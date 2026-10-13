@@ -1,0 +1,3 @@
+{{/* What a mail about one failed charge renews: "your <b>X</b> subscription
+(Plan)", or with several, "your subscriptions for <b>X</b> (Plan), <b>Y</b>
+(Plan) and <b>Z</b> (Plan)". Data with ProductName, PlanName and Lines. */}}{{define "subscription_names.html"}}{{if .Lines}}subscriptions for {{range $i, $l := .Lines}}{{if $i}}{{if eq (len (slice $.Lines $i)) 1}} and {{else}}, {{end}}{{end}}<strong>{{$l.ProductName}}</strong> ({{$l.PlanName}}){{end}}{{else}}<strong>{{.ProductName}}</strong> subscription ({{.PlanName}}){{end}}{{end}}

@@ -94,23 +94,26 @@ func (e *Enqueuer) EnqueueRenewalReceipt(ctx context.Context, tx pgx.Tx, orderID
 	return err
 }
 
-// EnqueuePastDueNotice enqueues one rung of the past-due email ladder in tx.
-// stage selects the notice — see SubscriptionPastDueArgs.
-func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscriptionID, customerID uuid.UUID, stage int) error {
+// EnqueuePastDueNotice enqueues one rung of the past-due email ladder in tx,
+// one notice for every subscription the failed charge covered. stage selects
+// the notice — see SubscriptionPastDueArgs.
+func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscriptionIDs []uuid.UUID, customerID uuid.UUID, stage int) error {
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionPastDueArgs{
-		SubscriptionID: subscriptionID,
-		CustomerID:     customerID,
-		Stage:          stage,
+		SubscriptionID:  subscriptionIDs[0],
+		SubscriptionIDs: subscriptionIDs,
+		CustomerID:      customerID,
+		Stage:           stage,
 	}, e.notifyOpts())
 	return err
 }
 
 // EnqueueSubscriptionEnded enqueues the "subscription ended" notice sent when
 // dunning retries are exhausted, in tx so it rides on the expiry's commit.
-func (e *Enqueuer) EnqueueSubscriptionEnded(ctx context.Context, tx pgx.Tx, subscriptionID, customerID uuid.UUID) error {
+func (e *Enqueuer) EnqueueSubscriptionEnded(ctx context.Context, tx pgx.Tx, subscriptionIDs []uuid.UUID, customerID uuid.UUID) error {
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionDunningEndedArgs{
-		SubscriptionID: subscriptionID,
-		CustomerID:     customerID,
+		SubscriptionID:  subscriptionIDs[0],
+		SubscriptionIDs: subscriptionIDs,
+		CustomerID:      customerID,
 	}, e.notifyOpts())
 	return err
 }

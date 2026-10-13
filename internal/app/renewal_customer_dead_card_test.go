@@ -89,7 +89,7 @@ func TestDeadCard_ABatchWithNothingElseOnFileIsNotCharged(t *testing.T) {
 	assert.Equal(t, domain.SubscriptionStatusPastDue, got.Status)
 	assert.Equal(t, 1, got.DunningAttempt())
 	assert.True(t, got.DunningHardDeclined(), "it says no charge is coming until a new card")
-	assert.Contains(t, enq.pastDueNotices(), renewalMail{SubscriptionID: b.ID, Stage: 1},
+	assert.Contains(t, enq.pastDueNotices(), renewalMail{SubscriptionIDs: []uuid.UUID{b.ID}, Stage: 1},
 		"the customer is told, so they can add a card")
 }
 

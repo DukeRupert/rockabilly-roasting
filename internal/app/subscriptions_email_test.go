@@ -156,3 +156,37 @@ func productTitleOf(t *testing.T, sub *domain.Subscription) string {
 	require.NoError(t, err)
 	return product.Title
 }
+
+// A box whose one charge failed is one email naming every item in it, at every
+// rung and at the end. Mailed per item, a box of three sent three.
+func TestSendPastDueEmail_OneEmailNamesTheWholeBox(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newConfirmEmailService(t)
+	customer, addr := committedCustomer(t)
+	a := committedSubscription(t, customer, addr, "Bonneville Blend "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+	b := committedSubscription(t, customer, addr, "Crazy Mountain Decaf "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+
+	require.NoError(t, svc.SendPastDueEmail(ctx, testPool, []uuid.UUID{a.ID, b.ID}, customer.ID, 1))
+	require.NoError(t, svc.SendDunningEndedEmail(ctx, testPool, []uuid.UUID{a.ID, b.ID}, customer.ID))
+
+	require.Len(t, sender.Sent, 2, "one past-due notice and one ended mail")
+	for _, msg := range sender.Sent {
+		for _, body := range []string{msg.HTML, msg.Text} {
+			assert.Contains(t, body, productTitleOf(t, a))
+			assert.Contains(t, body, productTitleOf(t, b))
+		}
+	}
+}
+
+func TestSendPastDueEmail_RefusesAnotherCustomersSubscription(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newConfirmEmailService(t)
+	customer, addr := committedCustomer(t)
+	stranger, strangerAddr := committedCustomer(t)
+	mine := committedSubscription(t, customer, addr, "Mine "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+	theirs := committedSubscription(t, stranger, strangerAddr, "Theirs "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+
+	err := svc.SendPastDueEmail(ctx, testPool, []uuid.UUID{mine.ID, theirs.ID}, customer.ID, 1)
+	assert.ErrorIs(t, err, app.ErrSubscriptionNotFound)
+	assert.Empty(t, sender.Sent)
+}

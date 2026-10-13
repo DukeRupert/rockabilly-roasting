@@ -205,7 +205,7 @@ func TestBatchRenewalWorker_RetriesAWriteFailureAfterTheCharge(t *testing.T) {
 // write of a failed renewal's transaction.
 type failingPastDue struct{ app.JobEnqueuer }
 
-func (failingPastDue) EnqueuePastDueNotice(context.Context, pgx.Tx, uuid.UUID, uuid.UUID, int) error {
+func (failingPastDue) EnqueuePastDueNotice(context.Context, pgx.Tx, []uuid.UUID, uuid.UUID, int) error {
 	return errors.New("failingPastDue: enqueue failed")
 }
 

@@ -318,16 +318,26 @@ func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause e
 	return v
 }
 
+// dunningNotice is the mail one member's failure calls for: a past-due notice
+// at stage for the given attempt, the ended mail, or nothing (the zero value —
+// a silent rung, or a member the customer stopped during the charge).
+type dunningNotice struct {
+	stage   int
+	attempt int
+	ended   bool
+}
+
 // recordRenewalFailure applies dunningVerdictFor to the database, inside the
 // caller's transaction: it advances the attempt count and either schedules the
 // next attempt (past_due, next_order_at pushed forward) or, at the end of the
-// ladder, expires the subscription. Emails are enqueued per the verdict's stage.
+// ladder, expires the subscription. It returns the mail the verdict calls for;
+// recordRenewalFailures sends it, one mail for every member that shares it.
 //
 // The decision lives in dunningVerdictFor; this function only writes it down.
 //
 // Idempotent enough for River's at-least-once delivery: re-running bumps the
 // attempt by one, which at worst shortens the dunning window slightly.
-func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
+func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) (dunningNotice, error) {
 	v := dunningVerdictFor(sub, paymentMethodID, cause)
 	attempt := v.attempt
 
@@ -343,20 +353,15 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	// about the card, and the customer's other subscriptions charge it too.
 	if v.deadPM != "" {
 		if err := s.customers.RecordDeadPaymentMethod(ctx, tx, customerID, v.deadPM, v.declineCode); err != nil {
-			return err
+			return dunningNotice{}, err
 		}
 	}
 
 	if v.expire {
 		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); errors.Is(err, pgx.ErrNoRows) {
-			return nil // paused or cancelled during the charge: theirs stands
+			return dunningNotice{}, nil // paused or cancelled during the charge: theirs stands
 		} else if err != nil {
-			return err
-		}
-		if s.enqueuer != nil {
-			if err := s.enqueuer.EnqueueSubscriptionEnded(ctx, tx, sub.ID, customerID); err != nil {
-				return fmt.Errorf("enqueue subscription-ended email: %w", err)
-			}
+			return dunningNotice{}, err
 		}
 		auditMeta["reason"] = "dunning_exhausted"
 		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
@@ -367,9 +372,9 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 			ResourceID:   sub.ID,
 			Metadata:     auditMeta,
 		}); err != nil {
-			return fmt.Errorf("audit subscription expired: %w", err)
+			return dunningNotice{}, fmt.Errorf("audit subscription expired: %w", err)
 		}
-		return nil
+		return dunningNotice{ended: true}, nil
 	}
 
 	// Anchor the retry to the renewal window too: a recovered charge produces a
@@ -379,18 +384,13 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	// Only while it is still running. A customer who paused or cancelled while
 	// this charge was out has stopped it: no retry, and no card-failed mail.
 	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		return dunningNotice{}, nil
 	} else if err != nil {
-		return err
+		return dunningNotice{}, err
 	}
 	if v.hardDecline {
 		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode); err != nil {
-			return fmt.Errorf("flag hard decline: %w", err)
-		}
-	}
-	if v.emailStage != dunningEmailSilent && s.enqueuer != nil {
-		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID, v.emailStage); err != nil {
-			return fmt.Errorf("enqueue past-due email: %w", err)
+			return dunningNotice{}, fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
 	auditMeta["next_retry_at"] = nextRetry.Format(time.RFC3339)
@@ -402,9 +402,9 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		ResourceID:   sub.ID,
 		Metadata:     auditMeta,
 	}); err != nil {
-		return fmt.Errorf("audit renewal failed: %w", err)
+		return dunningNotice{}, fmt.Errorf("audit renewal failed: %w", err)
 	}
-	return nil
+	return dunningNotice{stage: v.emailStage, attempt: attempt}, nil
 }
 
 // recordRenewalFailures writes a failed renewal down for every subscription it
@@ -417,9 +417,37 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 // workers cancel on — and River retries the renewal until it lands.
 func (s *RenewalService) recordRenewalFailures(ctx context.Context, pool *pgxpool.Pool, subs []*domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		// One mail per notice the members share, naming them all: the
+		// customer's card failed once, so they hear about it once. Members on
+		// different attempts — rare, a past-due one joining a box — differ in
+		// the stage and the end date the notice gives, so they mail apart.
+		var order []dunningNotice
+		named := map[dunningNotice][]uuid.UUID{}
 		for _, sub := range subs {
-			if err := s.recordRenewalFailure(ctx, tx, sub, customerID, paymentMethodID, cause); err != nil {
+			notice, err := s.recordRenewalFailure(ctx, tx, sub, customerID, paymentMethodID, cause)
+			if err != nil {
 				return err
+			}
+			if notice == (dunningNotice{}) || (!notice.ended && notice.stage == dunningEmailSilent) {
+				continue
+			}
+			if _, ok := named[notice]; !ok {
+				order = append(order, notice)
+			}
+			named[notice] = append(named[notice], sub.ID)
+		}
+		if s.enqueuer == nil {
+			return nil
+		}
+		for _, notice := range order {
+			if notice.ended {
+				if err := s.enqueuer.EnqueueSubscriptionEnded(ctx, tx, named[notice], customerID); err != nil {
+					return fmt.Errorf("enqueue subscription-ended email: %w", err)
+				}
+				continue
+			}
+			if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, named[notice], customerID, notice.stage); err != nil {
+				return fmt.Errorf("enqueue past-due email: %w", err)
 			}
 		}
 		return nil

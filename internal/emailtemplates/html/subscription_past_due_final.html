@@ -11,7 +11,7 @@
   <tr><td style="padding:32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Last call on your subscription</h1>
     <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
-    <p style="margin:0 0 16px;">We've been trying for two weeks to renew your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}) and haven't been able to. On <strong>{{date .EndsOn}}</strong> we'll stop trying and close it out.</p>
+    <p style="margin:0 0 16px;">We've been trying for two weeks to renew your {{template "subscription_names.html" .}}, but we haven't been able to. On <strong>{{date .EndsOn}}</strong> we'll stop trying and close it out.</p>
 
     {{if .HardDecline}}<p style="margin:0 0 24px;">The card on file has been blocked by your bank, so this needs a different one. That's the only thing standing between you and the next bag.</p>{{else}}<p style="margin:0 0 24px;">One working card is all it takes, and everything picks up where it left off — same coffee, same schedule, no re-signup.</p>{{end}}
 

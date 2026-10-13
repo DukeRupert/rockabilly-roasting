@@ -2,7 +2,7 @@
 
 Hi {{.CustomerName}},
 
-Your card on file didn't go through when we tried to renew your {{.ProductName}} subscription ({{.PlanName}}). Until it's sorted, we'll hold the next shipment.
+Your card on file didn't go through when we tried to renew your {{template "subscription_names.txt" .}}. Until it's sorted, we'll hold the next shipment.
 
 {{if .HardDecline}}Your bank has blocked this card for good -- a reissue, a report of loss, something on their end. It won't work again, so this one needs a different card.{{else}}Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.{{end}}
 

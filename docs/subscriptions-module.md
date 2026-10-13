@@ -265,6 +265,9 @@ were fixed here; these remain.
   day land on the same run anyway.
 - **One combined skip email per box.** Per-member emails are correct, just
   chatty.
-- **One dunning ladder per customer.**
+- **One dunning ladder per customer.** Decided against: each subscription
+  keeps its own, because subscriptions at different addresses fail on
+  different days, and merging them would move end dates customers have
+  already been sent.
 - **Admin list grouping by box.**
 - **Staff creating a subscription** from the admin. Still not possible.

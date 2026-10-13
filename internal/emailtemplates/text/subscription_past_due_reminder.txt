@@ -2,7 +2,7 @@
 
 Hi {{.CustomerName}},
 
-We still can't get a charge through for your {{.ProductName}} subscription ({{.PlanName}}), so the bag that should have gone out is sitting here instead of getting roasted for you.
+We still can't get a charge through for your {{template "subscription_names.txt" .}}, so {{if .Lines}}the bags that should have gone out are{{else}}the bag that should have gone out is{{end}} sitting here instead of getting roasted for you.
 
 {{if .HardDecline}}We've stopped trying this card -- your bank has blocked it, and no amount of retrying will change that. Put a different one on file and we'll pick right back up.{{else}}We'll keep trying the card on file, but if it's the one that changed, we won't get there on our own. Takes about a minute to swap it.{{end}}
 

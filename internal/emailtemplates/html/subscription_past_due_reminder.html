@@ -11,7 +11,7 @@
   <tr><td style="padding:32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Your coffee's on hold</h1>
     <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
-    <p style="margin:0 0 16px;">We still can't get a charge through for your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}), so the bag that should have gone out is sitting here instead of getting roasted for you.</p>
+    <p style="margin:0 0 16px;">We still can't get a charge through for your {{template "subscription_names.html" .}}, so {{if .Lines}}the bags that should have gone out are{{else}}the bag that should have gone out is{{end}} sitting here instead of getting roasted for you.</p>
 
     {{if .HardDecline}}<p style="margin:0 0 24px;">We've stopped trying this card — your bank has blocked it, and no amount of retrying will change that. Put a different one on file and we'll pick right back up.</p>{{else}}<p style="margin:0 0 24px;">We'll keep trying the card on file, but if it's the one that changed, we won't get there on our own. Takes about a minute to swap it.</p>{{end}}
 

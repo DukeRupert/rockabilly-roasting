@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -224,7 +225,7 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			// path does — a 2am card-decline webhook shouldn't ping the customer.
 			// This webhook fires on the active → past_due transition, so it is
 			// always the customer's first word that a charge failed.
-			if err := d.Enqueuer.EnqueuePastDueNotice(ctx, tx, *order.SubscriptionID, *order.CustomerID,
+			if err := d.Enqueuer.EnqueuePastDueNotice(ctx, tx, []uuid.UUID{*order.SubscriptionID}, *order.CustomerID,
 				jobs.SubscriptionPastDueStageFirst); err != nil {
 				return fmt.Errorf("enqueue past-due email: %w", err)
 			}

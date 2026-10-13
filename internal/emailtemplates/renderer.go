@@ -520,6 +520,15 @@ type SubscriptionPastDueData struct {
 	// configured. Templates must fall back to AccountURL when it is empty
 	// rather than rendering a dead link.
 	UpdateCardURL string
+	// Lines names every subscription the failed charge covered, when there is
+	// more than one; nil for one, which ProductName and PlanName name.
+	Lines []SubscriptionLine
+}
+
+// SubscriptionLine is one subscription named in a mail about several.
+type SubscriptionLine struct {
+	ProductName string
+	PlanName    string
 }
 
 // SubscriptionCancelledData holds data for the subscription-cancelled confirmation.
@@ -589,6 +598,8 @@ type SubscriptionDunningEndedData struct {
 	StoreName    string
 	StoreURL     string
 	AccountURL   string
+	// Lines is as SubscriptionPastDueData's.
+	Lines []SubscriptionLine
 }
 
 // RefundConfirmationData holds data for the refund-issued confirmation.

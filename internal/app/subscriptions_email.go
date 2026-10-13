@@ -171,12 +171,12 @@ var pastDueStageSpecs = map[int]struct {
 // unrecognised stage (including the zero value on a job enqueued before the
 // ladder existed) falls back to the first notice, which is the safe default —
 // its copy makes sense at any point in the window. Read → send → audit.
-func (s *SubscriptionService) SendPastDueEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, stage int) error {
+func (s *SubscriptionService) SendPastDueEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionIDs []uuid.UUID, customerID uuid.UUID, stage int) error {
 	spec, ok := pastDueStageSpecs[stage]
 	if !ok {
 		spec = pastDueStageSpecs[dunningEmailFirst]
 	}
-	return s.sendSubscriptionLifecycleEmail(ctx, pool, subscriptionID, customerID, lifecycleEmailSpec{
+	return s.sendSubscriptionsLifecycleEmail(ctx, pool, subscriptionIDs, customerID, lifecycleEmailSpec{
 		templateName: spec.template,
 		subject:      spec.subject,
 		tag:          spec.tag,
@@ -192,7 +192,8 @@ func (s *SubscriptionService) SendPastDueEmail(ctx context.Context, pool *pgxpoo
 				StoreName:     s.email.StoreName,
 				StoreURL:      s.email.BaseURL,
 				AccountURL:    s.email.BaseURL + "/account/subscriptions",
-				UpdateCardURL: s.updateCardURL(subscriptionID),
+				UpdateCardURL: s.updateCardURL(d.Sub.ID),
+				Lines:         d.Lines,
 			}
 		},
 	})
@@ -239,8 +240,8 @@ func (s *SubscriptionService) SendCancellationEmail(ctx context.Context, pool *p
 // the renewal charge never recovered (dunning exhausted). Distinct from a
 // customer-initiated cancellation — the copy acknowledges the failed card and
 // points them at restarting. Read → send → audit.
-func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID) error {
-	return s.sendSubscriptionLifecycleEmail(ctx, pool, subscriptionID, customerID, lifecycleEmailSpec{
+func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionIDs []uuid.UUID, customerID uuid.UUID) error {
+	return s.sendSubscriptionsLifecycleEmail(ctx, pool, subscriptionIDs, customerID, lifecycleEmailSpec{
 		templateName: "subscription_dunning_ended",
 		subject:      "Your subscription has ended",
 		tag:          "subscription-ended",
@@ -254,6 +255,7 @@ func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *p
 				StoreName:    s.email.StoreName,
 				StoreURL:     s.email.BaseURL,
 				AccountURL:   s.email.BaseURL + "/account/subscriptions",
+				Lines:        d.Lines,
 			}
 		},
 	})
@@ -550,52 +552,76 @@ type lifecycleEmailSpec struct {
 // lifecycleEmailData is what the loader resolved before rendering. The
 // subscription is included because the past-due ladder needs more than display
 // names — it reads the dunning state to decide its copy and to mint a one-click
-// card link.
+// card link. With several subscriptions, the names and Sub are the first's and
+// Lines names them all; with one, Lines is nil.
 type lifecycleEmailData struct {
 	CustomerName string
 	ProductName  string
 	PlanName     string
 	Sub          *domain.Subscription
+	Lines        []emailtemplates.SubscriptionLine
 }
 
 func (s *SubscriptionService) sendSubscriptionLifecycleEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, spec lifecycleEmailSpec) error {
+	return s.sendSubscriptionsLifecycleEmail(ctx, pool, []uuid.UUID{subscriptionID}, customerID, spec)
+}
+
+// sendSubscriptionsLifecycleEmail sends one mail about several subscriptions —
+// a box whose one charge failed. Every one must be the customer's: the job
+// names them separately, and a crossed job would otherwise mail one customer's
+// subscriptions to another.
+func (s *SubscriptionService) sendSubscriptionsLifecycleEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionIDs []uuid.UUID, customerID uuid.UUID, spec lifecycleEmailSpec) error {
+	if len(subscriptionIDs) == 0 {
+		return fmt.Errorf("send %s: no subscriptions named", spec.templateName)
+	}
 	var (
-		sub         *domain.Subscription
-		customer    *domain.Customer
-		plan        *domain.SubscriptionPlan
-		productName = "your subscription"
+		subs     []*domain.Subscription
+		customer *domain.Customer
+		lines    []emailtemplates.SubscriptionLine
 	)
 
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var err error
-		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
-		if err != nil {
-			return fmt.Errorf("get subscription %s: %w", subscriptionID, err)
-		}
 		customer, err = s.customers.GetByID(ctx, tx, customerID)
 		if err != nil {
 			return fmt.Errorf("get customer %s: %w", customerID, err)
 		}
-		plan, err = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
-		if err != nil {
-			return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
-		}
-		if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
-			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
-				productName = product.Title
+		for _, id := range subscriptionIDs {
+			sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+			if err != nil {
+				return fmt.Errorf("get subscription %s: %w", id, err)
 			}
+			if sub.CustomerID != customerID {
+				return fmt.Errorf("subscription %s is not customer %s's: %w", id, customerID, ErrSubscriptionNotFound)
+			}
+			plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+			if err != nil {
+				return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
+			}
+			productName := "your subscription"
+			if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
+				if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+					productName = product.Title
+				}
+			}
+			subs = append(subs, sub)
+			lines = append(lines, emailtemplates.SubscriptionLine{ProductName: productName, PlanName: plan.Name})
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	html, text, err := s.email.Renderer.Render(spec.templateName, spec.buildData(lifecycleEmailData{
+	data := lifecycleEmailData{
 		CustomerName: customer.FirstName,
-		ProductName:  productName,
-		PlanName:     plan.Name,
-		Sub:          sub,
-	}))
+		ProductName:  lines[0].ProductName,
+		PlanName:     lines[0].PlanName,
+		Sub:          subs[0],
+	}
+	if len(lines) > 1 {
+		data.Lines = lines
+	}
+	html, text, err := s.email.Renderer.Render(spec.templateName, spec.buildData(data))
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues(spec.templateName, "failed").Inc()
 		return fmt.Errorf("render %s template: %w", spec.templateName, err)
@@ -613,14 +639,20 @@ func (s *SubscriptionService) sendSubscriptionLifecycleEmail(ctx context.Context
 		return fmt.Errorf("send %s email: %w", spec.templateName, err)
 	}
 
+	// One entry per subscription, so each one's history shows the mail.
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
-		return s.audit.Record(ctx, tx, audit.AuditEntry{
-			ActorType:    domain.AuditActorTypeSystem,
-			ActorName:    spec.actorName,
-			Action:       spec.auditAction,
-			ResourceType: "subscription",
-			ResourceID:   sub.ID,
-		})
+		for _, sub := range subs {
+			if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    spec.actorName,
+				Action:       spec.auditAction,
+				ResourceType: "subscription",
+				ResourceID:   sub.ID,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return fmt.Errorf("audit %s sent: %w", spec.templateName, err)
 	}

@@ -1,0 +1,1 @@
+{{/* The text twin of html/_subscription_names.html. */}}{{define "subscription_names.txt"}}{{if .Lines}}subscriptions for {{range $i, $l := .Lines}}{{if $i}}{{if eq (len (slice $.Lines $i)) 1}} and {{else}}, {{end}}{{end}}{{$l.ProductName}} ({{$l.PlanName}}){{end}}{{else}}{{.ProductName}} subscription ({{.PlanName}}){{end}}{{end}}

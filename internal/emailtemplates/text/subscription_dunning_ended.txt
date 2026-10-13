@@ -2,7 +2,7 @@
 
 Hi {{.CustomerName}},
 
-We tried your card on file a few times over the past couple of weeks to renew your {{.ProductName}} subscription ({{.PlanName}}), but it didn't go through. We've stopped trying and ended the subscription — no further charges, no more shipments.
+We tried your card on file a few times over the past couple of weeks to renew your {{template "subscription_names.txt" .}}, but it didn't go through. We've stopped trying and ended {{if .Lines}}them{{else}}the subscription{{end}} — no further charges, no more shipments.
 
 No hard feelings, and no hoops to jump through if you want back in. Start a fresh subscription whenever you're ready — it takes a minute and you can use a new card.
 

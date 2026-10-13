@@ -113,8 +113,11 @@ Two places the box and the scheduler disagree, accepted:
   two boxes can ship as one order. The page then over-states the shipping; the
   customer is charged less than it says, never more.
 
-And one accepted cost: a declined batch runs **one dunning ladder per member**,
-so a box of three sends three emails per rung.
+A declined batch runs **one dunning ladder per member** — each keeps its own
+attempt count and retry date — but **one email per failed charge**: the
+past-due notice and the ended mail name every member they cover
+(`recordRenewalFailures`). Members on different attempts, rare, mail apart,
+because the notice's stage and end date differ.
 
 **The two notices.** The signup page, when its lines are on more than one plan:
 "Mixed schedules: it all ships together this first time — after that, each
@@ -240,7 +243,8 @@ were fixed here; these remain.
   hour (a resume, or a renewal that restarted a missed schedule) is advanced in
   UTC; across spring-forward the next renewal falls a day after its box-mates',
   and one box ships as two orders.
-- A declined batch runs one dunning ladder per member.
+- A declined batch runs one dunning ladder per member, though it sends one
+  email per failed charge.
 - Dunning state lives in `metadata` rather than in columns.
 
 ## Decided, and not to be reopened without reading why

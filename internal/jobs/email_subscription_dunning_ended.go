@@ -23,5 +23,5 @@ func NewSubscriptionDunningEndedWorker(subs *app.SubscriptionService, pool *pgxp
 
 // Work processes a subscription-ended (dunning-exhausted) email job.
 func (w *SubscriptionDunningEndedWorker) Work(ctx context.Context, job *river.Job[SubscriptionDunningEndedArgs]) error {
-	return w.subs.SendDunningEndedEmail(ctx, w.pool, job.Args.SubscriptionID, job.Args.CustomerID)
+	return w.subs.SendDunningEndedEmail(ctx, w.pool, argIDs(job.Args.SubscriptionID, job.Args.SubscriptionIDs), job.Args.CustomerID)
 }

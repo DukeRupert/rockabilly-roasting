@@ -35,10 +35,10 @@ type pastDueCall struct {
 func (f *fakeEnqueuer) EnqueueRenewalReceipt(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
 	return nil
 }
-func (f *fakeEnqueuer) EnqueuePastDueNotice(context.Context, pgx.Tx, uuid.UUID, uuid.UUID, int) error {
+func (f *fakeEnqueuer) EnqueuePastDueNotice(context.Context, pgx.Tx, []uuid.UUID, uuid.UUID, int) error {
 	return nil
 }
-func (f *fakeEnqueuer) EnqueueSubscriptionEnded(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
+func (f *fakeEnqueuer) EnqueueSubscriptionEnded(context.Context, pgx.Tx, []uuid.UUID, uuid.UUID) error {
 	return nil
 }
 func (f *fakeEnqueuer) EnqueueOrderConfirm(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {

@@ -970,3 +970,52 @@ func TestQBShadowDigestAllManualWeek(t *testing.T) {
 	}
 	assert.Contains(t, text, "[MANUAL]", "a manual row is marked as such")
 }
+
+// A mail about one failed charge names what it renews. One item reads as it
+// always did; several are listed, "and" before the last, in every rung and the
+// ended mail.
+func TestRender_DunningMailNamesEveryItem(t *testing.T) {
+	r, err := New(time.UTC)
+	require.NoError(t, err)
+	lines := func(names ...string) []SubscriptionLine {
+		var out []SubscriptionLine
+		for _, n := range names {
+			out = append(out, SubscriptionLine{ProductName: n, PlanName: "Monthly"})
+		}
+		return out
+	}
+	one := SubscriptionPastDueData{ProductName: "Bonneville", PlanName: "Monthly", AccountURL: "https://example.com/a"}
+
+	for _, name := range []string{"subscription_past_due", "subscription_past_due_reminder", "subscription_past_due_final"} {
+		_, text, err := r.Render(name, one)
+		require.NoError(t, err)
+		assert.Contains(t, text, "your Bonneville subscription (Monthly)", name)
+
+		two := one
+		two.Lines = lines("Bonneville", "Decaf")
+		html, text, err := r.Render(name, two)
+		require.NoError(t, err)
+		assert.Contains(t, text, "your subscriptions for Bonneville (Monthly) and Decaf (Monthly)", name)
+		assert.Contains(t, html, "<strong>Bonneville</strong> (Monthly) and <strong>Decaf</strong> (Monthly)", name)
+
+		three := one
+		three.Lines = lines("Bonneville", "Decaf", "Espresso")
+		_, text, err = r.Render(name, three)
+		require.NoError(t, err)
+		assert.Contains(t, text, "Bonneville (Monthly), Decaf (Monthly) and Espresso (Monthly)", name)
+		assert.NotContains(t, text, "(Monthly) and haven't", name)
+	}
+
+	box := one
+	box.Lines = lines("Bonneville", "Decaf")
+	_, text, err := r.Render("subscription_past_due_reminder", box)
+	require.NoError(t, err)
+	assert.Contains(t, text, "the bags that should have gone out are sitting here")
+
+	_, text, err = r.Render("subscription_dunning_ended", SubscriptionDunningEndedData{
+		ProductName: "Bonneville", PlanName: "Monthly", Lines: lines("Bonneville", "Decaf"),
+	})
+	require.NoError(t, err)
+	assert.Contains(t, text, "subscriptions for Bonneville (Monthly) and Decaf (Monthly)")
+	assert.Contains(t, text, "ended them")
+}

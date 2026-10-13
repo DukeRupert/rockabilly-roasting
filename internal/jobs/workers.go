@@ -544,9 +544,15 @@ func (SubscriptionRenewalReceiptArgs) Kind() string { return "email:subscription
 // template. Following the same shape as EmailInvoicePastDueArgs keeps three
 // near-identical workers from existing, and means a change to how past-due mail
 // is rendered lands in one place.
+//
+// SubscriptionIDs is every subscription the failed charge covered: a box that
+// fails gets one notice naming them all. SubscriptionID is the first of them,
+// and the only form a job queued before the list took; when SubscriptionIDs is
+// set it wins.
 type SubscriptionPastDueArgs struct {
-	SubscriptionID uuid.UUID `json:"subscription_id"`
-	CustomerID     uuid.UUID `json:"customer_id"`
+	SubscriptionID  uuid.UUID   `json:"subscription_id"`
+	SubscriptionIDs []uuid.UUID `json:"subscription_ids,omitempty"`
+	CustomerID      uuid.UUID   `json:"customer_id"`
 	// Stage is which notice this is — see the SubscriptionPastDueStage
 	// constants. A zero value (a job enqueued before the ladder existed) renders
 	// as the first notice.
@@ -615,10 +621,21 @@ type SubscriptionSkipUndoneArgs struct {
 func (SubscriptionSkipUndoneArgs) Kind() string { return "email:subscription_skip_undone" }
 
 // SubscriptionDunningEndedArgs sends the "subscription ended" notice after
-// dunning retries are exhausted and the subscription is expired.
+// dunning retries are exhausted and the subscription is expired. The two ids
+// are read as SubscriptionPastDueArgs's are.
 type SubscriptionDunningEndedArgs struct {
-	SubscriptionID uuid.UUID `json:"subscription_id"`
-	CustomerID     uuid.UUID `json:"customer_id"`
+	SubscriptionID  uuid.UUID   `json:"subscription_id"`
+	SubscriptionIDs []uuid.UUID `json:"subscription_ids,omitempty"`
+	CustomerID      uuid.UUID   `json:"customer_id"`
+}
+
+// argIDs is the subscriptions a job names: its list, or the single id a job
+// queued before the list took.
+func argIDs(id uuid.UUID, ids []uuid.UUID) []uuid.UUID {
+	if len(ids) == 0 {
+		return []uuid.UUID{id}
+	}
+	return ids
 }
 
 // Kind returns the job kind identifier.

@@ -11,7 +11,7 @@
   <tr><td style="padding:32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Your subscription has ended</h1>
     <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
-    <p style="margin:0 0 16px;">We tried your card on file a few times over the past couple of weeks to renew your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}), but it didn't go through. We've stopped trying and ended the subscription — no further charges, no more shipments.</p>
+    <p style="margin:0 0 16px;">We tried your card on file a few times over the past couple of weeks to renew your {{template "subscription_names.html" .}}, but it didn't go through. We've stopped trying and ended {{if .Lines}}them{{else}}the subscription{{end}} — no further charges, no more shipments.</p>
 
     <p style="margin:0 0 24px;">No hard feelings, and no hoops to jump through if you want back in. Start a fresh subscription whenever you're ready — it takes a minute and you can use a new card.</p>
 

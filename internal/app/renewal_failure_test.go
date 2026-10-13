@@ -29,10 +29,11 @@ import (
 // transactions, so there is no caller transaction to roll back. Every fixture
 // is fresh per test and every assertion is scoped by its ids.
 
-// renewalMail is one past-due notice or ended mail the enqueuer saw.
+// renewalMail is one past-due notice the enqueuer saw, and every subscription
+// it named.
 type renewalMail struct {
-	SubscriptionID uuid.UUID
-	Stage          int
+	SubscriptionIDs []uuid.UUID
+	Stage           int
 }
 
 // renewalEnqueuer records the mail a renewal sends and fails on demand. A
@@ -44,7 +45,7 @@ type renewalEnqueuer struct {
 	mu       sync.Mutex
 	receipts []uuid.UUID
 	pastDue  []renewalMail
-	ended    []uuid.UUID
+	ended    [][]uuid.UUID
 
 	// failReceipts fails the next n renewal receipts.
 	failReceipts int
@@ -65,28 +66,28 @@ func (e *renewalEnqueuer) EnqueueRenewalReceipt(_ context.Context, _ pgx.Tx, ord
 	return nil
 }
 
-func (e *renewalEnqueuer) EnqueuePastDueNotice(_ context.Context, _ pgx.Tx, subscriptionID, _ uuid.UUID, stage int) error {
+func (e *renewalEnqueuer) EnqueuePastDueNotice(_ context.Context, _ pgx.Tx, subscriptionIDs []uuid.UUID, _ uuid.UUID, stage int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.failPastDue > 0 {
 		e.failPastDue--
 		return errEnqueue
 	}
-	e.pastDue = append(e.pastDue, renewalMail{SubscriptionID: subscriptionID, Stage: stage})
+	e.pastDue = append(e.pastDue, renewalMail{SubscriptionIDs: subscriptionIDs, Stage: stage})
 	return nil
 }
 
-func (e *renewalEnqueuer) EnqueueSubscriptionEnded(_ context.Context, _ pgx.Tx, subscriptionID, _ uuid.UUID) error {
+func (e *renewalEnqueuer) EnqueueSubscriptionEnded(_ context.Context, _ pgx.Tx, subscriptionIDs []uuid.UUID, _ uuid.UUID) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.ended = append(e.ended, subscriptionID)
+	e.ended = append(e.ended, subscriptionIDs)
 	return nil
 }
 
-func (e *renewalEnqueuer) endedMail() []uuid.UUID {
+func (e *renewalEnqueuer) endedMail() [][]uuid.UUID {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return append([]uuid.UUID(nil), e.ended...)
+	return append([][]uuid.UUID(nil), e.ended...)
 }
 
 func (e *renewalEnqueuer) pastDueNotices() []renewalMail {
@@ -165,7 +166,7 @@ func TestRenewSubscription_ADeclineAdvancesTheLadder(t *testing.T) {
 	assert.True(t, got.CurrentPeriodEnd.Equal(sub.CurrentPeriodEnd), "the period does not advance on a decline")
 	assertRetryAround(t, got, before, after, 72*time.Hour)
 
-	assert.Equal(t, []renewalMail{{SubscriptionID: sub.ID, Stage: 1}}, enq.pastDueNotices(),
+	assert.Equal(t, []renewalMail{{SubscriptionIDs: []uuid.UUID{sub.ID}, Stage: 1}}, enq.pastDueNotices(),
 		"the first rung tells the customer")
 	assert.Equal(t, 1, auditCount(t, sub.ID, audit.AuditSubscriptionFailed))
 }
@@ -207,7 +208,7 @@ func TestRenewSubscription_NoCardOnFileAdvancesTheLadderWithoutCharging(t *testi
 	got := readSub(t, sub.ID)
 	assert.Equal(t, domain.SubscriptionStatusPastDue, got.Status)
 	assert.Equal(t, 1, got.DunningAttempt())
-	assert.Equal(t, []renewalMail{{SubscriptionID: sub.ID, Stage: 1}}, enq.pastDueNotices())
+	assert.Equal(t, []renewalMail{{SubscriptionIDs: []uuid.UUID{sub.ID}, Stage: 1}}, enq.pastDueNotices())
 }
 
 func TestRenewSubscription_TheLastRungExpiresTheSubscription(t *testing.T) {
@@ -227,14 +228,15 @@ func TestRenewSubscription_TheLastRungExpiresTheSubscription(t *testing.T) {
 	assert.ErrorIs(t, err, app.ErrRenewalPaymentDeclined)
 
 	assert.Equal(t, domain.SubscriptionStatusExpired, readSub(t, sub.ID).Status)
-	assert.Equal(t, []uuid.UUID{sub.ID}, enq.endedMail(), "the customer is told it has ended")
+	assert.Equal(t, [][]uuid.UUID{{sub.ID}}, enq.endedMail(), "the customer is told it has ended")
 	assert.Empty(t, enq.pastDueNotices())
 	assert.Equal(t, 1, auditCount(t, sub.ID, audit.AuditSubscriptionExpired))
 }
 
-// One decline in a box runs one ladder per member, and each member mails its
-// own notice. That is critique item 5, pinned here as today's behaviour so the
-// change to one ladder per customer is a deliberate one.
+// One decline in a box runs one ladder per member — their attempts and retry
+// dates stay their own — but the customer hears about it once: one notice for
+// the charge, naming every member. Mailed per member, a box of three sent three
+// "we couldn't charge your card" emails at every rung (critique item 5).
 func TestRenewBatch_ADeclineAdvancesEveryMember(t *testing.T) {
 	ctx := context.Background()
 	provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
@@ -252,8 +254,38 @@ func TestRenewBatch_ADeclineAdvancesEveryMember(t *testing.T) {
 		assert.Equal(t, domain.SubscriptionStatusPastDue, got.Status)
 		assert.Equal(t, 1, got.DunningAttempt())
 	}
-	assert.ElementsMatch(t, []renewalMail{{a.ID, 1}, {b.ID, 1}}, enq.pastDueNotices(),
-		"one notice per member (critique item 5)")
+	notices := enq.pastDueNotices()
+	require.Len(t, notices, 1, "one notice for the one failed charge")
+	assert.ElementsMatch(t, []uuid.UUID{a.ID, b.ID}, notices[0].SubscriptionIDs, "naming the whole box")
+	assert.Equal(t, 1, notices[0].Stage)
+}
+
+// The bottom of the ladder, for a box: one "your subscriptions have ended"
+// mail naming both, not one each.
+func TestRenewBatch_TheLastRungEndsTheBoxWithOneMail(t *testing.T) {
+	ctx := context.Background()
+	provider := paymentstest.New().Then(paymentstest.Decline("insufficient_funds"))
+	svc, enq := newFailureRenewalService(provider)
+	a, b := dueBox(t, domain.SubscriptionStatusActive)
+	require.NoError(t, store.Tx(ctx, testPool, func(tx pgx.Tx) error {
+		subs := store.NewSubscriptionStore(nil)
+		for _, id := range []uuid.UUID{a.ID, b.ID} {
+			if err := subs.SetDunningRetry(ctx, tx, id, time.Now().Add(-time.Minute), app.MaxDunningAttempts-1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+
+	_, err := svc.RenewBatch(ctx, testPool, []uuid.UUID{a.ID, b.ID})
+	assert.ErrorIs(t, err, app.ErrRenewalPaymentDeclined)
+	for _, id := range []uuid.UUID{a.ID, b.ID} {
+		assert.Equal(t, domain.SubscriptionStatusExpired, readSub(t, id).Status)
+	}
+	ended := enq.endedMail()
+	require.Len(t, ended, 1, "one mail for the box")
+	assert.ElementsMatch(t, []uuid.UUID{a.ID, b.ID}, ended[0])
+	assert.Empty(t, enq.pastDueNotices())
 }
 
 // What a failure after the charge does today: the order is not written, and

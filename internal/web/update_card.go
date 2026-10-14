@@ -31,8 +31,8 @@ import (
 //   - The Stripe session is created through CreatePaymentMethodUpdateSession,
 //     which Stripe scopes to the card form alone. The holder never reaches
 //     billing history or invoices.
-//   - The subscription must actually be past_due. A link that leaks after the
-//     card is fixed opens nothing.
+//   - The customer must actually have a subscription past_due. A link that
+//     leaks after the card is fixed opens nothing.
 
 // handleUpdateCardPage renders the confirmation. Read-only.
 func (d *Deps) handleUpdateCardPage(w http.ResponseWriter, r *http.Request) {
@@ -45,12 +45,9 @@ func (d *Deps) handleUpdateCardPage(w http.ResponseWriter, r *http.Request) {
 
 	var props storefront.UpdateCardProps
 	err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		sub, txErr := d.SubscriptionService.GetSubscriptionAsStaff(r.Context(), tx, subID)
+		sub, txErr := d.pastDueForCard(r, tx, subID)
 		if txErr != nil {
 			return txErr
-		}
-		if sub.Status != domain.SubscriptionStatusPastDue {
-			return errNotPastDue
 		}
 		props = d.updateCardProps(r, tx, sub)
 		props.Token = token
@@ -88,12 +85,9 @@ func (d *Deps) handleUpdateCard(w http.ResponseWriter, r *http.Request) {
 
 	var stripeCustomerID string
 	err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		sub, txErr := d.SubscriptionService.GetSubscriptionAsStaff(r.Context(), tx, subID)
+		sub, txErr := d.pastDueForCard(r, tx, subID)
 		if txErr != nil {
 			return txErr
-		}
-		if sub.Status != domain.SubscriptionStatusPastDue {
-			return errNotPastDue
 		}
 		customer, txErr := d.CustomerService.GetCustomer(r.Context(), tx, sub.CustomerID)
 		if txErr != nil {
@@ -131,6 +125,36 @@ var (
 	errNotPastDue        = errors.New("subscription is not past due")
 	errPortalUnavailable = errors.New("payment portal unavailable")
 )
+
+// pastDueForCard returns the subscription the link's page speaks for: the one
+// the token names while it is past due, otherwise another of the same
+// customer's that is.
+//
+// One link goes out per failed charge, minted for the first item of the box,
+// and the card form it opens changes the customer's card, not the item's. So
+// the question is whether this customer still owes a charge, not whether this
+// item does: a customer who paused the first item must still be able to fix
+// the card the rest of the box is waiting on. The token never reaches past the
+// customer of the subscription it names.
+func (d *Deps) pastDueForCard(r *http.Request, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
+	sub, err := d.SubscriptionService.GetSubscriptionAsStaff(r.Context(), tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if sub.Status == domain.SubscriptionStatusPastDue {
+		return sub, nil
+	}
+	subs, err := d.SubscriptionService.ListSubscriptionsByCustomer(r.Context(), tx, sub.CustomerID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range subs {
+		if subs[i].Status == domain.SubscriptionStatusPastDue {
+			return &subs[i], nil
+		}
+	}
+	return nil, errNotPastDue
+}
 
 // updateCardProps fills in the copy the page needs. Product and plan lookups
 // are best-effort: a missing product name must not cost the customer their way

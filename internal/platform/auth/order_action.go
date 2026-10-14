@@ -48,13 +48,16 @@ const OrderActionUndoSkip OrderActionPurpose = "undo_skip"
 // a session on Stripe. Two things keep it narrow and both are load-bearing: the
 // session is created through Provider.CreatePaymentMethodUpdateSession, which
 // Stripe scopes to the card form alone (no billing history, no invoices), and
-// the handler refuses any subscription that is not past_due. The token is not
+// the handler refuses unless the subscription's customer has one past_due —
+// not necessarily the one the token names, since one link goes out for a whole
+// box and the card it changes is the customer's. The token is not
 // a login and must never gate anything that reveals customer data.
 //
 // It shares DefaultOrderActionTTL deliberately: the dunning ladder runs 14 days
 // and the first email goes out on day zero, so a shorter TTL would kill that
-// link while the subscription was still recoverable. The link and the
-// subscription expire at roughly the same time, which is the behaviour we want.
+// link while the subscription was still recoverable. The link can outlive its
+// own subscription's trouble: it opens while any of the customer's
+// subscriptions is past due, until the TTL runs out.
 const OrderActionUpdateCard OrderActionPurpose = "update_card"
 
 // OrderActionSigner mints and verifies the tokens behind one-click order links

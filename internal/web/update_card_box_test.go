@@ -14,11 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/auth"
-	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/testutil"
@@ -108,11 +105,7 @@ func setStatus(t *testing.T, id uuid.UUID, status domain.SubscriptionStatus) {
 
 func newUpdateCardDeps(t *testing.T) (*Deps, *portalProvider) {
 	t.Helper()
-	d := newTestDeps()
-	d.SubscriptionService = app.NewSubscriptionService(store.NewSubscriptionStore(nil), store.NewOrderStore(nil),
-		audit.NewAuditWriter(), metrics.NewRegistry())
-	d.CustomerService = app.NewCustomerService(store.NewCustomerStore(), audit.NewAuditWriter(), metrics.NewRegistry())
-	d.MerchantTZ = time.UTC
+	d := newSubscribeDeps(t)
 	d.Logger = slog.New(slog.DiscardHandler)
 	d.OrderActionSigner = auth.NewOrderActionSigner("test-secret")
 	p := &portalProvider{}

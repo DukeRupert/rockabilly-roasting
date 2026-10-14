@@ -117,7 +117,11 @@ A declined batch runs **one dunning ladder per member** — each keeps its own
 attempt count and retry date — but **one email per failed charge**: the
 past-due notice and the ended mail name every member they cover
 (`recordRenewalFailures`). Members on different attempts, rare, mail apart,
-because the notice's stage and end date differ.
+because the notice's stage and end date differ. The notice's one-click card
+link names the first member, but it opens while any of the customer's
+subscriptions is past due: the form changes the customer's card, so pausing
+that one member must not lock the rest of the box out (`pastDueForCard`,
+`update_card_box_test.go`).
 
 **The two notices.** The signup page, when its lines are on more than one plan:
 "Mixed schedules: it all ships together this first time — after that, each

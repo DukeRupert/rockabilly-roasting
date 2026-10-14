@@ -23,8 +23,8 @@ const (
 	// one of these expires the subscription has usually ended, so the copy
 	// points at starting fresh rather than at fixing a card.
 	UpdateCardReasonExpired UpdateCardReason = "expired"
-	// UpdateCardReasonNotPastDue is a subscription that is no longer behind on
-	// payment — the card already went through, or the customer cancelled. Good
+	// UpdateCardReasonNotPastDue is a customer with nothing left behind on
+	// payment — the card already went through, or they cancelled. Good
 	// news, and worth saying plainly.
 	UpdateCardReasonNotPastDue UpdateCardReason = "not_past_due"
 	// UpdateCardReasonUnavailable is our end failing: no Stripe customer on the
@@ -313,7 +313,7 @@ func UpdateCardProblemContent(props UpdateCardProps) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<p class=\"font-oswald text-ink-soft text-sm leading-relaxed\">This subscription isn't behind on payment &mdash; either the charge went through or the subscription has since changed.</p><p class=\"font-oswald text-ink-soft text-sm mt-3 leading-relaxed\">Nothing to do here. Sign in if you'd still like to change the card on file.</p><a href=\"/account/subscriptions\" class=\"inline-block mt-5 font-oswald font-bold text-rust text-xs underline\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Your subscriptions</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<p class=\"font-oswald text-ink-soft text-sm leading-relaxed\">None of your subscriptions is behind on payment &mdash; either the charge went through or the subscription has since changed.</p><p class=\"font-oswald text-ink-soft text-sm mt-3 leading-relaxed\">Nothing to do here. Sign in if you'd still like to change the card on file.</p><a href=\"/account/subscriptions\" class=\"inline-block mt-5 font-oswald font-bold text-rust text-xs underline\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Your subscriptions</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

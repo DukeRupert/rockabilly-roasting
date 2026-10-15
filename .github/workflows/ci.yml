@@ -11,10 +11,11 @@ on:
   workflow_dispatch:
 
 # A force-push supersedes the run it interrupted — no point finishing a check
-# on a commit nobody will merge.
+# on a commit nobody will merge. Not on main, though: every commit there is
+# merged, so each one should get a finished run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -53,10 +54,10 @@ jobs:
           npm ci --prefix ui/checkout
 
       - name: Install mage
-        run: go install github.com/magefile/mage@latest
+        run: go install github.com/magefile/mage@v1.15.0  # pinned; matches magefiles/go.mod
 
-      # Runs vet, the scoping check, the admin-UI lint, both generated-artifact
-      # sync checks, and the full test suite. The testcontainer-backed packages
+      # Runs both generated-artifact sync checks, vet, the scoping check, the
+      # admin-UI lint, the full Go test suite and the checkout unit tests. The testcontainer-backed packages
       # need a Docker daemon, which the ubuntu runner provides.
       - name: mage check
         run: mage check

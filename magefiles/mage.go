@@ -106,8 +106,8 @@ func Clean() error {
 	return os.Remove("server")
 }
 
-// Check runs lint, scoping check, admin UI lint, and the Go and checkout tests
-// together (CI-style gate).
+// Check runs the templ and asset sync checks, then lint, scoping check, admin
+// UI lint, and the Go and checkout tests together (the CI gate).
 //
 // The two sync checks go first and alone. They are the targets here that
 // *write* — they re-run the generators and compare the result — while Lint and
@@ -545,9 +545,10 @@ func adminUIRoots() []string {
 // all. Today simply was not marked on the maintenance calendar, and nothing but
 // a browser could have said so.
 //
-// Read against the committed output.css rather than a fresh build. Having
-// `mage check` rebuild first made a lint depend on Node and a network, and
-// rewrote a tracked file as a side effect of checking it.
+// Read against the committed output.css rather than a fresh build, so the lint
+// alone (`mage checkAdminUI`) needs neither Node nor a network and never
+// rewrites a tracked file. Under `mage check` the committed file is trustworthy
+// anyway: CheckAssetSync runs first and fails if output.css is stale.
 //
 // That leaves one sharp edge: a token added without running `mage css` reads as
 // dead. It is not a false failure — the stylesheet genuinely does not carry the

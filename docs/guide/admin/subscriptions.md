@@ -37,6 +37,34 @@ The plan list table shows:
 
 Deactivating a plan does not cancel or pause any subscriptions already using it. It only prevents new customers from selecting it.
 
+## Several Coffees on One Subscription
+
+Customers can now put more than one coffee on a subscription in a single checkout. The **Subscribe** page lets them add items, and each item can have its own plan.
+
+**Each coffee is its own subscription.** A signup with three coffees creates three subscriptions, one per coffee, each with its own row in the Subscriptions list and its own detail page. Pause, skip, cancel, plan changes and size/grind changes all work on one coffee at a time from the admin, exactly as before.
+
+**Coffees that renew on the same day ship together.** When a customer has several subscriptions going to the same address on the same renewal run, they renew as **one order, one charge and one shipping fee**. Customers see these grouped as a "shipment" on their account page. Nothing groups them except the shared date and address: if one coffee is skipped or paused, it moves out of the shipment and the others stay where they were.
+
+- **Same plan:** coffees signed up together on one plan renew together every time.
+- **Different plans:** a weekly and a monthly ship together on the first order only. After that each plan renews on its own day, with its own shipping charge. The Subscribe page tells the customer this before they pay.
+
+### What the customer can do themselves
+
+On their account page, a customer can:
+
+- **Skip this shipment** -- move every coffee in a shipment to a new date together, so they keep shipping as one.
+- **Pause all** -- pause every coffee in a shipment.
+- Skip, pause, resume or cancel a single coffee.
+- Update the card on file.
+
+Changing size, grind or schedule still goes through you: the page tells customers to get in touch for those.
+
+If one coffee in a shipment is past due, the customer can't skip or pause the whole shipment until the payment is sorted.
+
+### Finding the subscriptions behind an order
+
+On an order's detail page, the side panel links to its subscriptions. An order for one subscription shows **View plan**. An order that covers several shows one link per coffee: **Plan 1 of 3**, **Plan 2 of 3**, and so on.
+
 ## Subscription List
 
 Navigate to **Subscriptions** in the admin sidebar to see all customer subscriptions.
@@ -110,7 +138,7 @@ A subscription moves through these statuses:
 active --> paused --> active (via resume)
 active --> cancelled
 active --> past_due --> active (on successful retry)
-active --> past_due --> cancelled
+active --> past_due --> expired (payment never recovered)
 paused --> cancelled
 past_due --> cancelled
 ```
@@ -121,9 +149,9 @@ past_due --> cancelled
 |--------|---------|
 | **Active** | The subscription is running normally. Renewal orders are placed automatically on schedule. |
 | **Paused** | The subscription is temporarily suspended. No renewal orders are created. The customer is not charged. |
-| **Past Due** | A renewal payment failed (e.g. expired card, insufficient funds). The system will retry, but staff attention may be needed. |
+| **Past Due** | A renewal payment failed (e.g. expired card, insufficient funds). The system retries and emails the customer on its own; see "Payment Failures" below. |
 | **Cancelled** | The subscription is permanently stopped. No further renewals will occur. This cannot be undone. |
-| **Expired** | The subscription reached its natural end date (if one was set). |
+| **Expired** | The payment never recovered, so the subscription ended after its last retry. The customer is emailed when it ends. Like Cancelled, it does not restart; the customer signs up again. |
 
 ## Staff Actions
 
@@ -184,11 +212,23 @@ Renewals are fully automatic and run in the background.
 
 ### Payment Failures
 
-If the payment fails (declined card, no saved payment method, etc.):
+If a renewal payment fails (declined card, no saved card, etc.), the subscription moves to **Past Due** and the shop works through a 14-day recovery schedule on its own:
 
-- The subscription is moved to **Past Due** status.
-- The renewal job returns an error and may be retried by the job queue.
-- If a past-due subscription successfully renews on retry, it is automatically restored to **Active**.
+| When | What happens |
+|------|--------------|
+| Day 0 | The charge fails. The customer is emailed with a one-click link to update their card. |
+| Day 3 | Retry. If it fails, no email (this one is deliberately quiet). |
+| Day 8 | Retry. If it fails, a reminder email. |
+| Day 12 | Retry. If it fails, a final-notice email. |
+| Day 14 | Last retry. If it fails, the subscription becomes **Expired** and the customer is emailed that it has ended. |
+
+Any successful retry puts the subscription back to **Active** and ships the order. The subscription's detail page shows a **Payment recovery** panel with where it is on this schedule, and **Retry payment now** queues a charge straight away, useful when a customer calls to say they've added a new card. It can be pressed once a day; a second press the same day says the attempt is already queued. A retry never charges a card the bank has blocked (below).
+
+**One email per failed charge.** When a shipment of several coffees fails, the customer gets one email naming every coffee in it, not one email per coffee. Each coffee still keeps its own place on the schedule above.
+
+**The card link covers the whole account.** The customer's card belongs to their account, not to one coffee, so updating it fixes every subscription they have. The link in the email keeps working as long as any of their subscriptions is past due, even if they have since paused or cancelled the coffee the email was about.
+
+**Cards the bank has blocked for good.** If the bank says a card is lost, stolen or closed, the shop never charges that card again, on any of the customer's subscriptions. The Payment recovery panel says so. If the customer has another card on file, renewals use it; if not, nothing more is charged until they add a new card, and the customer is still emailed so they know to do it.
 
 Jobs for subscriptions that no longer exist or are already cancelled are permanently discarded and will not retry.
 
@@ -200,4 +240,4 @@ Each renewal creates a standard order in the system with an order number prefixe
 - Are linked back to the subscription via the Renewal Orders table on the subscription detail page.
 - Track which billing period they cover (period start and end dates).
 
-When multiple subscriptions are batched into one order, each subscription gets its own line item, and all subscriptions are linked to that single order.
+When multiple subscriptions are batched into one order, each subscription gets its own line item, and all subscriptions are linked to that single order (see "Finding the subscriptions behind an order" above). A customer's first signup works the same way: one order, one shipping charge, however many coffees are on it.

@@ -42,4 +42,15 @@ jobs:
             export DOCKER_IMAGE=${{ env.IMAGE_NAME }}:dev-${{ github.sha }}
             docker compose pull
             docker compose down || true
-            docker compose up -d
+            # The script has no `set -e` and its last line decides the step's
+            # exit status, so a failed `up -d` must exit here or the cleanup
+            # below would turn the run green.
+            docker compose up -d || exit 1
+            # Each build is tagged dev-<sha>, so stale dev images pile up tagged,
+            # where a dangling-only prune never reaches them. Remove them by
+            # name rather than with a host-wide `prune -a`: this VPS also runs
+            # other sites, whose unused tagged images are not ours to delete.
+            # An image still in use is refused by rmi, which is the point.
+            docker images "${{ env.IMAGE_NAME }}" --format '{{.Repository}}:{{.Tag}}' \
+              | grep ':dev-' | grep -v -x -F "$DOCKER_IMAGE" \
+              | xargs -r docker rmi || true

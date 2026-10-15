@@ -11,8 +11,11 @@ on:
   workflow_dispatch:
 
 # A force-push supersedes the run it interrupted — no point finishing a check
-# on a commit nobody will merge. Not on main, though: every commit there is
-# merged, so each one should get a finished run.
+# on a commit nobody will merge. On main a running check is left to finish.
+# That does not give every main commit a run: a group holds one running and one
+# queued run, and a newer queued run replaces the older one, so of several
+# quick merges only the first and the last are checked. The last one's run
+# covers everything before it.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}

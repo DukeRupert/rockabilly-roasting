@@ -88,7 +88,7 @@ Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits 
 
 ## Releasing to production
 
-Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, then over SSH runs `docker compose pull` and `docker compose up -d` on the VPS — two separate lines, in a script with no `set -e`.
+Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, then over SSH runs `docker compose pull` and `docker compose up -d` on the VPS — two separate lines, in a script with no `set -e` — and finally `docker image prune -f` to clear the untagged image the previous `:latest` leaves behind. `up -d` is written `|| exit 1` so the prune after it cannot turn a failed start green; a failed `pull` still can (step 4).
 
 That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production — and not a passive one. It builds the ref you dispatch (`main` unless you pick another), pushes it as `:latest`, and deploys it. That is an unannotated release of trunk, not a restart of the current one, and it overwrites the `:latest` that had been pointing at the last release. `deploy-dev.yml` only ever pushes `:dev-<sha>`, so this workflow is the only writer of `:latest`. Use a tag unless you are deliberately deploying something that is not a release.
 

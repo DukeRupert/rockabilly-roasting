@@ -42,8 +42,13 @@ jobs:
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
             cd ${{ secrets.PROD_VPS_DEPLOY_PATH }}
             docker compose pull
-            docker compose up -d
-            # Each deploy orphans the previous :latest as an untagged image.
-            # Keep a week of them for a fast local rollback; every release is
-            # also on Docker Hub by tag, so older ones are just disk.
-            docker image prune -af --filter "until=168h"
+            # The script has no `set -e` and its last line decides the step's
+            # exit status, so a failed `up -d` must exit here or the cleanup
+            # below would turn the run green.
+            docker compose up -d || exit 1
+            # Each deploy leaves the previous :latest behind as an untagged
+            # (dangling) image. Rollback is a pull by tag from Docker Hub, so
+            # those are just disk. Dangling-only on purpose: this VPS also runs
+            # other sites, and `prune -a` would delete their unused tagged
+            # images too (and postgres:17-alpine, which the restore test uses).
+            docker image prune -f || true

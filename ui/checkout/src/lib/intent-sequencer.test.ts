@@ -1,4 +1,4 @@
-// Run with `node --test src/` from ui/checkout (Node 23.6+ strips the types).
+// Run with `npm test` from ui/checkout (Node 22.18+ strips the types).
 // The page is a box version and a valid flag; the server hands out intents
 // that the test answers by hand, so every interleaving is spelled out.
 import { test } from 'node:test';

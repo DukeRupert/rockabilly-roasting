@@ -208,9 +208,7 @@ maintenance calendar, and nothing short of opening a browser could have said so.
 If you add a token, add it to `input.css`; if the lint calls a class dead, the
 name is wrong rather than the check.
 
-**It is a local gate, not a CI one.** Nothing in `.github/workflows` runs `mage
-check` — the deploy workflows build and ship. So the lint only catches what
-somebody runs it against before pushing, which is how `bg-rr-paper-warm` reached
-`main`'s doorstep in the first place. Wiring `mage check` into CI is the obvious
-follow-up and is deliberately not done here, because it belongs to the repo's
-build setup rather than to a feature branch.
+**It runs locally and in CI.** `mage check` includes it, and
+`.github/workflows/ci.yml` runs `mage check` on every push and pull request. It
+used to be local only, which is how `bg-rr-paper-warm` reached `main`'s doorstep
+in the first place.

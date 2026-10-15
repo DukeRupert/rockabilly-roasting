@@ -68,7 +68,7 @@ func NewTestDB(t *testing.T) *pgxpool.Pool {
 	}
 
 	// Create pgxpool for test usage.
-	pool, err := pgxpool.New(ctx, connStr)
+	pool, err := newTestPool(ctx, connStr)
 	if err != nil {
 		t.Fatalf("create pgxpool: %v", err)
 	}
@@ -139,7 +139,7 @@ func SetupTestDB() (*pgxpool.Pool, func()) {
 	}
 	sqlDB.Close()
 
-	pool, err := pgxpool.New(ctx, connStr)
+	pool, err := newTestPool(ctx, connStr)
 	if err != nil {
 		panic(fmt.Sprintf("create pgxpool: %v", err))
 	}
@@ -159,4 +159,22 @@ func SetupTestDB() (*pgxpool.Pool, func()) {
 func migrationsPath() string {
 	_, filename, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(filename), "..", "..", "db", "migrations")
+}
+
+// testPoolMaxConns is fixed rather than left to pgxpool's default of
+// max(4, NumCPU). NewTestTx holds its connection until the test ends, and a
+// test commonly holds several while the code under test takes its own, so the
+// number a test needs does not depend on the machine. With the default, the
+// same test passed on an 8-CPU laptop and hung for ten minutes on a 4-CPU CI
+// runner waiting for a connection nothing would give back. Postgres allows 100
+// per container, and each test package gets its own container.
+const testPoolMaxConns = 32
+
+func newTestPool(ctx context.Context, connStr string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxConns = testPoolMaxConns
+	return pgxpool.NewWithConfig(ctx, cfg)
 }

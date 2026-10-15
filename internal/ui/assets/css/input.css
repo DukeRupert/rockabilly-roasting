@@ -1,10 +1,11 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 
 @source "../../components/**/*.templ";
 @source "../../layouts/**/*.templ";
 @source "../../admin/**/*.templ";
 @source "../../storefront/**/*.templ";
-@source "../../../../../ui/checkout/src/**/*.svelte";
+@source "../../**/*.go";
+@source "../../../../ui/checkout/src/**/*.svelte";
 
 @theme {
 	/* Rockabilly Roasting — Brand Colors (invariant) */

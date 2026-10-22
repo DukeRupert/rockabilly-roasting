@@ -618,12 +618,15 @@ templ SettingsContent(props SettingsProps) {
 					@fieldNote(props.FieldErrors, "tare_weight_oz", "")
 				</div>
 			</div>
-			<!-- Save bar. Not sticky: the admin layout sets overflow-x-hidden on
-			     the content wrapper, which computes overflow-y to auto and makes
-			     that wrapper the scrollport for any position:sticky inside it —
-			     the bar would silently never pin. The "unsaved changes" note is
-			     what tells a staffer who scrolled past it that the trip back up
-			     is still owed. -->
+			<!-- Save bar. Not sticky — but no longer because it cannot be: the
+			     admin layout used to set overflow-x-hidden on the content wrapper,
+			     which computes overflow-y to auto and made that wrapper the
+			     scrollport for any position:sticky inside it, so the bar would
+			     silently never pin. v1.123.0 swapped that for overflow-x-clip,
+			     which creates no scrollport, and sticky now works panel-wide. This
+			     bar simply has not been revisited; the "unsaved changes" note is
+			     still what tells a staffer who scrolled past it that the trip back
+			     up is owed. Making it pin is now a free choice, not a blocked one. -->
 			<div class="flex items-center justify-end gap-3 border-t border-rr-border bg-rr-raised px-4 py-3 sm:px-6">
 				<span x-show="dirty" x-cloak class="text-xs font-medium text-rr-body">Unsaved changes</span>
 				<button type="submit" class="rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">

@@ -337,8 +337,8 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Reset rate limit counters on successful login.
-		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
-		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.AuthScopeRetail, ratelimit.ClientIP(r)))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.AuthScopeLoginGuess, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 		// SameSite=Strict for password logins (not a cross-site redirect from email).
 		newCustomerSessionCookie(w, d.SecureCookies, rawToken, sessions.CustomerSessionDuration, http.SameSiteStrictMode)
@@ -723,8 +723,10 @@ func (d *Deps) handleAccountPasswordSetup(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var customer *domain.Customer
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.AuthService.SetPasswordWithToken(ctx, tx, token, password)
+		var txErr error
+		customer, txErr = d.AuthService.SetPasswordWithToken(ctx, tx, token, password)
 		return txErr
 	})
 	if err != nil {
@@ -740,7 +742,25 @@ func (d *Deps) handleAccountPasswordSetup(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	props := storefront.AccountPasswordSetupProps{Success: true}
+	// Redeeming the emailed token proves the reader owns the address, so the
+	// sign-in attempts it took to get here should not count against the new
+	// password. Per-account counters only (password guesses and emails sent):
+	// the IP counters stay, since anyone can reset their own account and that
+	// must not buy fresh guesses at somebody else's.
+	emailKey := ratelimit.HashIdentifier(domain.NormalizeEmail(customer.Email))
+	for _, scope := range []string{ratelimit.AuthScopeLoginGuess, ratelimit.AuthScopeRetail} {
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(scope, emailKey))
+	}
+
+	// Send each customer to the form they actually sign in on. Wholesale
+	// buyers used to land on the retail login, a different rate-limit bucket
+	// and a different flow, straight after resetting.
+	loginURL := "/account/login"
+	if customer.AccountType == domain.AccountTypeWholesale {
+		loginURL = "/wholesale/login"
+	}
+
+	props := storefront.AccountPasswordSetupProps{Success: true, LoginURL: loginURL}
 	if IsHTMX(r) {
 		storefront.AccountPasswordSetupContent(props).Render(ctx, w) //nolint:errcheck
 		return
@@ -847,8 +867,8 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reset rate limit counters on successful login.
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.AuthScopeWholesale, ratelimit.ClientIP(r)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.AuthScopeLoginGuess, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 	duration := sessions.CustomerSessionDuration
 	if rememberMe {

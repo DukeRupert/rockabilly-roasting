@@ -193,6 +193,9 @@ templ StaffLoginPage(errMsg string) {
 						</div>
 						<!-- Form card -->
 						<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
+							<div id="rate-limit-error" role="alert" class="mb-5 border-2 border-rust bg-paper p-3 text-center" hidden>
+								<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;"></p>
+							</div>
 							@StaffLoginForm(errMsg, "")
 						</div>
 						<p
@@ -204,6 +207,21 @@ templ StaffLoginPage(errMsg string) {
 					</div>
 				</div>
 			</div>
+			<script>
+				// A 429 swaps nothing, so the form would just sit there. The limiter
+				// sends its message as an HX-Trigger event; show it above the form.
+				document.body.addEventListener('rateLimited', function(evt) {
+					var box = document.getElementById('rate-limit-error');
+					if (!box || !evt.detail || !evt.detail.message) return;
+					box.querySelector('p').textContent = evt.detail.message;
+					box.hidden = false;
+				});
+				// Clear it on the next attempt, which renders its own outcome.
+				document.body.addEventListener('htmx:beforeRequest', function() {
+					var box = document.getElementById('rate-limit-error');
+					if (box) box.hidden = true;
+				});
+			</script>
 		</body>
 	</html>
 }

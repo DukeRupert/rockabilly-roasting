@@ -649,9 +649,7 @@ templ Storefront(props StorefrontProps) {
 						el.addEventListener('transitionend', function() { el.remove(); }, { once: true });
 					}
 
-					document.addEventListener('htmx:oobAfterSwap', function(evt) {
-						var toast = evt.detail.target.querySelector('[data-toast]');
-						if (!toast) return;
+					function animateToast(toast) {
 						toast.style.transform = 'translateX(100%)';
 						toast.style.opacity = '0';
 						requestAnimationFrame(function() {
@@ -661,6 +659,43 @@ templ Storefront(props StorefrontProps) {
 						setTimeout(function() { dismissToast(toast); }, 5000);
 						var closeBtn = toast.querySelector('[data-toast-close]');
 						if (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });
+					}
+
+					document.addEventListener('htmx:oobAfterSwap', function(evt) {
+						var toast = evt.detail.target.querySelector('[data-toast]');
+						if (toast) animateToast(toast);
+					});
+
+					// A rate-limited request comes back 429, which htmx refuses to swap, so
+					// without this the form simply does nothing and looks frozen. The limiter
+					// sends its message as an HX-Trigger event; render it as the same error
+					// toast the server's toast.Toast produces. textContent, never innerHTML.
+					document.body.addEventListener('rateLimited', function(evt) {
+						var container = document.getElementById('toast-container');
+						if (!container || !evt.detail || !evt.detail.message) return;
+						var wrap = document.createElement('div');
+						wrap.className = 'pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-6';
+						var toast = document.createElement('div');
+						toast.className = 'pointer-events-auto max-w-sm rounded-lg p-4 shadow-lg ring-1 bg-red-50 text-red-800 ring-red-600/10';
+						toast.style.transition = 'transform 300ms ease-out, opacity 300ms ease-out';
+						toast.setAttribute('role', 'alert');
+						toast.setAttribute('data-toast', '');
+						var row = document.createElement('div');
+						row.className = 'flex items-start';
+						var msg = document.createElement('p');
+						msg.className = 'flex-1 text-sm font-medium';
+						msg.textContent = evt.detail.message;
+						var close = document.createElement('button');
+						close.type = 'button';
+						close.setAttribute('data-toast-close', '');
+						close.className = 'ml-4 inline-flex shrink-0 rounded-md hover:opacity-70 focus:outline-2 focus:outline-offset-2';
+						close.innerHTML = '<span class="sr-only">Close</span><svg class="size-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"></path></svg>';
+						row.appendChild(msg);
+						row.appendChild(close);
+						toast.appendChild(row);
+						wrap.appendChild(toast);
+						container.replaceChildren(wrap);
+						animateToast(toast);
 					});
 				})();
 			</script>

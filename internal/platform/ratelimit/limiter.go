@@ -16,7 +16,7 @@ import (
 // Predefined limit configurations.
 var (
 	// Auth endpoints — tight sliding windows.
-	AuthIPLimit         = 10 // attempts per window per IP (across all auth endpoints)
+	AuthIPLimit         = 10 // attempts per window per IP, per auth scope
 	AuthIdentifierLimit = 5  // attempts per window per identifier
 	AuthWindow          = 15 * time.Minute
 
@@ -259,8 +259,6 @@ func HashIdentifier(identifier string) string {
 
 // Key builders for consistent rate limit key construction.
 
-func AuthIPKey(ip string) string                 { return "auth:ip:" + ip }
-func AuthIdentifierKey(hash string) string       { return "auth:id:" + hash }
 func MagicLinkIPKey(ip string) string            { return "magic:ip:" + ip }
 func CouponSessionKey(sessionID string) string   { return "coupon:sess:" + sessionID }
 func CouponIPKey(ip string) string               { return "coupon:ip:" + ip }
@@ -271,6 +269,24 @@ func WholesaleApplyIPKey(ip string) string       { return "wholesale-apply:ip:" 
 func NewsletterIPKey(ip string) string           { return "newsletter:ip:" + ip }
 func WhiteLabelIPKey(ip string) string           { return "white-label:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }
+
+// Auth counter scopes. See AuthLimit.
+const (
+	AuthScopeWholesale = "wholesale" // wholesale login (IP)
+	AuthScopeRetail    = "retail"    // retail login, forgot-password, verify-email send (IP); emails sent (identifier)
+	AuthScopeSecurity  = "security"  // signed-in password set/change
+	AuthScopeStaff     = "staff"     // admin login
+
+	// AuthScopeLoginGuess is the per-account budget for customer password
+	// checks. The wholesale form and the password path of the retail form
+	// both call CustomerLogin, which does not care about account type, so
+	// they must share one count: separate ones would give an attacker
+	// AuthIdentifierLimit guesses per form instead of per account.
+	AuthScopeLoginGuess = "login-guess"
+)
+
+func AuthIPKey(scope, ip string) string           { return "auth:" + scope + ":ip:" + ip }
+func AuthIdentifierKey(scope, hash string) string { return "auth:" + scope + ":id:" + hash }
 
 // ServiceReportKey buckets equipment fault reports by wholesale account, not by
 // IP: a cafe is one account behind one router, and the barista reporting the

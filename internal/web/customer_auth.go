@@ -338,7 +338,7 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 
 		// Reset rate limit counters on successful login.
 		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.AuthScopeRetail, ratelimit.ClientIP(r)))
-		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.AuthScopeRetail, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.AuthScopePassword, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 		// SameSite=Strict for password logins (not a cross-site redirect from email).
 		newCustomerSessionCookie(w, d.SecureCookies, rawToken, sessions.CustomerSessionDuration, http.SameSiteStrictMode)
@@ -744,11 +744,11 @@ func (d *Deps) handleAccountPasswordSetup(w http.ResponseWriter, r *http.Request
 
 	// Redeeming the emailed token proves the reader owns the address, so the
 	// sign-in attempts it took to get here should not count against the new
-	// password. Per-account counters only: the IP counters stay, since anyone
-	// can reset their own account and that must not buy fresh guesses at
-	// somebody else's.
+	// password. Per-account counters only (password guesses and emails sent):
+	// the IP counters stay, since anyone can reset their own account and that
+	// must not buy fresh guesses at somebody else's.
 	emailKey := ratelimit.HashIdentifier(domain.NormalizeEmail(customer.Email))
-	for _, scope := range []string{ratelimit.AuthScopeWholesale, ratelimit.AuthScopeRetail} {
+	for _, scope := range []string{ratelimit.AuthScopePassword, ratelimit.AuthScopeRetail} {
 		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(scope, emailKey))
 	}
 
@@ -868,7 +868,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Reset rate limit counters on successful login.
 	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.AuthScopeWholesale, ratelimit.ClientIP(r)))
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.AuthScopeWholesale, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.AuthScopePassword, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 	duration := sessions.CustomerSessionDuration
 	if rememberMe {

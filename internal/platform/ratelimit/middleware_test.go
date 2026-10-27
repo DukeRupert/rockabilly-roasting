@@ -37,41 +37,59 @@ func formEmail(r *http.Request) string { return r.FormValue("email") }
 
 // Reproduces the Village Bistro lockout: failed wholesale logins plus a
 // forgot-password request used to fill the shared retail bucket, so every
-// sign-in form answered 429. Each scope must count on its own.
-func TestAuthLimit_ScopesDoNotShareCounters(t *testing.T) {
+// sign-in form answered 429. Emails sent and password guesses now count
+// separately, wired as in router.go.
+func TestAuthLimit_ForgotPasswordDoesNotSpendPasswordBudget(t *testing.T) {
 	l := newTestLimiter(t)
-	wholesale := AuthLimit(l, AuthScopeWholesale, 10, 5, time.Minute, formEmail)(okHandler)
-	retail := AuthLimit(l, AuthScopeRetail, 5, 5, time.Minute, formEmail)(okHandler)
+	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 5, time.Minute, formEmail)(okHandler)
+	forgot := AuthLimit(l, AuthScopeRetail, AuthScopeRetail, 5, 5, time.Minute, formEmail)(okHandler)
 
 	for i := 0; i < 4; i++ {
 		if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusOK {
 			t.Fatalf("wholesale attempt %d: status %d", i+1, rec.Code)
 		}
 	}
-	if rec := postLogin(t, retail, "kara@example.com", false); rec.Code != http.StatusOK {
+	if rec := postLogin(t, forgot, "kara@example.com", false); rec.Code != http.StatusOK {
 		t.Fatalf("forgot-password: status %d", rec.Code)
 	}
-	if rec := postLogin(t, retail, "kara@example.com", false); rec.Code != http.StatusOK {
-		t.Fatalf("retail login after wholesale failures: status %d, want 200", rec.Code)
-	}
 	if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusOK {
-		t.Fatalf("5th wholesale attempt: status %d, want 200", rec.Code)
+		t.Fatalf("5th wholesale attempt after forgot-password: status %d, want 200", rec.Code)
 	}
 	if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("6th wholesale attempt: status %d, want 429", rec.Code)
 	}
 }
 
+// Both password forms call CustomerLogin, so splitting their per-account
+// counters would double the guesses an attacker gets at one account.
+func TestAuthLimit_PasswordFormsShareOneGuessBudget(t *testing.T) {
+	l := newTestLimiter(t)
+	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 5, time.Minute, formEmail)(okHandler)
+	retail := AuthLimit(l, AuthScopeRetail, AuthScopePassword, 5, 5, time.Minute, formEmail)(okHandler)
+
+	allowed := 0
+	for i := 0; i < 10; i++ {
+		for _, h := range []http.Handler{wholesale, retail} {
+			if postLogin(t, h, "victim@example.com", false).Code == http.StatusOK {
+				allowed++
+			}
+		}
+	}
+	if allowed != 5 {
+		t.Fatalf("%d password checks reached the handler across both forms, want 5", allowed)
+	}
+}
+
 func TestAuthLimit_ResetIdentifierReopensAccount(t *testing.T) {
 	l := newTestLimiter(t)
-	h := AuthLimit(l, AuthScopeWholesale, 10, 2, time.Minute, formEmail)(okHandler)
+	h := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 2, time.Minute, formEmail)(okHandler)
 	for i := 0; i < 2; i++ {
 		postLogin(t, h, "kara@example.com", false)
 	}
 	if rec := postLogin(t, h, "kara@example.com", false); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("status %d, want 429", rec.Code)
 	}
-	_ = l.Reset(t.Context(), AuthIdentifierKey(AuthScopeWholesale, HashIdentifier("kara@example.com")))
+	_ = l.Reset(t.Context(), AuthIdentifierKey(AuthScopePassword, HashIdentifier("kara@example.com")))
 	if rec := postLogin(t, h, "kara@example.com", false); rec.Code != http.StatusOK {
 		t.Fatalf("after reset: status %d, want 200", rec.Code)
 	}
@@ -81,7 +99,7 @@ func TestAuthLimit_ResetIdentifierReopensAccount(t *testing.T) {
 // the visitor sees a form that does nothing.
 func TestTooManyRequests_HTMXCarriesMessageInTrigger(t *testing.T) {
 	l := newTestLimiter(t)
-	h := AuthLimit(l, AuthScopeRetail, 1, 1, 15*time.Minute, formEmail)(okHandler)
+	h := AuthLimit(l, AuthScopeRetail, AuthScopeRetail, 1, 1, 15*time.Minute, formEmail)(okHandler)
 	postLogin(t, h, "kara@example.com", true)
 	rec := postLogin(t, h, "kara@example.com", true)
 
@@ -106,7 +124,7 @@ func TestTooManyRequests_HTMXCarriesMessageInTrigger(t *testing.T) {
 
 func TestTooManyRequests_PlainRequestHasNoHTMXHeaders(t *testing.T) {
 	l := newTestLimiter(t)
-	h := AuthLimit(l, AuthScopeRetail, 1, 1, time.Minute, formEmail)(okHandler)
+	h := AuthLimit(l, AuthScopeRetail, AuthScopeRetail, 1, 1, time.Minute, formEmail)(okHandler)
 	postLogin(t, h, "kara@example.com", false)
 	rec := postLogin(t, h, "kara@example.com", false)
 

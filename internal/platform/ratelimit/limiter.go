@@ -270,12 +270,19 @@ func NewsletterIPKey(ip string) string           { return "newsletter:ip:" + ip 
 func WhiteLabelIPKey(ip string) string           { return "white-label:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }
 
-// Auth counter scopes, one per sign-in surface. See AuthLimit.
+// Auth counter scopes. See AuthLimit.
 const (
-	AuthScopeWholesale = "wholesale" // wholesale password login
-	AuthScopeRetail    = "retail"    // retail login (magic link or password) and forgot-password
+	AuthScopeWholesale = "wholesale" // wholesale login (IP)
+	AuthScopeRetail    = "retail"    // retail login, forgot-password, verify-email send (IP); emails sent (identifier)
 	AuthScopeSecurity  = "security"  // signed-in password set/change
 	AuthScopeStaff     = "staff"     // admin login
+
+	// AuthScopePassword is the per-account budget for customer password
+	// checks. The wholesale form and the password path of the retail form
+	// both call CustomerLogin, which does not care about account type, so
+	// they must share one count: separate ones would give an attacker
+	// AuthIdentifierLimit guesses per form instead of per account.
+	AuthScopePassword = "password"
 )
 
 func AuthIPKey(scope, ip string) string           { return "auth:" + scope + ":ip:" + ip }

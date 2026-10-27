@@ -78,18 +78,21 @@ func GlobalLimit(limiter *Limiter, limit int, window time.Duration) func(http.Ha
 // limit when identifierFn is non-nil — identifierFn extracts the login
 // identifier (e.g. email) from the request form.
 //
-// scope names the counter set (AuthScopeWholesale and friends). Each auth
-// surface gets its own, because their limits differ: when they shared one,
-// four wrong wholesale passwords plus a forgot-password request filled the
-// retail allowance of 5, and the buyer who had just reset their password
-// was locked out of every sign-in form.
-func AuthLimit(limiter *Limiter, scope string, ipLimit int, idLimit int, window time.Duration, identifierFn func(*http.Request) string) func(http.Handler) http.Handler {
+// ipScope names the per-IP counter set and idScope the per-identifier one
+// (AuthScopeWholesale and friends). Each sign-in surface gets its own IP
+// counters, because their limits differ: when they shared one, four wrong
+// wholesale passwords plus a forgot-password request filled the retail
+// allowance of 5, and the buyer who had just reset their password was locked
+// out of every sign-in form. The identifier scope is separate so that forms
+// checking the same password can still share one per-account guess budget
+// (AuthScopePassword).
+func AuthLimit(limiter *Limiter, ipScope, idScope string, ipLimit int, idLimit int, window time.Duration, identifierFn func(*http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := ClientIP(r)
 
 			// Check per-IP limit.
-			ipKey := AuthIPKey(scope, ip)
+			ipKey := AuthIPKey(ipScope, ip)
 			allowed, _, resetAt, err := limiter.Allow(r.Context(), ipKey, ipLimit, window)
 			if err != nil {
 				next.ServeHTTP(w, r)
@@ -103,7 +106,7 @@ func AuthLimit(limiter *Limiter, scope string, ipLimit int, idLimit int, window 
 			// Check per-identifier limit if an identifier is present.
 			if identifierFn != nil {
 				if identifier := identifierFn(r); identifier != "" {
-					idKey := AuthIdentifierKey(scope, HashIdentifier(identifier))
+					idKey := AuthIdentifierKey(idScope, HashIdentifier(identifier))
 					allowed, _, resetAt, err = limiter.Allow(r.Context(), idKey, idLimit, window)
 					if err != nil {
 						next.ServeHTTP(w, r)

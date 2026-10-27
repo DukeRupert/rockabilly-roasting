@@ -85,7 +85,7 @@ func GlobalLimit(limiter *Limiter, limit int, window time.Duration) func(http.Ha
 // allowance of 5, and the buyer who had just reset their password was locked
 // out of every sign-in form. The identifier scope is separate so that forms
 // checking the same password can still share one per-account guess budget
-// (AuthScopePassword).
+// (AuthScopeLoginGuess).
 func AuthLimit(limiter *Limiter, ipScope, idScope string, ipLimit int, idLimit int, window time.Duration, identifierFn func(*http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

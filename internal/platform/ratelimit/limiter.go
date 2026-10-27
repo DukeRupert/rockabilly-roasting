@@ -277,12 +277,12 @@ const (
 	AuthScopeSecurity  = "security"  // signed-in password set/change
 	AuthScopeStaff     = "staff"     // admin login
 
-	// AuthScopePassword is the per-account budget for customer password
+	// AuthScopeLoginGuess is the per-account budget for customer password
 	// checks. The wholesale form and the password path of the retail form
 	// both call CustomerLogin, which does not care about account type, so
 	// they must share one count: separate ones would give an attacker
 	// AuthIdentifierLimit guesses per form instead of per account.
-	AuthScopePassword = "password"
+	AuthScopeLoginGuess = "login-guess"
 )
 
 func AuthIPKey(scope, ip string) string           { return "auth:" + scope + ":ip:" + ip }

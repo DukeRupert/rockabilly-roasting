@@ -41,7 +41,7 @@ func formEmail(r *http.Request) string { return r.FormValue("email") }
 // separately, wired as in router.go.
 func TestAuthLimit_ForgotPasswordDoesNotSpendPasswordBudget(t *testing.T) {
 	l := newTestLimiter(t)
-	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 5, time.Minute, formEmail)(okHandler)
+	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopeLoginGuess, 10, 5, time.Minute, formEmail)(okHandler)
 	forgot := AuthLimit(l, AuthScopeRetail, AuthScopeRetail, 5, 5, time.Minute, formEmail)(okHandler)
 
 	for i := 0; i < 4; i++ {
@@ -64,8 +64,8 @@ func TestAuthLimit_ForgotPasswordDoesNotSpendPasswordBudget(t *testing.T) {
 // counters would double the guesses an attacker gets at one account.
 func TestAuthLimit_PasswordFormsShareOneGuessBudget(t *testing.T) {
 	l := newTestLimiter(t)
-	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 5, time.Minute, formEmail)(okHandler)
-	retail := AuthLimit(l, AuthScopeRetail, AuthScopePassword, 5, 5, time.Minute, formEmail)(okHandler)
+	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopeLoginGuess, 10, 5, time.Minute, formEmail)(okHandler)
+	retail := AuthLimit(l, AuthScopeRetail, AuthScopeLoginGuess, 5, 5, time.Minute, formEmail)(okHandler)
 
 	allowed := 0
 	for i := 0; i < 10; i++ {
@@ -82,14 +82,14 @@ func TestAuthLimit_PasswordFormsShareOneGuessBudget(t *testing.T) {
 
 func TestAuthLimit_ResetIdentifierReopensAccount(t *testing.T) {
 	l := newTestLimiter(t)
-	h := AuthLimit(l, AuthScopeWholesale, AuthScopePassword, 10, 2, time.Minute, formEmail)(okHandler)
+	h := AuthLimit(l, AuthScopeWholesale, AuthScopeLoginGuess, 10, 2, time.Minute, formEmail)(okHandler)
 	for i := 0; i < 2; i++ {
 		postLogin(t, h, "kara@example.com", false)
 	}
 	if rec := postLogin(t, h, "kara@example.com", false); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("status %d, want 429", rec.Code)
 	}
-	_ = l.Reset(t.Context(), AuthIdentifierKey(AuthScopePassword, HashIdentifier("kara@example.com")))
+	_ = l.Reset(t.Context(), AuthIdentifierKey(AuthScopeLoginGuess, HashIdentifier("kara@example.com")))
 	if rec := postLogin(t, h, "kara@example.com", false); rec.Code != http.StatusOK {
 		t.Fatalf("after reset: status %d, want 200", rec.Code)
 	}

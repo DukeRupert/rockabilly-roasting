@@ -293,7 +293,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// login. A password attempt counts against the account's password budget,
 	// shared with the wholesale form; a magic-link request counts against the
 	// email-sending budget, shared with forgot-password.
-	retailPasswordLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeRetail, ratelimit.AuthScopePassword, ratelimit.MagicLinkIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
+	retailPasswordLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeRetail, ratelimit.AuthScopeLoginGuess, ratelimit.MagicLinkIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
 		return domain.NormalizeEmail(r.FormValue("email"))
 	})
 	accountLogin := http.HandlerFunc(deps.handleAccountLoginRequest)
@@ -354,7 +354,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(metrics.RecordRoute(accountMux)))
 
 	// Wholesale auth routes (password, no session required)
-	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeWholesale, ratelimit.AuthScopePassword, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
+	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeWholesale, ratelimit.AuthScopeLoginGuess, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
 		// Normalized so varying capitalization cannot mint a fresh bucket and
 		// multiply the per-identifier allowance.
 		return domain.NormalizeEmail(r.FormValue("email"))

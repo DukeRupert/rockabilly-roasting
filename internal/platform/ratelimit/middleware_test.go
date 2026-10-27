@@ -43,6 +43,7 @@ func TestAuthLimit_ForgotPasswordDoesNotSpendPasswordBudget(t *testing.T) {
 	l := newTestLimiter(t)
 	wholesale := AuthLimit(l, AuthScopeWholesale, AuthScopeLoginGuess, 10, 5, time.Minute, formEmail)(okHandler)
 	forgot := AuthLimit(l, AuthScopeRetail, AuthScopeRetail, 5, 5, time.Minute, formEmail)(okHandler)
+	retailPassword := AuthLimit(l, AuthScopeRetail, AuthScopeLoginGuess, 5, 5, time.Minute, formEmail)(okHandler)
 
 	for i := 0; i < 4; i++ {
 		if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusOK {
@@ -52,8 +53,10 @@ func TestAuthLimit_ForgotPasswordDoesNotSpendPasswordBudget(t *testing.T) {
 	if rec := postLogin(t, forgot, "kara@example.com", false); rec.Code != http.StatusOK {
 		t.Fatalf("forgot-password: status %d", rec.Code)
 	}
-	if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusOK {
-		t.Fatalf("5th wholesale attempt after forgot-password: status %d, want 200", rec.Code)
+	// The retail form is where the setup page used to send her, and where the
+	// shared IP counter answered 429.
+	if rec := postLogin(t, retailPassword, "kara@example.com", false); rec.Code != http.StatusOK {
+		t.Fatalf("5th guess, on the retail form: status %d, want 200", rec.Code)
 	}
 	if rec := postLogin(t, wholesale, "kara@example.com", false); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("6th wholesale attempt: status %d, want 429", rec.Code)

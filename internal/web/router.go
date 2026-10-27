@@ -283,7 +283,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /staff/setup", deps.handleStaffSetup)
 
 	// Retail account auth routes (magic link, no session required)
-	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
+	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeRetail, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
 		// Normalized so varying capitalization cannot mint a fresh bucket and
 		// multiply the per-identifier allowance.
 		return domain.NormalizeEmail(r.FormValue("email"))
@@ -303,7 +303,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// mux so the rate-limit middleware wraps the auth check (same pattern as wholesale
 	// auth routes). The limiter uses the same IP-based limits as magic-link since the
 	// threat model is identical: someone with a stolen session brute-forcing passwords.
-	securityLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
+	securityLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeSecurity, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
 		return ratelimit.ClientIP(r)
 	})
 	mux.Handle("POST /account/security/set", securityLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountPasswordSet))))
@@ -339,7 +339,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(metrics.RecordRoute(accountMux)))
 
 	// Wholesale auth routes (password, no session required)
-	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
+	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeWholesale, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
 		// Normalized so varying capitalization cannot mint a fresh bucket and
 		// multiply the per-identifier allowance.
 		return domain.NormalizeEmail(r.FormValue("email"))
@@ -440,7 +440,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /wholesale/account/equipment/{id}/report", servicePortal)
 
 	// Staff auth routes (no session required)
-	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
+	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthScopeStaff, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
 		// Normalized so varying capitalization cannot mint a fresh bucket and
 		// multiply the per-identifier allowance.
 		return domain.NormalizeEmail(r.FormValue("email"))

@@ -337,8 +337,8 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Reset rate limit counters on successful login.
-		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
-		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.AuthScopeRetail, ratelimit.ClientIP(r)))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.AuthScopeRetail, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 		// SameSite=Strict for password logins (not a cross-site redirect from email).
 		newCustomerSessionCookie(w, d.SecureCookies, rawToken, sessions.CustomerSessionDuration, http.SameSiteStrictMode)
@@ -847,8 +847,8 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reset rate limit counters on successful login.
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.AuthScopeWholesale, ratelimit.ClientIP(r)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.AuthScopeWholesale, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 	duration := sessions.CustomerSessionDuration
 	if rememberMe {

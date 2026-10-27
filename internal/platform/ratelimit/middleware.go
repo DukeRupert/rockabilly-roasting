@@ -77,13 +77,19 @@ func GlobalLimit(limiter *Limiter, limit int, window time.Duration) func(http.Ha
 // authentication endpoints. It also supports an optional per-identifier
 // limit when identifierFn is non-nil — identifierFn extracts the login
 // identifier (e.g. email) from the request form.
-func AuthLimit(limiter *Limiter, ipLimit int, idLimit int, window time.Duration, identifierFn func(*http.Request) string) func(http.Handler) http.Handler {
+//
+// scope names the counter set (AuthScopeWholesale and friends). Each auth
+// surface gets its own, because their limits differ: when they shared one,
+// four wrong wholesale passwords plus a forgot-password request filled the
+// retail allowance of 5, and the buyer who had just reset their password
+// was locked out of every sign-in form.
+func AuthLimit(limiter *Limiter, scope string, ipLimit int, idLimit int, window time.Duration, identifierFn func(*http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := ClientIP(r)
 
 			// Check per-IP limit.
-			ipKey := AuthIPKey(ip)
+			ipKey := AuthIPKey(scope, ip)
 			allowed, _, resetAt, err := limiter.Allow(r.Context(), ipKey, ipLimit, window)
 			if err != nil {
 				next.ServeHTTP(w, r)
@@ -97,7 +103,7 @@ func AuthLimit(limiter *Limiter, ipLimit int, idLimit int, window time.Duration,
 			// Check per-identifier limit if an identifier is present.
 			if identifierFn != nil {
 				if identifier := identifierFn(r); identifier != "" {
-					idKey := AuthIdentifierKey(HashIdentifier(identifier))
+					idKey := AuthIdentifierKey(scope, HashIdentifier(identifier))
 					allowed, _, resetAt, err = limiter.Allow(r.Context(), idKey, idLimit, window)
 					if err != nil {
 						next.ServeHTTP(w, r)

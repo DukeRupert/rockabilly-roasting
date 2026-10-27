@@ -165,8 +165,8 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reset rate limit counters on successful login.
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
-	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.AuthScopeStaff, ratelimit.ClientIP(r)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.AuthScopeStaff, ratelimit.HashIdentifier(domain.NormalizeEmail(email))))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,

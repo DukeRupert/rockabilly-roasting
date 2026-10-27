@@ -216,6 +216,11 @@ templ StaffLoginPage(errMsg string) {
 					box.querySelector('p').textContent = evt.detail.message;
 					box.hidden = false;
 				});
+				// Clear it on the next attempt, which renders its own outcome.
+				document.body.addEventListener('htmx:beforeRequest', function() {
+					var box = document.getElementById('rate-limit-error');
+					if (box) box.hidden = true;
+				});
 			</script>
 		</body>
 	</html>

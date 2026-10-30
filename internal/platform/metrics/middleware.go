@@ -8,9 +8,18 @@ import (
 	"time"
 )
 
-// unmatchedRoute labels every request no mux matched — scanner probes, and
-// requests rejected by middleware before routing (global rate limit, CSRF).
+// unmatchedRoute labels every request no mux matched: a method no route
+// registers (the mux's 405), and a request rejected by middleware before
+// routing (global rate limit, cross-origin check). A GET or HEAD scanner probe
+// is not one of them: it matches the router's "GET /" catch-all and is labelled
+// "/", the 404 page, or under a mounted prefix ("/admin/", "/static/") takes
+// that prefix's pattern. The home page is "/{$}".
 const unmatchedRoute = "unmatched"
+
+// otherMethod labels any method outside the standard set. net/http accepts any
+// token as a method, so a raw method label would let a scanner mint a series
+// per made-up verb.
+const otherMethod = "other"
 
 // statusRecorder captures the HTTP status code written by the handler.
 type statusRecorder struct {
@@ -56,8 +65,9 @@ func HTTPMiddleware(reg *Registry) func(http.Handler) http.Handler {
 			status := strconv.Itoa(rw.status)
 			duration := time.Since(start).Seconds()
 
-			reg.HTTPRequestsTotal.WithLabelValues(r.Method, pattern, status).Inc()
-			reg.HTTPRequestDuration.WithLabelValues(r.Method, pattern, status).Observe(duration)
+			method := methodLabel(r.Method)
+			reg.HTTPRequestsTotal.WithLabelValues(method, pattern, status).Inc()
+			reg.HTTPRequestDuration.WithLabelValues(method, pattern, status).Observe(duration)
 		})
 	}
 }
@@ -67,13 +77,20 @@ func HTTPMiddleware(reg *Registry) func(http.Handler) http.Handler {
 // innermost match is the most specific ("/admin/orders/{id}" rather than the
 // "/admin/" that mounted it), and since the innermost mux returns first, it is
 // the one that fills the slot.
+//
+// The fill is deferred so a panicking handler would keep its route if recovery
+// sat between HTTPMiddleware and the mux. This router has no recovery: a panic
+// unwinds past HTTPMiddleware too, and the request is not counted at all.
 func RecordRoute(mux *http.ServeMux) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ServeMux.ServeHTTP sets r.Pattern on the request it was given, before
+		// it calls the handler.
+		defer func() {
+			if slot, ok := r.Context().Value(routeKey{}).(*routeSlot); ok && slot.pattern == "" {
+				slot.pattern = r.Pattern
+			}
+		}()
 		mux.ServeHTTP(w, r)
-		// ServeMux.ServeHTTP sets r.Pattern on the request it was given.
-		if slot, ok := r.Context().Value(routeKey{}).(*routeSlot); ok && slot.pattern == "" {
-			slot.pattern = r.Pattern
-		}
 	})
 }
 
@@ -87,4 +104,15 @@ func routeLabel(pattern string) string {
 		return path
 	}
 	return pattern
+}
+
+// methodLabel passes the standard methods through and collapses anything else
+// to "other". Case-sensitive, as methods are.
+func methodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodOptions, http.MethodConnect, http.MethodTrace:
+		return method
+	}
+	return otherMethod
 }

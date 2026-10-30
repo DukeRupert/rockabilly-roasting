@@ -12,7 +12,8 @@ import (
 // registers (the mux's 405), and a request rejected by middleware before
 // routing (global rate limit, cross-origin check). A GET or HEAD scanner probe
 // is not one of them: it matches the router's "GET /" catch-all and is labelled
-// "/", the 404 page. The home page is "/{$}".
+// "/", the 404 page, or under a mounted prefix ("/admin/", "/static/") takes
+// that prefix's pattern. The home page is "/{$}".
 const unmatchedRoute = "unmatched"
 
 // otherMethod labels any method outside the standard set. net/http accepts any

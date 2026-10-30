@@ -12,10 +12,10 @@ import (
 
 // The shape of the real router: an inner mux mounted on an outer one, a home
 // page, a GET catch-all 404, and between HTTPMiddleware and the outer mux,
-// middleware that hands the next handler a copy of the request. The recovery
-// layer is not the real router's (it has none); it is here so the deferred
-// fill in RecordRoute can be seen. That copy is why the label cannot be read off r.Pattern in
-// HTTPMiddleware itself.
+// middleware that hands the next handler a copy of the request. That copy is
+// why the label cannot be read off r.Pattern in HTTPMiddleware itself. The
+// recovery layer is not the real router's (it has none); it is here so the
+// deferred fill in RecordRoute can be seen.
 func newTestHandler(reg *Registry) http.Handler {
 	inner := http.NewServeMux()
 	inner.HandleFunc("GET /admin/orders/{id}", func(w http.ResponseWriter, r *http.Request) {})

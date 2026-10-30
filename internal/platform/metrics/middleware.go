@@ -10,8 +10,7 @@ import (
 
 // unmatchedRoute labels every request no mux matched: a method no route
 // registers (the mux's 405), and a request rejected by middleware before
-// routing (global rate limit, cross-origin check) or by a panic in the
-// middleware above the mux. A GET or HEAD scanner probe
+// routing (global rate limit, cross-origin check). A GET or HEAD scanner probe
 // is not one of them: it matches the router's "GET /" catch-all and is labelled
 // "/", the 404 page. The home page is "/{$}".
 const unmatchedRoute = "unmatched"
@@ -78,8 +77,9 @@ func HTTPMiddleware(reg *Registry) func(http.Handler) http.Handler {
 // "/admin/" that mounted it), and since the innermost mux returns first, it is
 // the one that fills the slot.
 //
-// The fill is deferred so a panicking handler keeps its route: recovery sits
-// between HTTPMiddleware and the mux, so the panic unwinds through here.
+// The fill is deferred so a panicking handler would keep its route if recovery
+// sat between HTTPMiddleware and the mux. This router has no recovery: a panic
+// unwinds past HTTPMiddleware too, and the request is not counted at all.
 func RecordRoute(mux *http.ServeMux) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// ServeMux.ServeHTTP sets r.Pattern on the request it was given, before

@@ -12,8 +12,9 @@ import (
 
 // The shape of the real router: an inner mux mounted on an outer one, a home
 // page, a GET catch-all 404, and between HTTPMiddleware and the outer mux,
-// panic recovery and middleware that hands the next handler a copy of the
-// request. That copy is why the label cannot be read off r.Pattern in
+// middleware that hands the next handler a copy of the request. The recovery
+// layer is not the real router's (it has none); it is here so the deferred
+// fill in RecordRoute can be seen. That copy is why the label cannot be read off r.Pattern in
 // HTTPMiddleware itself.
 func newTestHandler(reg *Registry) http.Handler {
 	inner := http.NewServeMux()
@@ -93,7 +94,7 @@ func TestHTTPMiddleware_WrongMethodIsUnmatched(t *testing.T) {
 	assert.Equal(t, 2.0, testutil.ToFloat64(reg.HTTPRequestsTotal.WithLabelValues("POST", "unmatched", "405")))
 }
 
-// Recovery sits between HTTPMiddleware and the mux, so a panic unwinds through
+// With recovery between HTTPMiddleware and the mux, a panic unwinds through
 // RecordRoute. The route is still the one the mux matched.
 func TestHTTPMiddleware_PanicKeepsItsRoute(t *testing.T) {
 	reg := NewRegistry()

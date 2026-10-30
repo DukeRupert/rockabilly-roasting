@@ -10,7 +10,8 @@ import (
 
 // unmatchedRoute labels every request no mux matched: a method no route
 // registers (the mux's 405), and a request rejected by middleware before
-// routing (global rate limit, cross-origin check). A GET or HEAD scanner probe
+// routing (global rate limit, cross-origin check) or by a panic in the
+// middleware above the mux. A GET or HEAD scanner probe
 // is not one of them: it matches the router's "GET /" catch-all and is labelled
 // "/", the 404 page. The home page is "/{$}".
 const unmatchedRoute = "unmatched"

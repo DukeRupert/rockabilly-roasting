@@ -766,7 +766,7 @@ templ activeCustomersChannelToggle(value, label, current string) {
 	}
 }
 
-// SubscriptionsCard renders the active-subscriptions trend: each bar is the
+// SubscriptionsCard renders the live-subscriptions trend: each bar is the
 // live subscription count at the end of that day, so the series reads as a
 // growth curve. Mirrors RevenueCard — a 7/30/90-day selector swaps the whole
 // card via htmx, and #subscriptions-card is the stable swap target.
@@ -774,15 +774,14 @@ templ SubscriptionsCard(props SubscriptionsProps) {
 	<div id="subscriptions-card" class="border border-rr-border bg-rr-surface px-6 py-5">
 		<div class="flex items-baseline justify-between gap-3">
 			<div class="min-w-0">
-				<p class="label-font text-rr-muted">{ fmt.Sprintf("Active subscriptions · last %d days", props.Days) }</p>
+				<p class="label-font text-rr-muted">{ fmt.Sprintf("Live subscriptions · last %d days", props.Days) }</p>
 				<div class="mt-1 flex items-baseline gap-3 flex-wrap">
 					<p class="text-xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.CurrentActive) }</p>
 					@subscriptionsDelta(props)
 				</div>
+				<p class="mt-1 text-xs text-rr-muted">Live base — active, paused &amp; past-due, until cancelled.</p>
 				if props.Mode == "delta" {
-					<p class="mt-1 text-xs text-rr-muted">Net change per day — new &amp; reactivated minus cancelled.</p>
-				} else {
-					<p class="mt-1 text-xs text-rr-muted">Live base — active, paused &amp; past-due, until cancelled.</p>
+					<p class="mt-0.5 text-xs text-rr-muted">Bars: net change per day — new &amp; reactivated minus cancelled.</p>
 				}
 			</div>
 			<div class="flex flex-col items-end gap-1.5 shrink-0">

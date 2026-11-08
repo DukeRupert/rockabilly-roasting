@@ -42,10 +42,15 @@ func collectSubscriptionCounts(ctx context.Context, reg *Registry, pool *pgxpool
 	}
 	defer rows.Close()
 
-	// Reset to zero before updating.
+	// Reset to zero before updating: a status with no rows is absent from the
+	// GROUP BY, and its gauge must read zero rather than its last value.
+	// Every status gets a gauge so active + paused + past_due adds up to the
+	// admin dashboard's live-subscriptions number.
 	reg.SubscriptionsActive.Set(0)
 	reg.SubscriptionsPaused.Set(0)
+	reg.SubscriptionsPastDue.Set(0)
 	reg.SubscriptionsCancelled.Set(0)
+	reg.SubscriptionsExpired.Set(0)
 
 	for rows.Next() {
 		var status string
@@ -59,8 +64,12 @@ func collectSubscriptionCounts(ctx context.Context, reg *Registry, pool *pgxpool
 			reg.SubscriptionsActive.Set(float64(count))
 		case "paused":
 			reg.SubscriptionsPaused.Set(float64(count))
+		case "past_due":
+			reg.SubscriptionsPastDue.Set(float64(count))
 		case "cancelled":
 			reg.SubscriptionsCancelled.Set(float64(count))
+		case "expired":
+			reg.SubscriptionsExpired.Set(float64(count))
 		}
 	}
 }

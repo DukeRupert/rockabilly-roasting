@@ -517,7 +517,7 @@ func (d *Deps) handleAdminActiveCustomers(w http.ResponseWriter, r *http.Request
 	admin.ActiveCustomersCard(props).Render(ctx, w) //nolint:errcheck
 }
 
-// buildSubscriptionsProps assembles the active-subscriptions trend card: the
+// buildSubscriptionsProps assembles the live-subscriptions trend card: the
 // live base at the window start, the per-day net deltas across the window, and
 // the resulting daily levels. PriorActive is the window-start base; the card
 // renders growth against it. CurrentActive is the final (today's) level.

@@ -223,7 +223,7 @@ func (s *SubscriptionService) ForecastRenewals(ctx context.Context, tx pgx.Tx, n
 
 // ActiveSubscriptionsAsOf returns the number of subscriptions live (created and
 // not yet cancelled or expired) at the instant asOf. Seeds the running total
-// for the active-subscriptions-over-time chart.
+// for the live-subscriptions-over-time chart.
 func (s *SubscriptionService) ActiveSubscriptionsAsOf(ctx context.Context, tx pgx.Tx, asOf time.Time) (int, error) {
 	count, err := s.subscriptions.ActiveSubscriptionsAsOf(ctx, tx, asOf)
 	if err != nil {

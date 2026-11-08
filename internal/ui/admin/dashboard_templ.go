@@ -40,7 +40,7 @@ type ChannelRevenue struct {
 	HasSubs      bool // render the subscription/one-time mix instead of "No subscriptions"
 }
 
-// SubscriptionsProps backs the active-subscriptions trend card. Trend holds one
+// SubscriptionsProps backs the live-subscriptions trend card. Trend holds one
 // point per day (the live subscription count at end of day) over the selected
 // 7/30/90-day window. CurrentActive is today's count; PriorActive is the count
 // at the window's start, driving the period-over-period delta. PriorActive == 0
@@ -293,7 +293,7 @@ type DashboardProps struct {
 	// Charts
 	ActiveCustomers ActiveCustomersProps // distinct customers ordering, by window and channel
 	Revenue         RevenueProps
-	Subscriptions   SubscriptionsProps    // active-subscriptions trend, 7/30/90-day window
+	Subscriptions   SubscriptionsProps    // live-subscriptions trend, 7/30/90-day window
 	TopProducts     []charts.LabeledValue // top 5 by selected metric, last 30 days
 	TopBy           string                // "units" (default) or "weight"
 
@@ -1841,12 +1841,12 @@ func SubscriptionsCard(props SubscriptionsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "</div><p class=\"mt-1 text-xs text-rr-muted\">Live base — active, paused &amp; past-due, until cancelled.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "</div><p class=\"mt-1 text-xs text-rr-muted\">Live base — active, paused &amp; past-due, until cancelled or expired.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Mode == "delta" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "<p class=\"mt-0.5 text-xs text-rr-muted\">Bars: net change per day — new &amp; reactivated minus cancelled.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "<p class=\"mt-0.5 text-xs text-rr-muted\">Bars: net change per day — new minus cancelled &amp; expired.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -597,7 +597,7 @@ const subscriptionTermExpr = `CASE
 // cancelled or expired. Pause spans aren't individually timestamped, so a
 // paused subscription counts as live throughout; for a subscriber-base trend
 // that's the intended reading. Used to seed the running total for the
-// active-subscriptions-over-time chart.
+// live-subscriptions-over-time chart.
 func (s *SubscriptionStore) ActiveSubscriptionsAsOf(ctx context.Context, tx pgx.Tx, asOf time.Time) (_ int, err error) {
 	defer trackQuery(s.metrics, "subscriptions.active_as_of", time.Now(), &err)
 	var count int

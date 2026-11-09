@@ -46,7 +46,9 @@ type Registry struct {
 	// coffee went.
 	SubscriptionsRenewalBlocked prometheus.Gauge
 	SubscriptionsPaused         prometheus.Gauge
+	SubscriptionsPastDue        prometheus.Gauge
 	SubscriptionsCancelled      prometheus.Gauge
+	SubscriptionsExpired        prometheus.Gauge
 	SubscriptionRenewals        *prometheus.CounterVec
 
 	// Equipment service module. The two gauges are set by the daily stale sweep
@@ -272,9 +274,19 @@ func NewRegistry() *Registry {
 			Help: "Current count of paused subscriptions.",
 		}),
 
+		SubscriptionsPastDue: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "subscriptions_past_due_total",
+			Help: "Current count of past-due subscriptions.",
+		}),
+
 		SubscriptionsCancelled: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "subscriptions_cancelled_total",
 			Help: "Current count of cancelled subscriptions.",
+		}),
+
+		SubscriptionsExpired: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "subscriptions_expired_total",
+			Help: "Current count of expired subscriptions.",
 		}),
 
 		SubscriptionRenewals: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -375,7 +387,9 @@ func NewRegistry() *Registry {
 		m.SubscriptionsActive,
 		m.SubscriptionsRenewalBlocked,
 		m.SubscriptionsPaused,
+		m.SubscriptionsPastDue,
 		m.SubscriptionsCancelled,
+		m.SubscriptionsExpired,
 		m.SubscriptionRenewals,
 		// Stripe webhooks
 		m.StripeWebhooksReceived,

@@ -598,11 +598,42 @@ func priceToDollars(cents int) string {
 	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
 }
 
+// archivedVariantCount reports how many of the product's variants are archived,
+// which sizes the panel's show-archived toggle.
+func archivedVariantCount(variants []VariantWithOptions) int {
+	n := 0
+	for _, v := range variants {
+		if v.Variant.ArchivedAt != nil {
+			n++
+		}
+	}
+	return n
+}
+
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
 templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, attrs templ.Attributes) {
-	<div id="variants-panel" { attrs... } class="border border-rr-border bg-rr-surface">
-		<div class="px-4 py-5 sm:px-6">
+	<!--
+		Archived variants are hidden by default — products that have been
+		re-cut (sizes or grinds dropped) carry long tails of archived rows that
+		bury the live ones. The toggle is client-side and resets on every htmx
+		swap of this panel, so archiving a row drops it out of view and
+		unarchiving one brings it back into the live list.
+	-->
+	<div id="variants-panel" { attrs... } class="border border-rr-border bg-rr-surface" x-data="{ showArchived: false }">
+		<div class="flex items-center justify-between gap-4 px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Variants</h3>
+			if n := archivedVariantCount(variants); n > 0 {
+				<button
+					type="button"
+					class="text-sm text-rr-muted hover:text-rr-heading"
+					x-on:click="showArchived = !showArchived"
+					x-bind:aria-pressed="showArchived.toString()"
+					aria-pressed="false"
+				>
+					<span x-show="!showArchived">Show archived ({ fmt.Sprint(n) })</span>
+					<span x-show="showArchived" x-cloak>Hide archived ({ fmt.Sprint(n) })</span>
+				</button>
+			}
 		</div>
 		<div class="border-t border-rr-border">
 			if len(variants) > 0 {
@@ -625,7 +656,13 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, vwo := range variants {
-							<tr class={ templ.KV("opacity-60", vwo.Variant.ArchivedAt != nil) }>
+							<tr
+								class={ templ.KV("opacity-60", vwo.Variant.ArchivedAt != nil) }
+								if vwo.Variant.ArchivedAt != nil {
+									x-show="showArchived"
+									x-cloak
+								}
+							>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
 									<div>
 										<span class="font-mono font-medium text-rr-heading">{ vwo.Variant.SKU }</span>
@@ -734,6 +771,11 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						}
 					</tbody>
 				</table>
+				if archivedVariantCount(variants) == len(variants) {
+					<div class="px-4 py-5 sm:px-6" x-show="!showArchived">
+						<p class="text-sm text-rr-muted">Every variant is archived.</p>
+					</div>
+				}
 			} else {
 				<div class="px-4 py-5 sm:px-6">
 					<p class="text-sm text-rr-muted">No variants yet. Define options above first, then add variants.</p>

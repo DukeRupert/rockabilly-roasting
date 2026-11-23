@@ -91,6 +91,22 @@ var (
 	// (ErrRenewalNotDue) or charges it.
 	ErrRenewalInFlight          = errors.New("subscription renewal already in progress")
 	ErrSubscriptionPlanNotFound = errors.New("subscription plan not found")
+	// ErrSubscriptionRenewing refuses a customer's change while a renewal is
+	// charging or packing the subscription, or its box is due. Shown to the
+	// customer as is.
+	ErrSubscriptionRenewing = errors.New("we're packing this shipment right now — give it a few minutes, then try again")
+	// ErrSubscriptionPastDue refuses a customer's change to a subscription, or
+	// a box, with an unpaid charge. Shown to the customer as is.
+	ErrSubscriptionPastDue = errors.New("there's an unpaid charge to sort out first — update your card or retry the payment, then make your changes")
+	// ErrBoxFull refuses adding a coffee to a box that already holds the most
+	// a signup may. Shown to the customer as is.
+	ErrBoxFull = errors.New("a shipment holds up to 10 coffees")
+	// ErrAlreadyInBox refuses adding a coffee to a box that already has it on
+	// the same schedule. Shown to the customer as is.
+	ErrAlreadyInBox = errors.New("that coffee is already in this shipment on that schedule — change its quantity instead")
+	// ErrVariantNotSubscribable refuses a variant whose product is not sold on
+	// subscription, or not active. Shown to the customer as is.
+	ErrVariantNotSubscribable   = errors.New("that coffee isn't available on subscription")
 	ErrSubscriptionPlanInactive = errors.New("subscription plan is not active")
 
 	// Fulfillment errors

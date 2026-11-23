@@ -318,6 +318,22 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrSubscriptionChanged):
 		return http.StatusConflict, app.ErrSubscriptionChanged.Error()
 
+	// A customer's subscription change refused because a renewal is working on
+	// it. Conflict, like the one above: try again shortly and it goes through.
+	case errors.Is(err, app.ErrSubscriptionRenewing):
+		return http.StatusConflict, app.ErrSubscriptionRenewing.Error()
+
+	// A customer's subscription change the rules refuse. Each sentinel is
+	// written for the customer, so its own sentence, never the wrapped chain.
+	case errors.Is(err, app.ErrSubscriptionPastDue):
+		return http.StatusUnprocessableEntity, app.ErrSubscriptionPastDue.Error()
+	case errors.Is(err, app.ErrBoxFull):
+		return http.StatusUnprocessableEntity, app.ErrBoxFull.Error()
+	case errors.Is(err, app.ErrAlreadyInBox):
+		return http.StatusUnprocessableEntity, app.ErrAlreadyInBox.Error()
+	case errors.Is(err, app.ErrVariantNotSubscribable):
+		return http.StatusUnprocessableEntity, app.ErrVariantNotSubscribable.Error()
+
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotPayable),
 		errors.Is(err, app.ErrOrderNotCancellable),

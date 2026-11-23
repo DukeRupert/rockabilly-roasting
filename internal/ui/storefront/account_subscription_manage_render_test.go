@@ -133,6 +133,55 @@ func TestAccountSubscriptions_SavingDoesNotScrollToTheTop(t *testing.T) {
 	}
 }
 
+// The Change and Add a coffee forms sit in drawers that slide open and shut.
+// A saved change keeps its drawer open and swaps only the card's summary, so
+// the customer sees the new values without anything moving. A coffee added
+// closes its drawer, and the swap waits for the slide, so nothing under the
+// form leaps up when the page comes back.
+func TestAccountSubscriptions_Drawers(t *testing.T) {
+	f := newBoxPageFixture(t)
+	decaf := []SubscriptionChoice{{VariantID: uuid.New(), ProductID: uuid.New(), ProductTitle: "Decaf", BasePrice: 1900}}
+	active := f.row(f.month, f.run, domain.SubscriptionStatusActive, "Coffee")
+	paused := f.row(f.month, f.run, domain.SubscriptionStatusPaused, "Tea")
+	html := renderWithChoices(t, f, []AccountSubscriptionRow{active, paused}, decaf)
+
+	assert.Equal(t, 2, strings.Count(html, `data-manage-drawer="change"`), "the active and the paused card")
+	assert.Equal(t, 1, strings.Count(html, `data-manage-drawer="add"`))
+	assert.NotContains(t, html, `x-show="confirming === &#39;change&#39;"`, "x-show cannot animate")
+
+	t.Run("a saved change swaps only its own card's summary", func(t *testing.T) {
+		for _, row := range []AccountSubscriptionRow{active, paused} {
+			summary := "sub-summary-" + row.Subscription.ID.String()
+			assert.Contains(t, html, `id="`+summary+`"`)
+			start := strings.Index(html, `data-subscription-change="`+row.Subscription.ID.String()+`"`)
+			require.GreaterOrEqual(t, start, 0)
+			tag := html[strings.LastIndex(html[:start], "<form"):start]
+			assert.Contains(t, tag, `hx-target="#`+summary+`"`)
+			assert.Contains(t, tag, `hx-select="#`+summary+`"`)
+			assert.Contains(t, tag, `hx-swap="outerHTML show:none"`)
+			assert.Contains(t, tag, `saved = true`, "the drawer stays open and says Saved")
+			assert.NotContains(t, tag, `confirming = &#39;&#39;`, "a saved change does not close the drawer")
+		}
+	})
+
+	t.Run("a coffee added closes its drawer before the swap", func(t *testing.T) {
+		start := strings.Index(html, `data-box-add`)
+		require.GreaterOrEqual(t, start, 0)
+		tag := html[strings.LastIndex(html[:start], "<form"):start]
+		assert.Contains(t, tag, `hx-swap="innerHTML show:none swap:300ms"`)
+		assert.Contains(t, html, "duration-300", "the swap delay is the slide's duration")
+		assert.Contains(t, tag, `x-on:htmx:before-swap="if ($event.detail.xhr.getResponseHeader(&#39;HX-Reswap&#39;) !== &#39;none&#39;) confirming = &#39;&#39;"`,
+			"a rejected save (HX-Reswap: none) leaves the drawer open")
+	})
+
+	t.Run("closed and inert until opened", func(t *testing.T) {
+		start := strings.Index(html, `data-manage-drawer="add"`)
+		tag := html[strings.LastIndex(html[:start], "<div"):start]
+		assert.Contains(t, tag, " inert", "out of the tab order")
+		assert.Contains(t, tag, "grid-rows-[0fr]")
+	})
+}
+
 // The page's price, the form's live price and a renewal's charge must agree,
 // so all three round the discount the same way: down, in whole cents.
 func TestLineTotal_RoundsTheDiscountLikeARenewal(t *testing.T) {

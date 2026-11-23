@@ -825,8 +825,9 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					</div>
 				}
 			</div>
-			<!-- Title + meta -->
-			<div class="flex-1 min-w-0">
+			<!-- Title + meta. A saved Change swaps just this, by id, so the
+			     open drawer below stays put (subscriptionChangeForm). -->
+			<div id={ idAttr("sub-summary", sub.ID) } class="flex-1 min-w-0">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						if row.Product != nil {

@@ -116,6 +116,23 @@ func TestAccountSubscriptions_AddACoffee(t *testing.T) {
 	})
 }
 
+// Every form on the list saves back to this page. The body's boost scrolls
+// to the top after a swap, so the list overrides it: a customer who changes
+// the third card should still be looking at the third card.
+func TestAccountSubscriptions_SavingDoesNotScrollToTheTop(t *testing.T) {
+	f := newBoxPageFixture(t)
+	decaf := []SubscriptionChoice{{VariantID: uuid.New(), ProductID: uuid.New(), ProductTitle: "Decaf", BasePrice: 1900}}
+	html := renderWithChoices(t, f, []AccountSubscriptionRow{
+		f.row(f.month, f.run, domain.SubscriptionStatusActive, "Coffee"),
+	}, decaf)
+
+	list := strings.Index(html, `hx-swap="innerHTML show:none"`)
+	require.GreaterOrEqual(t, list, 0, "the list overrides the body's show:window:top")
+	for _, form := range []string{`/edit"`, `action="/account/subscriptions/box/add"`, `action="/account/subscriptions/box/skip"`} {
+		assert.Greater(t, strings.Index(html, form), list, "%s sits inside the list and inherits the override", form)
+	}
+}
+
 // The page's price, the form's live price and a renewal's charge must agree,
 // so all three round the discount the same way: down, in whole cents.
 func TestLineTotal_RoundsTheDiscountLikeARenewal(t *testing.T) {

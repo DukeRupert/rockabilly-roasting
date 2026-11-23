@@ -725,7 +725,11 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 			if props.hasControls() {
 				@subscriptionHelp()
 			}
-			<div class="space-y-8">
+			<!-- The body boosts every form with show:window:top, which suits a
+			     navigation. A save here comes back to this same page, so the
+			     reader stays where they were and the card they changed redraws
+			     in place. Errors are toasts and swap nothing either way. -->
+			<div class="space-y-8" hx-swap="innerHTML show:none">
 				for _, box := range props.Boxes {
 					@accountSubscriptionBox(box, props.MerchantTZ, props.ResumeOrderOn, props.options())
 				}

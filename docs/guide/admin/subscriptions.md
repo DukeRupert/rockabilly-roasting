@@ -55,9 +55,11 @@ On their account page, a customer can:
 - **Skip this shipment** -- move every coffee in a shipment to a new date together, so they keep shipping as one.
 - **Pause all** -- pause every coffee in a shipment.
 - Skip, pause, resume or cancel a single coffee.
+- **Change** a coffee: its size or grind, how many bags, and how often. Nothing is charged; it applies from the next shipment, and a new schedule starts after the shipment already booked.
+- **Add a coffee** to a shipment. It becomes a new subscription that ships and is charged with that shipment. If every coffee in the shipment has grandfathered free shipping, the new one gets it too, so the shipment keeps shipping free.
 - Update the card on file.
 
-Changing size, grind or schedule still goes through you: the page tells customers to get in touch for those.
+Each change shows in the subscription's activity like a staff change does, marked as the customer's, and the customer gets an email listing what changed. Switching to a different coffee altogether is still add, then cancel.
 
 If one coffee in a shipment is past due, the customer can't skip or pause the whole shipment until the payment is sorted.
 

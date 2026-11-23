@@ -131,6 +131,38 @@ coming: "These go out on different days — each shipment carries its own
 shipping charge", adding "Skip one to line them up" only when the items share a
 plan — a weekly and a monthly drift apart again whatever day they are moved to.
 
+### Customer changes
+
+From the account page a customer can change a subscription and add a coffee to
+a box (`SubscriptionService.EditSubscription`, `AddToBox`). Nothing is charged
+when they do: a renewal prices from the row as it stands, so every change
+simply arrives with the next shipment, and one email says what changed.
+
+- **What can change.** Quantity (1–10), the variant (another of the same
+  coffee — a grind or a size — whose own price then applies), and the plan.
+  A different coffee altogether is add, then cancel. Offered only for active
+  and paused subscriptions; a past-due one has a charge to settle first.
+- **A plan change keeps the booked shipment.** The next shipment goes out on
+  its date and the new interval counts from there. Staff `ChangePlan`
+  recomputes the date from the period start instead, which can land in the
+  past and charge at the next run; a customer must not get a charge they did
+  not see coming. A member that changes plan leaves its box after that
+  shipment, as a skip would.
+- **An added coffee joins the box's next renewal.** A new subscription at the
+  box's address and instant, its first period running from now to that
+  renewal. Not prorated: it is charged when it ships, like everything else in
+  the box. It inherits grandfathered shipping only when every member has it,
+  because `RenewBatch` waives shipping only when all members are grandfathered.
+- **Never during a renewal.** Both read under a row lock (`LockForCustomer`,
+  `LockBox`). A renewal claims before it reads, and its claim is an UPDATE, so
+  the two serialise: the change sees the claim and is refused
+  (`ErrSubscriptionRenewing`, "try again in a few minutes"), or the renewal
+  waits and reads the change. A box that is already due is refused too, since
+  an added coffee would miss the batch and ship alone.
+- **The email carries what changed.** The job holds the old and new values
+  captured at the change, so a second change a moment later cannot rewrite
+  what the first email says.
+
 ## 3. Rules worth knowing before changing anything
 
 - **The plan discount is a property of the line.** `OrderLine.PlanDiscountPct`,
@@ -267,8 +299,11 @@ were fixed here; these remain.
 
 ## Deferred, on purpose
 
-- **"Add to my next box"** from the product page: a first period shorter than
-  the plan interval, and a pro-rating question nobody has answered.
+- **"Add to my next box" from the product page.** The account page's Add a
+  coffee does it from the box, charged when it ships with no prorating (§2,
+  "Customer changes"); a product-page button is the open part.
+- **Swapping to a different coffee in one step.** Add the new one, cancel the
+  old.
 - **Whole-box resume.** Paused subscriptions have no box. Rows resumed the same
   day land on the same run anyway.
 - **One combined skip email per box.** Per-member emails are correct, just

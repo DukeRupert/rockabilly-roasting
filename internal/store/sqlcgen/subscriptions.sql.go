@@ -558,6 +558,111 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 	return items, nil
 }
 
+const lockSubscriptionBox = `-- name: LockSubscriptionBox :many
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions
+WHERE customer_id = $1
+  AND shipping_address_id = $2
+  AND next_order_at = $3
+  AND status IN ('active', 'past_due')
+ORDER BY id
+FOR UPDATE
+`
+
+type LockSubscriptionBoxParams struct {
+	CustomerID        uuid.UUID `json:"customer_id"`
+	ShippingAddressID uuid.UUID `json:"shipping_address_id"`
+	NextOrderAt       time.Time `json:"next_order_at"`
+}
+
+// Every member of one box, locked: the customer's active and past-due
+// subscriptions at one address on one renewal instant (domain.GroupIntoBoxes).
+// Adding to a box holds these so a renewal cannot claim the box between the
+// check and the insert.
+func (q *Queries) LockSubscriptionBox(ctx context.Context, arg LockSubscriptionBoxParams) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, lockSubscriptionBox, arg.CustomerID, arg.ShippingAddressID, arg.NextOrderAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Subscription{}
+	for rows.Next() {
+		var i Subscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.CustomerID,
+			&i.PlanID,
+			&i.Status,
+			&i.ShippingAddressID,
+			&i.CurrentPeriodStart,
+			&i.CurrentPeriodEnd,
+			&i.NextOrderAt,
+			&i.CancelledAt,
+			&i.PauseUntil,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.VariantID,
+			&i.Quantity,
+			&i.EndsAt,
+			&i.StripePaymentMethodID,
+			&i.RenewalClaimedAt,
+			&i.RenewalPaymentIntentID,
+			&i.RenewalRefunding,
+			&i.RenewalKeyGeneration,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockSubscriptionForCustomer = `-- name: LockSubscriptionForCustomer :one
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation FROM subscriptions
+WHERE id = $1 AND customer_id = $2
+FOR UPDATE
+`
+
+type LockSubscriptionForCustomerParams struct {
+	ID         uuid.UUID `json:"id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// A customer's edit reads the row under a lock. A renewal claims before it
+// reads, and its claim is an UPDATE, so the two serialise on this row: either
+// the edit sees the claim and refuses, or the renewal waits and reads the edit.
+func (q *Queries) LockSubscriptionForCustomer(ctx context.Context, arg LockSubscriptionForCustomerParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, lockSubscriptionForCustomer, arg.ID, arg.CustomerID)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.PlanID,
+		&i.Status,
+		&i.ShippingAddressID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.NextOrderAt,
+		&i.CancelledAt,
+		&i.PauseUntil,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.VariantID,
+		&i.Quantity,
+		&i.EndsAt,
+		&i.StripePaymentMethodID,
+		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
+	)
+	return i, err
+}
+
 const markSubscriptionRenewalRefunding = `-- name: MarkSubscriptionRenewalRefunding :exec
 UPDATE subscriptions
 SET renewal_key_generation = renewal_key_generation + CASE WHEN renewal_refunding THEN 0 ELSE 1 END,
@@ -715,6 +820,47 @@ type UpdateSubscriptionPlanDiscountParams struct {
 func (q *Queries) UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error {
 	_, err := q.db.Exec(ctx, updateSubscriptionPlanDiscount, arg.ID, arg.DiscountPct)
 	return err
+}
+
+const updateSubscriptionQuantity = `-- name: UpdateSubscriptionQuantity :one
+UPDATE subscriptions
+SET quantity = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id, renewal_claimed_at, renewal_payment_intent_id, renewal_refunding, renewal_key_generation
+`
+
+type UpdateSubscriptionQuantityParams struct {
+	ID       uuid.UUID `json:"id"`
+	Quantity int32     `json:"quantity"`
+}
+
+func (q *Queries) UpdateSubscriptionQuantity(ctx context.Context, arg UpdateSubscriptionQuantityParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, updateSubscriptionQuantity, arg.ID, arg.Quantity)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.PlanID,
+		&i.Status,
+		&i.ShippingAddressID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.NextOrderAt,
+		&i.CancelledAt,
+		&i.PauseUntil,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.VariantID,
+		&i.Quantity,
+		&i.EndsAt,
+		&i.StripePaymentMethodID,
+		&i.RenewalClaimedAt,
+		&i.RenewalPaymentIntentID,
+		&i.RenewalRefunding,
+		&i.RenewalKeyGeneration,
+	)
+	return i, err
 }
 
 const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one

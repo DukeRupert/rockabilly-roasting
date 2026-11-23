@@ -115,6 +115,33 @@ SET plan_id = $2,
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateSubscriptionQuantity :one
+UPDATE subscriptions
+SET quantity = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: LockSubscriptionForCustomer :one
+-- A customer's edit reads the row under a lock. A renewal claims before it
+-- reads, and its claim is an UPDATE, so the two serialise on this row: either
+-- the edit sees the claim and refuses, or the renewal waits and reads the edit.
+SELECT * FROM subscriptions
+WHERE id = $1 AND customer_id = $2
+FOR UPDATE;
+
+-- name: LockSubscriptionBox :many
+-- Every member of one box, locked: the customer's active and past-due
+-- subscriptions at one address on one renewal instant (domain.GroupIntoBoxes).
+-- Adding to a box holds these so a renewal cannot claim the box between the
+-- check and the insert.
+SELECT * FROM subscriptions
+WHERE customer_id = @customer_id
+  AND shipping_address_id = @shipping_address_id
+  AND next_order_at = @next_order_at
+  AND status IN ('active', 'past_due')
+ORDER BY id
+FOR UPDATE;
+
 -- name: UpdateSubscriptionStripePaymentMethodID :exec
 UPDATE subscriptions
 SET stripe_payment_method_id = $2, updated_at = now()

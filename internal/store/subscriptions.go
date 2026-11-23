@@ -507,6 +507,56 @@ func (s *SubscriptionStore) UpdatePlan(ctx context.Context, tx pgx.Tx, id, planI
 	return subscriptionFromRow(row), nil
 }
 
+// UpdateQuantity changes how many of its variant a subscription ships and
+// returns the updated row. The next renewal charges and ships the new count.
+func (s *SubscriptionStore) UpdateQuantity(ctx context.Context, tx pgx.Tx, id uuid.UUID, quantity int) (_ *domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.update_quantity", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateSubscriptionQuantity(ctx, sqlcgen.UpdateSubscriptionQuantityParams{
+		ID:       id,
+		Quantity: int32(quantity),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update subscription quantity: %w", err)
+	}
+	return subscriptionFromRow(row), nil
+}
+
+// LockForCustomer returns a customer's subscription with its row locked until
+// the transaction ends. pgx.ErrNoRows when the customer has no such
+// subscription. A renewal claims before it reads, so a customer edit made under
+// this lock either sees the claim or is seen by the renewal.
+func (s *SubscriptionStore) LockForCustomer(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID) (_ *domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.lock_for_customer", time.Now(), &err)
+	row, err := sqlcgen.New(tx).LockSubscriptionForCustomer(ctx, sqlcgen.LockSubscriptionForCustomerParams{
+		ID:         id,
+		CustomerID: customerID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("lock subscription %s for customer %s: %w", id, customerID, err)
+	}
+	return subscriptionFromRow(row), nil
+}
+
+// LockBox returns the members of one of a customer's boxes, with their rows
+// locked until the transaction ends: the active and past-due subscriptions at
+// one address on one renewal instant. Empty when there is no such box.
+func (s *SubscriptionStore) LockBox(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, key domain.SubscriptionBoxKey) (_ []domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.lock_box", time.Now(), &err)
+	rows, err := sqlcgen.New(tx).LockSubscriptionBox(ctx, sqlcgen.LockSubscriptionBoxParams{
+		CustomerID:        customerID,
+		ShippingAddressID: key.ShippingAddressID,
+		NextOrderAt:       key.NextOrderAt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("lock subscription box: %w", err)
+	}
+	subs := make([]domain.Subscription, len(rows))
+	for i, r := range rows {
+		subs[i] = *subscriptionFromRow(r)
+	}
+	return subs, nil
+}
+
 // ClearEndsAt removes a subscription's end date.
 //
 // The counterpart ExpireForDunning has existed since June; this did not, which
@@ -989,6 +1039,7 @@ func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 		RenewalPaymentIntentID: r.RenewalPaymentIntentID,
 		RenewalRefunding:       r.RenewalRefunding,
 		RenewalKeyGeneration:   int(r.RenewalKeyGeneration),
+		RenewalClaimedAt:       timestampFromPG(r.RenewalClaimedAt),
 		Metadata:               metadataFromJSON(r.Metadata),
 		CreatedAt:              r.CreatedAt,
 		UpdatedAt:              r.UpdatedAt,

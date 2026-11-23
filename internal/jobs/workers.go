@@ -620,6 +620,29 @@ type SubscriptionSkipUndoneArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionSkipUndoneArgs) Kind() string { return "email:subscription_skip_undone" }
 
+// SubscriptionChangedArgs tells a customer what they changed on a
+// subscription from their account, or that they added a coffee to a box. The
+// old and new values are carried, as app.SubscriptionChangeNotice explains.
+type SubscriptionChangedArgs struct {
+	SubscriptionID uuid.UUID  `json:"subscription_id"`
+	CustomerID     uuid.UUID  `json:"customer_id"`
+	Added          bool       `json:"added,omitempty"`
+	OldQuantity    int        `json:"old_quantity,omitempty"`
+	NewQuantity    int        `json:"new_quantity,omitempty"`
+	OldVariantID   *uuid.UUID `json:"old_variant_id,omitempty"`
+	NewVariantID   *uuid.UUID `json:"new_variant_id,omitempty"`
+	OldPlanID      *uuid.UUID `json:"old_plan_id,omitempty"`
+	NewPlanID      *uuid.UUID `json:"new_plan_id,omitempty"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionChangedArgs) Kind() string { return "email:subscription_changed" }
+
+// SubscriptionChangedArgsFrom is the job for a change notice.
+func SubscriptionChangedArgsFrom(n app.SubscriptionChangeNotice) SubscriptionChangedArgs {
+	return SubscriptionChangedArgs(n)
+}
+
 // SubscriptionDunningEndedArgs sends the "subscription ended" notice after
 // dunning retries are exhausted and the subscription is expired. The two ids
 // are read as SubscriptionPastDueArgs's are.

@@ -660,3 +660,167 @@ func (s *SubscriptionService) sendSubscriptionsLifecycleEmail(ctx context.Contex
 	s.metrics.EmailsSent.WithLabelValues(spec.templateName, "sent").Inc()
 	return nil
 }
+
+// SendChangeEmail tells a customer what they changed on a subscription, or
+// that they added a coffee to a box, and when it takes effect. Read → send →
+// audit. The subscription must belong to n.CustomerID, or nothing is sent: the
+// read is unscoped, and a crossed job must not mail one customer's coffee to
+// another.
+func (s *SubscriptionService) SendChangeEmail(ctx context.Context, pool *pgxpool.Pool, n SubscriptionChangeNotice) error {
+	var (
+		sub      *domain.Subscription
+		customer *domain.Customer
+		data     emailtemplates.SubscriptionChangedData
+	)
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var err error
+		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, n.SubscriptionID)
+		if err != nil {
+			return fmt.Errorf("get subscription %s: %w", n.SubscriptionID, err)
+		}
+		if sub.CustomerID != n.CustomerID {
+			return fmt.Errorf("subscription %s for customer %s: %w", sub.ID, n.CustomerID, ErrSubscriptionNotFound)
+		}
+		customer, err = s.customers.GetByID(ctx, tx, n.CustomerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", n.CustomerID, err)
+		}
+		data, err = s.changeEmailData(ctx, tx, sub, n)
+		return err
+	}); err != nil {
+		return err
+	}
+	data.CustomerName = customer.FirstName
+	data.NextShipOn = sub.NextOrderAt
+	data.StoreName = s.email.StoreName
+	data.StoreURL = s.email.BaseURL
+	data.AccountURL = s.email.BaseURL + "/account/subscriptions"
+
+	subject := "Your subscription is updated"
+	if n.Added {
+		subject = "Added to your next shipment"
+	}
+	html, text, err := s.email.Renderer.Render("subscription_changed", data)
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_changed", "failed").Inc()
+		return fmt.Errorf("render subscription changed template: %w", err)
+	}
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+		Tag:     "subscription-changed",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_changed", "failed").Inc()
+		return fmt.Errorf("send subscription changed email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "subscription_changed_worker",
+			Action:       audit.AuditEmailSubscriptionChanged,
+			ResourceType: "subscription",
+			ResourceID:   sub.ID,
+		})
+	}); err != nil {
+		return fmt.Errorf("audit subscription changed email sent: %w", err)
+	}
+	s.metrics.EmailsSent.WithLabelValues("subscription_changed", "sent").Inc()
+	return nil
+}
+
+// changeEmailData names what changed, in the words the customer chose from.
+func (s *SubscriptionService) changeEmailData(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, n SubscriptionChangeNotice) (emailtemplates.SubscriptionChangedData, error) {
+	data := emailtemplates.SubscriptionChangedData{Added: n.Added, PlanChanged: n.NewPlanID != nil && !n.Added}
+
+	product, err := s.coffeeName(ctx, tx, sub.VariantID)
+	if err != nil {
+		return data, err
+	}
+	data.ProductName = product
+
+	planName := func(id *uuid.UUID) (string, error) {
+		plan, err := s.subscriptions.GetPlanByID(ctx, tx, *id)
+		if err != nil {
+			return "", fmt.Errorf("get plan %s: %w", *id, err)
+		}
+		return plan.Name, nil
+	}
+
+	if n.Added {
+		plan, err := planName(n.NewPlanID)
+		if err != nil {
+			return data, err
+		}
+		data.Rows = []emailtemplates.SubscriptionChangeRow{
+			{Label: "Coffee", Now: product},
+			{Label: "How many", Now: fmt.Sprintf("%d", n.NewQuantity)},
+			{Label: "How often", Now: plan},
+		}
+		return data, nil
+	}
+
+	if n.NewVariantID != nil {
+		was, err := s.optionLabel(ctx, tx, *n.OldVariantID)
+		if err != nil {
+			return data, err
+		}
+		now, err := s.optionLabel(ctx, tx, *n.NewVariantID)
+		if err != nil {
+			return data, err
+		}
+		data.Rows = append(data.Rows, emailtemplates.SubscriptionChangeRow{Label: "Grind & size", Was: was, Now: now})
+	}
+	if n.NewQuantity != 0 {
+		data.Rows = append(data.Rows, emailtemplates.SubscriptionChangeRow{
+			Label: "How many", Was: fmt.Sprintf("%d", n.OldQuantity), Now: fmt.Sprintf("%d", n.NewQuantity),
+		})
+	}
+	if n.NewPlanID != nil {
+		was, err := planName(n.OldPlanID)
+		if err != nil {
+			return data, err
+		}
+		now, err := planName(n.NewPlanID)
+		if err != nil {
+			return data, err
+		}
+		data.Rows = append(data.Rows, emailtemplates.SubscriptionChangeRow{Label: "How often", Was: was, Now: now})
+	}
+	return data, nil
+}
+
+// coffeeName is the product's title, with its grind and size when it has them:
+// "Switchblade Espresso (Whole Bean · 12oz)".
+func (s *SubscriptionService) coffeeName(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) (string, error) {
+	variant, err := s.catalog.GetVariantByID(ctx, tx, variantID)
+	if err != nil {
+		return "", fmt.Errorf("get variant %s: %w", variantID, err)
+	}
+	product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID)
+	if err != nil {
+		return "", fmt.Errorf("get product %s: %w", variant.ProductID, err)
+	}
+	label, err := s.optionLabel(ctx, tx, variantID)
+	if err != nil {
+		return "", err
+	}
+	if label == "" {
+		return product.Title, nil
+	}
+	return product.Title + " (" + label + ")", nil
+}
+
+// optionLabel is a variant's option values as a customer reads them,
+// "Whole Bean · 12oz", the way CatalogService.VariantLabel joins them. Empty
+// for a product with no options.
+func (s *SubscriptionService) optionLabel(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) (string, error) {
+	labels, err := s.catalog.ListVariantOptionLabels(ctx, tx, variantID)
+	if err != nil {
+		return "", fmt.Errorf("list variant option labels: %w", err)
+	}
+	return strings.Join(labels, " · "), nil
+}

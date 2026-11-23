@@ -1,0 +1,23 @@
+{{define "subscription_changed.txt"}}{{if .Added}}Added to Your Next Shipment
+
+Hi {{.CustomerName}},
+
+{{.ProductName}} is riding along with your next shipment. Nothing's charged today -- it's billed with the rest of the box when it goes out.
+{{else}}Your Subscription Is Updated
+
+Hi {{.CustomerName}},
+
+Here's what you changed on your {{.ProductName}} subscription. Nothing's charged today -- the change shows up in your next shipment.
+{{end}}
+{{range .Rows}}{{.Label}}: {{if .Was}}{{.Was}} -> {{end}}{{.Now}}
+{{end}}Next shipment: {{date .NextShipOn}}
+{{if .PlanChanged}}
+Your shipment on {{date .NextShipOn}} goes out as booked. The new rhythm picks up from there.
+{{end}}
+Manage your subscription: {{.AccountURL}}
+
+Didn't mean to? Change it back from your account any time before {{date .NextShipOn}}.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

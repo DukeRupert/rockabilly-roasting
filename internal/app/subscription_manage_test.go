@@ -466,3 +466,20 @@ func execT(t *testing.T, tx pgx.Tx, sql string, args ...any) {
 	_, err := tx.Exec(context.Background(), sql, args...)
 	require.NoError(t, err)
 }
+
+func TestSubscriptionEdit_Notice(t *testing.T) {
+	before := &domain.Subscription{ID: uuid.New(), CustomerID: uuid.New(), Quantity: 1, VariantID: uuid.New(), PlanID: uuid.New()}
+	after := *before
+	after.Quantity = 2
+	after.PlanID = uuid.New()
+	edit := &app.SubscriptionEdit{Before: before, After: &after, QuantityChanged: true, PlanChanged: true}
+
+	n := edit.Notice()
+	assert.Equal(t, 1, n.OldQuantity)
+	assert.Equal(t, 2, n.NewQuantity)
+	assert.Nil(t, n.NewVariantID, "an unchanged field is left out")
+	require.NotNil(t, n.OldPlanID)
+	assert.Equal(t, before.PlanID, *n.OldPlanID)
+	assert.Equal(t, after.PlanID, *n.NewPlanID)
+	assert.False(t, n.Added)
+}

@@ -392,3 +392,48 @@ func (s *SubscriptionService) activePlan(ctx context.Context, tx pgx.Tx, id uuid
 	}
 	return plan, nil
 }
+
+// SubscriptionChangeNotice is what a customer changed, captured when they
+// changed it, for the email that tells them. Old and new values are carried
+// rather than read back when the email is sent, so a second change a moment
+// later cannot rewrite what the first email says. A field that did not change
+// is zero (quantities) or nil (ids). Added marks a coffee added to a box; it has
+// only new values.
+type SubscriptionChangeNotice struct {
+	SubscriptionID uuid.UUID
+	CustomerID     uuid.UUID
+	Added          bool
+	OldQuantity    int
+	NewQuantity    int
+	OldVariantID   *uuid.UUID
+	NewVariantID   *uuid.UUID
+	OldPlanID      *uuid.UUID
+	NewPlanID      *uuid.UUID
+}
+
+// Notice is the change email's record of this edit.
+func (e *SubscriptionEdit) Notice() SubscriptionChangeNotice {
+	n := SubscriptionChangeNotice{SubscriptionID: e.After.ID, CustomerID: e.After.CustomerID}
+	if e.QuantityChanged {
+		n.OldQuantity, n.NewQuantity = e.Before.Quantity, e.After.Quantity
+	}
+	if e.VariantChanged {
+		n.OldVariantID, n.NewVariantID = &e.Before.VariantID, &e.After.VariantID
+	}
+	if e.PlanChanged {
+		n.OldPlanID, n.NewPlanID = &e.Before.PlanID, &e.After.PlanID
+	}
+	return n
+}
+
+// AddedNotice is the change email's record of a coffee added to a box.
+func AddedNotice(sub *domain.Subscription) SubscriptionChangeNotice {
+	return SubscriptionChangeNotice{
+		SubscriptionID: sub.ID,
+		CustomerID:     sub.CustomerID,
+		Added:          true,
+		NewQuantity:    sub.Quantity,
+		NewVariantID:   &sub.VariantID,
+		NewPlanID:      &sub.PlanID,
+	}
+}

@@ -1019,3 +1019,55 @@ func TestRender_DunningMailNamesEveryItem(t *testing.T) {
 	assert.Contains(t, text, "subscriptions for Bonneville (Monthly) and Decaf (Monthly)")
 	assert.Contains(t, text, "ended them")
 }
+
+func TestRender_SubscriptionChanged(t *testing.T) {
+	r, err := New(time.UTC)
+	require.NoError(t, err)
+	base := SubscriptionChangedData{
+		CustomerName: "Jane",
+		ProductName:  "Switchblade Espresso (Whole Bean · 12oz)",
+		NextShipOn:   time.Date(2026, 12, 14, 9, 0, 0, 0, time.UTC),
+		StoreName:    "Rockabilly Roasting",
+		StoreURL:     "https://rockabillyroasting.com",
+		AccountURL:   "https://rockabillyroasting.com/account/subscriptions",
+	}
+
+	t.Run("an edit lists what it was and what it is, and when", func(t *testing.T) {
+		data := base
+		data.Rows = []SubscriptionChangeRow{
+			{Label: "How many", Was: "1", Now: "3"},
+			{Label: "How often", Was: "Monthly", Now: "Every 2 weeks"},
+		}
+		data.PlanChanged = true
+		html, text, err := r.Render("subscription_changed", data)
+		require.NoError(t, err)
+		for _, body := range []string{html, text} {
+			assert.Contains(t, body, "Your Subscription Is Updated")
+			assert.Contains(t, body, "Every 2 weeks")
+			assert.Contains(t, body, "Monthly", "the old value is shown, so the customer can see what moved")
+			assert.Contains(t, body, "December 14, 2026")
+			assert.Contains(t, body, "goes out as booked", "a plan change keeps the booked shipment")
+			assert.Contains(t, body, "Nothing's charged today")
+		}
+		assert.Contains(t, text, "How many: 1 -> 3")
+	})
+
+	t.Run("an added coffee has no old values and no plan-change note", func(t *testing.T) {
+		data := base
+		data.Added = true
+		data.Rows = []SubscriptionChangeRow{
+			{Label: "Coffee", Now: "Switchblade Espresso (Whole Bean · 12oz)"},
+			{Label: "How many", Now: "2"},
+			{Label: "How often", Now: "Monthly"},
+		}
+		html, text, err := r.Render("subscription_changed", data)
+		require.NoError(t, err)
+		for _, body := range []string{html, text} {
+			assert.Contains(t, body, "Added to Your Next Shipment")
+			assert.Contains(t, body, "December 14, 2026")
+			assert.NotContains(t, body, "goes out as booked")
+		}
+		assert.Contains(t, text, "How many: 2\n")
+		assert.NotContains(t, html, "line-through")
+	})
+}

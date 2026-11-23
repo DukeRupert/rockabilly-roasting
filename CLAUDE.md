@@ -76,7 +76,7 @@ mage -l
 
 ## Architecture — Strict Layered Packages
 
-All application code lives under `internal/`. Dependencies flow **inward only** — violating these import rules is a compile error:
+All application code lives under `internal/`. Dependencies flow **inward only**. Nothing enforces these import rules yet (Go doesn't, and there is no archtest), so check them by hand in review:
 
 ```
 domain/   → nothing from this project (pure types, enums, constants)
@@ -144,6 +144,35 @@ Every admin HTML page uses htmx for in-page navigation. The pattern:
 - GET handlers check `IsHTMX(r)` and render the `Content` variant for htmx requests, full page for normal requests
 - POST handlers use `http.Redirect()` as-is — htmx follows redirects naturally
 - `hx-boost="true"` on `<body>` auto-upgrades links/forms; sidebar stays, content area swaps
+
+## Relationship to the firefly-go guide
+
+The `firefly-go` skill is the house Go guide, but Hiri predates it and is a product, not a brochure site. Decided 2026-11-23: in this repo, **package consistency wins for shape rules and the guide wins for safety rules.** Follow this section over the guide's "the guide wins for new code" rule. Don't migrate shapes piecemeal; that only happens as a planned, whole-package change.
+
+**Keep Hiri's way (shape rules), even in new code:**
+- Layers: `domain` / `store` / `app` / `web` / `jobs` / `platform`, not the guide's `core` / `store` / `web`.
+- Transactions: handlers open `store.Tx`; `app` methods take `pgx.Tx` and write audit records and River jobs in that same transaction (see Critical Patterns). Not the guide's store-only `InTx`.
+- Handlers: the plain `func(w, r)` shape with `web.Error` / `respond.go`, not `func(w, r) error` and an adapter.
+- Errors: specific sentinels in `app/errors.go` (`ErrOrderNotRefundable`) that carry the user-facing message.
+- htmx: version 2.0.4, `hx-boost` in the admin, errors as an OOB toast with `HX-Reswap: none`. The guide's htmx 4 rules don't apply.
+- Background work: River, not the guide's `workers` package and outbox table.
+- Tests: testify and testcontainers, as described under Testing.
+
+**Follow the guide (safety rules) in all new and touched code:**
+- Read settings only in config; no new `os.Getenv` in handlers or services.
+- Log with a context (`InfoContext`, `ErrorContext`) on an injected logger, under the key `"error"`; no `slog` package-level functions.
+- Outbound HTTP uses a client with a timeout and `http.NewRequestWithContext`; never `http.DefaultClient`, `http.Get` or `http.PostForm`.
+- Read form fields with `r.PostFormValue`, not `r.FormValue`.
+- Never send `err.Error()` to a visitor; compare errors with `errors.Is` / `errors.As`.
+- Responses that change with `HX-Request` set `Vary: HX-Request`.
+- No `time.Tick`, and no goroutines on `context.Background()`.
+
+**Known gaps from the guide, not yet fixed:**
+- No archtest enforcing the import rules above.
+- The runtime image is alpine and runs as root; the entrypoint shells out to the goose CLI.
+- `godotenv` loads `.env` in the binary.
+- Static assets aren't content-hashed; they're cached for an hour or a day, not served as immutable.
+- Session tokens are v4 UUIDs, not 32 bytes from `crypto/rand` (only the hash is stored, which is correct).
 
 ## Naming Conventions
 

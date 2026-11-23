@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +19,7 @@ import (
 // The account subscriptions page tells the customer what they can change and
 // how, next to the controls that do it. Without it the buttons were the only
 // hint, and a customer who wanted a different size or schedule had no way to
-// learn that the shop would switch it for them.
+// learn they could change it here.
 
 // helpSection cuts the help panel out of the page, so an assertion on it is
 // not satisfied by the account nav or a button elsewhere.
@@ -38,7 +39,7 @@ func TestAccountSubscriptions_HelpNamesWhatTheCustomerCanChange(t *testing.T) {
 	})
 
 	help := helpSection(t, html)
-	for _, want := range []string{"Skip", "Pause", "Resume", "Cancel", "Update payment method", "grind or schedule"} {
+	for _, want := range []string{"Change", "Add a coffee", "Skip", "Pause", "Resume", "Cancel", "Update payment method", "grind or size"} {
 		assert.Contains(t, help, want)
 	}
 	assert.Contains(t, help, `href="/account/addresses"`, "a move is an address edit")
@@ -74,6 +75,9 @@ func TestAccountSubscriptions_HelpQuotesLabelsThePageUses(t *testing.T) {
 	}
 	stripeID := "cus_test"
 	props := BuildAccountSubscriptionsProps(&domain.Customer{StripeCustomerID: &stripeID}, rows, f.tz)
+	// Something to add, so the box offers Add a coffee.
+	props.Choices = []SubscriptionChoice{{VariantID: uuid.New(), ProductID: uuid.New(), ProductTitle: "Decaf", BasePrice: 1800}}
+	props.Plans = []domain.SubscriptionPlan{*f.weekly}
 	var buf bytes.Buffer
 	require.NoError(t, AccountSubscriptionsContent(props).Render(context.Background(), &buf))
 	html := buf.String()

@@ -292,6 +292,8 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	customer, _ := auth.CustomerFromContext(ctx)
 
 	var rows []storefront.AccountSubscriptionRow
+	var choices []storefront.SubscriptionChoice
+	var activePlans []domain.SubscriptionPlan
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		subs, txErr := d.SubscriptionService.ListSubscriptionsByCustomer(ctx, tx, customer.ID)
@@ -357,6 +359,10 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 			}
 
 			price, prErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
+			if prErr == nil {
+				base := price.Amount
+				row.BasePrice = &base
+			}
 			if prErr == nil && row.Plan != nil {
 				unit := price.Amount
 				if row.Plan.DiscountPct > 0 {
@@ -364,8 +370,21 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 				}
 				row.UnitPrice = &unit
 			}
+			if label, lErr := d.CatalogService.VariantLabel(ctx, tx, variant.ID); lErr == nil {
+				row.VariantLabel = label
+			}
 
 			rows = append(rows, row)
+		}
+
+		// What the Change and Add a coffee forms offer. Only read when there
+		// is something to change: a cancelled-only page has no forms.
+		if hasChangeableSubscription(subs) {
+			var txErr error
+			choices, activePlans, txErr = d.subscriptionChoices(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
 		}
 		return nil
 	})
@@ -376,6 +395,7 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 
 	// Grouped into the boxes they ship in; see BuildAccountSubscriptionsProps.
 	props := storefront.BuildAccountSubscriptionsProps(customer, rows, d.MerchantTZ)
+	props.Choices, props.Plans = choices, activePlans
 	props.CartCount = d.cartItemCountFromCookie(r)
 	// Asked of the service rather than derived here, so the card quotes the
 	// same arithmetic the resume runs. Advisory, not a booking: this is the

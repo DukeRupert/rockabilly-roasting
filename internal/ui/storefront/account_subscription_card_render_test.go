@@ -21,7 +21,7 @@ import (
 func renderSubscriptionCard(t *testing.T, row AccountSubscriptionRow, tz *time.Location, resumeOn time.Time) string {
 	t.Helper()
 	var buf bytes.Buffer
-	require.NoError(t, accountSubscriptionCard(row, tz, resumeOn).Render(context.Background(), &buf))
+	require.NoError(t, accountSubscriptionCard(row, tz, resumeOn, subscriptionOptions{}).Render(context.Background(), &buf))
 	return buf.String()
 }
 

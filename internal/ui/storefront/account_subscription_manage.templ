@@ -1,0 +1,134 @@
+package storefront
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// subscriptionChangeForm is the Change panel on an active or paused card. It
+// sits inside the card's actions, whose Alpine scope holds confirming, and
+// keeps its own price state. Every select opens on what the subscription has,
+// so saving without touching anything changes nothing.
+templ subscriptionChangeForm(row AccountSubscriptionRow, opts subscriptionOptions, tz *time.Location) {
+	{{ sub := row.Subscription }}
+	{{ base, disc, qty := rowPrice(row) }}
+	{{ grinds := grindChoices(row, opts.Choices) }}
+	<form
+		x-show="confirming === 'change'"
+		x-cloak
+		x-data={ priceState(base, disc, qty) }
+		method="POST"
+		action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/edit") }
+		class="w-full border-2 border-ink bg-paper p-4 mt-1"
+		data-subscription-change={ sub.ID.String() }
+	>
+		<p class="font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Change this subscription</p>
+		<div class="mt-3 flex flex-wrap items-end gap-3">
+			if len(grinds) > 1 {
+				<div>
+					<label for={ idAttr("change-variant", sub.ID) } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Grind &amp; size</label>
+					<select id={ idAttr("change-variant", sub.ID) } name="variant_id" x-on:change="unit = +$event.target.selectedOptions[0].dataset.price" class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2">
+						for i, c := range grinds {
+							<option value={ c.VariantID.String() } data-price={ fmt.Sprintf("%d", c.BasePrice) } selected?={ i == 0 }>{ grindName(c) }</option>
+						}
+					</select>
+				</div>
+			}
+			<div>
+				<label for={ idAttr("change-qty", sub.ID) } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">How many</label>
+				<select id={ idAttr("change-qty", sub.ID) } name="quantity" x-model.number="qty" class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2">
+					for _, n := range subscriptionQuantities() {
+						<option value={ fmt.Sprintf("%d", n) } selected?={ n == qty }>{ fmt.Sprintf("%d", n) }</option>
+					}
+				</select>
+			</div>
+			<div>
+				<label for={ idAttr("change-plan", sub.ID) } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">How often</label>
+				<select id={ idAttr("change-plan", sub.ID) } name="plan_id" x-on:change="disc = +$event.target.selectedOptions[0].dataset.discount" class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2">
+					for i, p := range planChoices(row, opts.Plans) {
+						<option value={ p.ID.String() } data-discount={ fmt.Sprintf("%d", p.DiscountPct) } selected?={ i == 0 }>{ intervalLabel(p.Interval) }</option>
+					}
+				</select>
+			</div>
+		</div>
+		if base > 0 {
+			<p class="font-oswald text-ink-soft text-sm mt-3" style="letter-spacing:0.04em;">
+				<span class="font-special text-ink" x-text={ priceExpr } data-testid="change-price">{ formatCents(lineTotal(base, disc, qty)) }</span> per shipment for this coffee, plus shipping as usual.
+			</p>
+		}
+		<p class="font-special text-chrome-deep text-xs mt-2">
+			if sub.Status == domain.SubscriptionStatusPaused {
+				Nothing is charged today. Your changes ship when you resume.
+			} else {
+				Nothing is charged today. Your changes ship on { formatDateIn(sub.NextOrderAt, tz) }; a new schedule starts after that shipment.
+			}
+		</p>
+		<div class="mt-4 flex flex-wrap items-center gap-2">
+			<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Save changes</button>
+			<button type="button" x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+		</div>
+	</form>
+}
+
+// boxAddForm is the "Add a coffee" panel in a box's header, inside the header's
+// Alpine scope. The coffee rides with this shipment and is charged with it;
+// nothing is charged today.
+templ boxAddForm(box AccountSubscriptionBox, opts subscriptionOptions, tz *time.Location) {
+	{{ boxInstant := box.Key.NextOrderAt.UTC().Format(time.RFC3339Nano) }}
+	{{ formID := "box-add-" + box.Key.ShippingAddressID.String() + box.Key.NextOrderAt.UTC().Format("20060102150405") }}
+	{{ defaultPlan := boxPlanID(box) }}
+	<form
+		x-show="confirming === 'add'"
+		x-cloak
+		x-data={ priceState(0, boxPlanDiscount(box), 1) }
+		method="POST"
+		action="/account/subscriptions/box/add"
+		class="w-full border-2 border-ink bg-cream-hi p-4"
+		data-box-add
+	>
+		<input type="hidden" name="address_id" value={ box.Key.ShippingAddressID.String() }/>
+		<input type="hidden" name="next_order_at" value={ boxInstant }/>
+		<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+			It rides along with this shipment on <span class="font-special text-ink">{ formatDateIn(box.Day, tz) }</span> and is charged with it. Nothing is charged today.
+		</p>
+		<div class="mt-3 flex flex-wrap items-end gap-3">
+			<div class="min-w-0">
+				<label for={ formID + "-variant" } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Coffee</label>
+				<select id={ formID + "-variant" } name="variant_id" required x-on:change="unit = +$event.target.selectedOptions[0].dataset.price" class="mt-1 max-w-full border-2 border-ink bg-paper text-ink font-oswald text-sm px-3 py-2">
+					<option value="" disabled selected>Pick a coffee</option>
+					for _, c := range opts.Choices {
+						<option value={ c.VariantID.String() } data-price={ fmt.Sprintf("%d", c.BasePrice) }>{ c.Name() }</option>
+					}
+				</select>
+			</div>
+			<div>
+				<label for={ formID + "-qty" } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">How many</label>
+				<select id={ formID + "-qty" } name="quantity" x-model.number="qty" class="mt-1 border-2 border-ink bg-paper text-ink font-oswald text-sm px-3 py-2">
+					for _, n := range subscriptionQuantities() {
+						<option value={ fmt.Sprintf("%d", n) } selected?={ n == 1 }>{ fmt.Sprintf("%d", n) }</option>
+					}
+				</select>
+			</div>
+			<div>
+				<label for={ formID + "-plan" } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">How often</label>
+				<select id={ formID + "-plan" } name="plan_id" x-on:change="disc = +$event.target.selectedOptions[0].dataset.discount" class="mt-1 border-2 border-ink bg-paper text-ink font-oswald text-sm px-3 py-2">
+					for _, p := range opts.Plans {
+						<option value={ p.ID.String() } data-discount={ fmt.Sprintf("%d", p.DiscountPct) } selected?={ p.ID == defaultPlan }>{ intervalLabel(p.Interval) }</option>
+					}
+				</select>
+			</div>
+		</div>
+		<p x-show="unit > 0" x-cloak class="font-oswald text-ink-soft text-sm mt-3" style="letter-spacing:0.04em;">
+			<span class="font-special text-ink" x-text={ priceExpr }></span> per shipment for this coffee, plus shipping as usual.
+		</p>
+		<p class="font-special text-chrome-deep text-xs mt-2">
+			On a different schedule from the rest, it ships with this box once, then goes out on its own days.
+		</p>
+		<div class="mt-4 flex flex-wrap items-center gap-2">
+			<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Add to this shipment</button>
+			<button type="button" x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+		</div>
+	</form>
+}

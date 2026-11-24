@@ -76,17 +76,20 @@ mage -l
 
 ## Architecture — Strict Layered Packages
 
-All application code lives under `internal/`. Dependencies flow **inward only** — violating these import rules is a compile error:
+All application code lives under `internal/`. Dependencies flow **inward only**. Nothing enforces these import rules yet (Go doesn't, and there is no archtest), so check them by hand in review. This is what each package may import, and what the code does today:
 
 ```
-domain/   → nothing from this project (pure types, enums, constants)
-store/    → domain/
-app/      → store/, platform/audit, platform/metrics, domain/
-web/      → app/, platform/*, domain/, ui/
-ui/       → domain/ only
-jobs/     → app/, platform/*, domain/
-platform/ → domain/ only (audit sub-package)
+domain/         → nothing from this project (pure types, enums, constants)
+store/          → domain/
+platform/*      → domain/ (no platform package imports another)
+emailtemplates/ → nothing from this project
+app/            → store/, platform/*, emailtemplates/, domain/
+jobs/           → app/, store/ (to open transactions), platform/*, domain/
+ui/             → domain/, emailtemplates/, and platform/ helpers it renders with (audit, auth, help, media)
+web/            → app/, store/ (to open transactions), jobs/ (job args to enqueue), platform/*, ui/, domain/
 ```
+
+The lines that matter: `app` never imports `web`, `ui` or `jobs`; `jobs` never imports `web` or `ui`; `store` and `platform` never import `app`; nothing imports `web`.
 
 **Package responsibilities:**
 - `domain/` — shared vocabulary types, status enums as typed strings, no logic
@@ -144,6 +147,41 @@ Every admin HTML page uses htmx for in-page navigation. The pattern:
 - GET handlers check `IsHTMX(r)` and render the `Content` variant for htmx requests, full page for normal requests
 - POST handlers use `http.Redirect()` as-is — htmx follows redirects naturally
 - `hx-boost="true"` on `<body>` auto-upgrades links/forms; sidebar stays, content area swaps
+
+## Relationship to the firefly-go guide
+
+The `firefly-go` skill is the house Go guide, but Hiri predates it and is a product, not a brochure site. Decided 2026-11-23: in this repo, **package consistency wins for shape rules and the guide wins for safety rules.** Follow this section over the skill's "follow the guide for new code" instruction. Don't migrate shapes piecemeal; that only happens as a planned, whole-package change.
+
+**Keep Hiri's way (shape rules), even in new code:**
+- Layers: `domain` / `store` / `app` / `web` / `jobs` / `platform`, not the guide's `core` / `store` / `web`.
+- Transactions: handlers open `store.Tx`; `app` methods take `pgx.Tx` and write audit records and River jobs in that same transaction (see Critical Patterns). Work that calls an outside service (email, renewals, sweeps, geocoding) takes the pool instead and opens its own short transactions around the external call, so no transaction is held open across the network. Not the guide's store-only `InTx`.
+- Handlers: the plain `func(w, r)` shape with `web.Error` / `respond.go`, not `func(w, r) error` and an adapter.
+- Errors: specific sentinels in `app/errors.go` (`ErrOrderNotRefundable`) whose text is written for the customer. `web.Error` maps them in `respond.go` and shows that text, and everything unmapped gets "internal server error". That is the guide's "never send `err.Error()` to a visitor" done Hiri's way, so keep it.
+- htmx: version 2.0.4, `hx-boost` on the admin and storefront `<body>`, errors as an OOB toast with `HX-Reswap: none`. Of the guide's htmx rules, only its htmx 2 appendix applies; the htmx 4 rules don't.
+- Background work: River, not the guide's `workers` package and outbox table.
+- Tests: testify and testcontainers, as described under Testing.
+
+**Follow the guide (safety rules) in all new and touched code:**
+- Read environment variables only in `cmd/server/main.go` and pass the values in; there is no config package. No new `os.Getenv` in handlers or services.
+- Log with a context (`InfoContext`, `ErrorContext`) on the request logger from `logging.FromContext(ctx)` (see `docs/CLAUDE-backend.md`), errors under the key `"error"`; no new `slog` package-level calls.
+- Outbound HTTP uses a client with a timeout and `http.NewRequestWithContext`; never `http.DefaultClient`, `http.Get` or `http.PostForm`.
+- Read form fields with `r.PostFormValue`, not `r.FormValue`.
+- Never send a raw error to a visitor: only the sentinel text `respond.go` maps, as above. Compare errors with `errors.Is` / `errors.As`.
+- Responses that change with `HX-Request` set `Vary: HX-Request`.
+- No `time.Tick`, and no goroutines on `context.Background()`.
+
+**Known gaps from the guide, not yet fixed.** Existing code that breaks a safety rule above is listed here; fix it when you touch it, not in a sweep:
+- No archtest enforcing the import rules above.
+- About 400 `r.FormValue` calls in `internal/web` (the rule above is for new and touched code).
+- About 100 package-level `slog` calls.
+- Nothing sets `Vary: HX-Request`, though many handlers branch on `IsHTMX(r)`.
+- Handlers read `os.Getenv` directly: `web/checkout.go`, `web/subscribe.go` (Stripe publishable key), `web/admin_settings.go` (QuickBooks item fallback).
+- The Postmark client (`platform/email/postmark.go`) has no timeout: the SDK builds a bare `http.Client`.
+- Static assets are served from disk (`http.Dir` in `web/static.go`), not an `embed.FS`.
+- The runtime image is alpine and runs as root; the entrypoint shells out to the goose CLI.
+- `godotenv` loads `.env` in the binary.
+- Static assets aren't content-hashed; they're cached for an hour or a day, not served as immutable.
+- Session tokens are v4 UUIDs, not 32 bytes from `crypto/rand` (only the hash is stored, which is correct).
 
 ## Naming Conventions
 

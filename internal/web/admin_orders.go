@@ -401,6 +401,8 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var subscriptionIDs []uuid.UUID
 	var dealersChoice []admin.DealersChoiceLine
 	var dealersChoicePrevious *domain.PreviousPicks
+	var addressLock string
+	var addressSubscriptions int
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -471,6 +473,22 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			localPickupEnabled = cfg.LocalPickupEnabled
 			if shippingAddress != nil {
 				shipToIsLocal = cfg.IsLocal(shippingAddress.PostalCode)
+			}
+		}
+
+		// Whether staff may correct the ship-to, and if not, why. A refusal
+		// the service names (label bought, on a route, left the shop) is shown
+		// in place of the form; anything else is a real failure.
+		if editErr := d.OrderService.ShippingAddressEditable(ctx, tx, order); editErr != nil {
+			code, msg := mapError(editErr)
+			if code >= http.StatusInternalServerError {
+				return editErr
+			}
+			addressLock = msg
+		} else {
+			addressSubscriptions, txErr = d.OrderService.LiveSubscriptionsAtShippingAddress(ctx, tx, order)
+			if txErr != nil {
+				return txErr
 			}
 		}
 
@@ -672,6 +690,9 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 		DealersChoice:         dealersChoice,
 		DealersChoicePrevious: dealersChoicePrevious,
+
+		AddressLock:          addressLock,
+		AddressSubscriptions: addressSubscriptions,
 
 		PaymentDueAt: orderPaymentDueAt(order, customer, d.MerchantTZ),
 		Activity:     activity,
@@ -1077,6 +1098,90 @@ func (d *Deps) handleAdminOrderConvertToLocal(w http.ResponseWriter, r *http.Req
 		flash = "Converted+to+local+delivery.+It+is+on+the+delivery+queue+now."
 	}
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
+// handleAdminOrderShippingAddress corrects an order's ship-to from the edit
+// form on the order page. The address is saved to the order customer's
+// address book (reusing a matching row) and the order is pointed at it; with
+// move_subscriptions ticked, their live subscriptions at the old address move
+// too. Ungated like its sibling order actions.
+//
+// A refusal a person can act on (bad ZIP, label bought, on a route) comes back
+// as a flash on the order page rather than an error page, so the form is one
+// click away.
+func (d *Deps) handleAdminOrderShippingAddress(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	optional := func(name string) *string {
+		v := strings.TrimSpace(r.FormValue(name))
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
+	params := store.CreateAddressParams{
+		FirstName:   strings.TrimSpace(r.FormValue("first_name")),
+		LastName:    strings.TrimSpace(r.FormValue("last_name")),
+		Company:     optional("company"),
+		Line1:       strings.TrimSpace(r.FormValue("line1")),
+		Line2:       optional("line2"),
+		City:        strings.TrimSpace(r.FormValue("city")),
+		State:       strings.TrimSpace(r.FormValue("state")),
+		PostalCode:  strings.TrimSpace(r.FormValue("postal_code")),
+		CountryCode: "US",
+	}
+	moveSubs := r.FormValue("move_subscriptions") != ""
+	back := "/admin/orders/" + id.String()
+
+	if params.FirstName == "" || params.LastName == "" || params.Line1 == "" ||
+		params.City == "" || params.State == "" || params.PostalCode == "" {
+		http.Redirect(w, r, back+"?flash="+url.QueryEscape("Address not saved: name, street, city, state and ZIP are all required."), http.StatusSeeOther)
+		return
+	}
+
+	var change *app.ShippingAddressChange
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		order, txErr := d.OrderService.GetOrderAsStaff(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		if order.CustomerID == nil {
+			return app.ErrOrderAddressLocked
+		}
+		addr, txErr := d.CustomerService.FindOrCreateAddress(ctx, tx, *order.CustomerID, params, staffActor(r))
+		if txErr != nil {
+			return txErr
+		}
+		change, txErr = d.OrderService.ChangeShippingAddress(ctx, tx, id, addr.ID, moveSubs, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		code, msg := mapError(err)
+		if code >= http.StatusInternalServerError || errors.Is(err, app.ErrOrderNotFound) {
+			Error(w, r, err)
+			return
+		}
+		http.Redirect(w, r, back+"?flash="+url.QueryEscape("Address not saved: "+msg), http.StatusSeeOther)
+		return
+	}
+
+	flash := "Ship-to address updated. Shipping and tax were not recalculated."
+	switch n := len(change.MovedSubscriptions); n {
+	case 0:
+	case 1:
+		flash += " Their subscription now ships there too."
+	default:
+		flash += fmt.Sprintf(" Their %d subscriptions now ship there too.", n)
+	}
+	http.Redirect(w, r, back+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
 }
 
 // handleAdminOrderInternalNote saves the staff-only note on an order. Blank

@@ -178,3 +178,21 @@ VALUES ($1, $2, $3, $4);
 SELECT * FROM subscription_orders
 WHERE subscription_id = $1
 ORDER BY period_start DESC;
+
+-- name: CountLiveSubscriptionsAtAddress :one
+-- Subscriptions that will still renew to this address: everything not
+-- cancelled or expired. Paused ones count, because they resume to it.
+SELECT count(*) FROM subscriptions
+WHERE customer_id = @customer_id
+  AND shipping_address_id = @shipping_address_id
+  AND status IN ('active', 'paused', 'past_due');
+
+-- name: MoveLiveSubscriptionsToAddress :many
+-- Moves every live subscription at one address to another, together, so the
+-- box they renew in (grouped by address) stays one box.
+UPDATE subscriptions
+SET shipping_address_id = @to_address_id, updated_at = now()
+WHERE customer_id = @customer_id
+  AND shipping_address_id = @from_address_id
+  AND status IN ('active', 'paused', 'past_due')
+RETURNING id;

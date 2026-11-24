@@ -1800,3 +1800,19 @@ func (s *OrderStore) ListWaitingPickups(ctx context.Context, tx pgx.Tx, before t
 	}
 	return out, rows.Err()
 }
+
+// UpdateOrderShippingAddress points an order at another address belonging to
+// the order's own customer. pgx.ErrNoRows means the order does not exist or
+// the address is not that customer's; the query refuses rather than ship to
+// someone else's house.
+func (s *OrderStore) UpdateOrderShippingAddress(ctx context.Context, tx pgx.Tx, id, addressID uuid.UUID) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_shipping_address", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateOrderShippingAddress(ctx, sqlcgen.UpdateOrderShippingAddressParams{
+		ID:        id,
+		AddressID: addressID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update order shipping address: %w", err)
+	}
+	return orderFromRow(row), nil
+}

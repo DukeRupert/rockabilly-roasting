@@ -1183,3 +1183,32 @@ func (s *SubscriptionStore) ReleaseRenewalClaim(ctx context.Context, tx pgx.Tx, 
 	}
 	return nil
 }
+
+// CountLiveSubscriptionsAtAddress counts a customer's subscriptions that will
+// still renew to addressID: active, paused, or past due.
+func (s *SubscriptionStore) CountLiveSubscriptionsAtAddress(ctx context.Context, tx pgx.Tx, customerID, addressID uuid.UUID) (_ int, err error) {
+	defer trackQuery(s.metrics, "subscriptions.count_live_at_address", time.Now(), &err)
+	n, err := sqlcgen.New(tx).CountLiveSubscriptionsAtAddress(ctx, sqlcgen.CountLiveSubscriptionsAtAddressParams{
+		CustomerID:        customerID,
+		ShippingAddressID: addressID,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("count live subscriptions at address: %w", err)
+	}
+	return int(n), nil
+}
+
+// MoveLiveSubscriptionsToAddress moves every live subscription a customer has
+// at one address to another, returning the IDs it moved.
+func (s *SubscriptionStore) MoveLiveSubscriptionsToAddress(ctx context.Context, tx pgx.Tx, customerID, from, to uuid.UUID) (_ []uuid.UUID, err error) {
+	defer trackQuery(s.metrics, "subscriptions.move_live_to_address", time.Now(), &err)
+	ids, err := sqlcgen.New(tx).MoveLiveSubscriptionsToAddress(ctx, sqlcgen.MoveLiveSubscriptionsToAddressParams{
+		CustomerID:    customerID,
+		FromAddressID: from,
+		ToAddressID:   to,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("move live subscriptions to address: %w", err)
+	}
+	return ids, nil
+}

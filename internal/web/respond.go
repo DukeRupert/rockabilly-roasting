@@ -281,6 +281,8 @@ func mapError(err error) (int, string) {
 		}
 		return http.StatusConflict, "this order is not in a state where that step can be taken — reload the page to see where it stands"
 	case errors.Is(err, app.ErrOrderHasActiveLabel),
+		errors.Is(err, app.ErrOrderAddressLocked),
+		errors.Is(err, app.ErrOrderOnRoute),
 		errors.Is(err, app.ErrOrderQBManaged),
 		errors.Is(err, app.ErrStopAlreadyDelivered):
 		return http.StatusConflict, err.Error()

@@ -1111,6 +1111,69 @@ func (q *Queries) UpdateOrderRequestedDeliveryDate(ctx context.Context, arg Upda
 	return i, err
 }
 
+const updateOrderShippingAddress = `-- name: UpdateOrderShippingAddress :one
+UPDATE orders o
+SET shipping_address_id = $1, updated_at = now()
+WHERE o.id = $2
+  AND EXISTS (
+    SELECT 1 FROM addresses a
+    WHERE a.id = $1 AND a.customer_id = o.customer_id
+  )
+RETURNING o.id, o.number, o.customer_id, o.status, o.payment_status, o.fulfillment_status, o.currency_code, o.subtotal, o.discount_total, o.shipping_total, o.tax_total, o.total, o.shipping_address_id, o.billing_address_id, o.subscription_id, o.draft_by_user_id, o.tax_exempt, o.tax_exempt_reason, o.stripe_tax_id, o.notes, o.metadata, o.placed_at, o.created_at, o.updated_at, o.stripe_payment_intent_id, o.customer_po_number, o.internal_note, o.qb_invoice_id, o.qb_invoice_no, o.qb_synced_at, o.shipping_method, o.requested_delivery_date, o.overdue_reminder_stage, o.channel, o.scheduled_delivery_date, o.delivery_run_date
+`
+
+type UpdateOrderShippingAddressParams struct {
+	AddressID uuid.UUID `json:"address_id"`
+	ID        uuid.UUID `json:"id"`
+}
+
+// Points an order at another of its own customer's addresses. The EXISTS
+// refuses an address belonging to anyone else, so no caller can ship one
+// customer's order to another customer's house; zero rows means refused.
+func (q *Queries) UpdateOrderShippingAddress(ctx context.Context, arg UpdateOrderShippingAddressParams) (Order, error) {
+	row := q.db.QueryRow(ctx, updateOrderShippingAddress, arg.AddressID, arg.ID)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.Number,
+		&i.CustomerID,
+		&i.Status,
+		&i.PaymentStatus,
+		&i.FulfillmentStatus,
+		&i.CurrencyCode,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.ShippingTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.ShippingAddressID,
+		&i.BillingAddressID,
+		&i.SubscriptionID,
+		&i.DraftByUserID,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.StripeTaxID,
+		&i.Notes,
+		&i.Metadata,
+		&i.PlacedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripePaymentIntentID,
+		&i.CustomerPoNumber,
+		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
+		&i.ShippingMethod,
+		&i.RequestedDeliveryDate,
+		&i.OverdueReminderStage,
+		&i.Channel,
+		&i.ScheduledDeliveryDate,
+		&i.DeliveryRunDate,
+	)
+	return i, err
+}
+
 const updateOrderShippingMethod = `-- name: UpdateOrderShippingMethod :one
 UPDATE orders
 SET shipping_method = $2, updated_at = now()

@@ -331,3 +331,21 @@ func (s *RouteStore) MarkStopSkipped(ctx context.Context, tx pgx.Tx, id uuid.UUI
 		id, reason)
 	return scanRouteStop(row)
 }
+
+// OrderHasPendingStop reports whether the order is waiting as a pending stop
+// on a route that has not been completed. Such a stop carries its own copy of
+// the address and pin, taken when the route was planned.
+func (s *RouteStore) OrderHasPendingStop(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (_ bool, err error) {
+	defer trackQuery(s.metrics, "routes.order_has_pending_stop", time.Now(), &err)
+	var exists bool
+	err = tx.QueryRow(ctx,
+		`SELECT EXISTS (
+		   SELECT 1 FROM route_stops s
+		   JOIN delivery_routes r ON r.id = s.route_id
+		   WHERE s.order_id = $1 AND s.status = 'pending' AND r.status <> 'completed'
+		 )`, orderID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("order has pending stop: %w", err)
+	}
+	return exists, nil
+}

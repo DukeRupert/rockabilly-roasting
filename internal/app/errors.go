@@ -206,6 +206,16 @@ var (
 	// already has a live (non-refunded) label must have it refunded first.
 	ErrOrderHasActiveLabel = errors.New("order already has an active shipping label")
 
+	// ErrOrderAddressLocked refuses a ship-to change on an order that has left
+	// the shop, or never will (cancelled, refunded, complete), or has no
+	// customer whose address book it could point at.
+	ErrOrderAddressLocked = errors.New("this order's address can no longer be changed")
+
+	// ErrOrderOnRoute refuses a ship-to change on an order waiting as a stop on
+	// an open delivery route. The stop holds its own copy of the address and
+	// map pin, so changing the order alone would send the driver to the old one.
+	ErrOrderOnRoute = errors.New("this order is a stop on an open delivery route; take it off the route before changing its address")
+
 	// Taxon errors
 	ErrTaxonNotFound = errors.New("taxon not found")
 

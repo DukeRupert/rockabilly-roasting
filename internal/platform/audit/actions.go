@@ -119,6 +119,7 @@ const (
 	AuditOrderSwitchedToPickup       = "order.switched_to_pickup"
 	AuditOrderInternalNoteUpdated    = "order.internal_note_updated"
 	AuditOrderDealersChoicePicked    = "order.dealers_choice_picked"
+	AuditOrderShippingAddressChanged = "order.shipping_address_changed"
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"
@@ -149,6 +150,7 @@ const (
 	AuditSubscriptionVariantChanged        = "subscription.variant_changed"
 	AuditSubscriptionPlanChanged           = "subscription.plan_changed"
 	AuditSubscriptionQuantityChanged       = "subscription.quantity_changed"
+	AuditSubscriptionAddressChanged        = "subscription.address_changed"
 	AuditSubscriptionSkipped               = "subscription.skipped"
 	AuditSubscriptionSkipUndone            = "subscription.skip_undone"
 	// A renewal charged the card and has not yet written the order: the

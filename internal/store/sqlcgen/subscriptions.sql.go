@@ -125,6 +125,27 @@ func (q *Queries) ClearSubscriptionRenewalPaymentIntent(ctx context.Context, pay
 	return items, nil
 }
 
+const countLiveSubscriptionsAtAddress = `-- name: CountLiveSubscriptionsAtAddress :one
+SELECT count(*) FROM subscriptions
+WHERE customer_id = $1
+  AND shipping_address_id = $2
+  AND status IN ('active', 'paused', 'past_due')
+`
+
+type CountLiveSubscriptionsAtAddressParams struct {
+	CustomerID        uuid.UUID `json:"customer_id"`
+	ShippingAddressID uuid.UUID `json:"shipping_address_id"`
+}
+
+// Subscriptions that will still renew to this address: everything not
+// cancelled or expired. Paused ones count, because they resume to it.
+func (q *Queries) CountLiveSubscriptionsAtAddress(ctx context.Context, arg CountLiveSubscriptionsAtAddressParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countLiveSubscriptionsAtAddress, arg.CustomerID, arg.ShippingAddressID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, ends_at,
@@ -675,6 +696,43 @@ WHERE renewal_payment_intent_id = $1::text
 func (q *Queries) MarkSubscriptionRenewalRefunding(ctx context.Context, paymentIntentID string) error {
 	_, err := q.db.Exec(ctx, markSubscriptionRenewalRefunding, paymentIntentID)
 	return err
+}
+
+const moveLiveSubscriptionsToAddress = `-- name: MoveLiveSubscriptionsToAddress :many
+UPDATE subscriptions
+SET shipping_address_id = $1, updated_at = now()
+WHERE customer_id = $2
+  AND shipping_address_id = $3
+  AND status IN ('active', 'paused', 'past_due')
+RETURNING id
+`
+
+type MoveLiveSubscriptionsToAddressParams struct {
+	ToAddressID   uuid.UUID `json:"to_address_id"`
+	CustomerID    uuid.UUID `json:"customer_id"`
+	FromAddressID uuid.UUID `json:"from_address_id"`
+}
+
+// Moves every live subscription at one address to another, together, so the
+// box they renew in (grouped by address) stays one box.
+func (q *Queries) MoveLiveSubscriptionsToAddress(ctx context.Context, arg MoveLiveSubscriptionsToAddressParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, moveLiveSubscriptionsToAddress, arg.ToAddressID, arg.CustomerID, arg.FromAddressID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const releaseSubscriptionRenewalClaim = `-- name: ReleaseSubscriptionRenewalClaim :exec

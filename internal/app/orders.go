@@ -43,6 +43,9 @@ type OrderService struct {
 	// picks gates fulfillment and local hand-off on saved dealer's choice
 	// picks. Stateless, so NewOrderService builds it.
 	picks *store.PickStore
+	// routes answers whether an order is waiting on an open delivery route,
+	// which blocks changing its address. Stateless, so NewOrderService builds it.
+	routes *store.RouteStore
 	// settings answers whether QuickBooks billing is live, and which items
 	// invoices bill against. Populated via WithQBPreviews alongside the
 	// previews, because the digest is what first needed both.
@@ -85,6 +88,7 @@ func NewOrderService(orders *store.OrderStore, audit *audit.AuditWriter, metrics
 		audit:   audit,
 		metrics: metrics,
 		picks:   store.NewPickStore(nil),
+		routes:  store.NewRouteStore(nil),
 	}
 }
 

@@ -289,3 +289,17 @@ Once every stop is delivered or skipped, the route completes on its own and the 
 | Check the delivery load | Fulfillment → **Load list** | Pounds of each coffee needed for the run; uncheck orders that aren't going today |
 | Carry the load list | **Print load sheet** | Printable totals + stop list, with tick boxes |
 | Finish somewhere else | **End of run** field, then Plan route | Route ends at that address instead of the roastery; no return leg |
+
+## Dealer's Choice Picks
+
+Orders that include a dealer's choice pack show a **Dealer's choice picks** panel under the line items on the order page. There's one dropdown per bag, so a 6-bag pack has six.
+
+- At the top of the panel, **Last box** shows the customer's previous dealer's choice order (linked) with its date and the coffees that went out, repeats counted (`Cloud 9 ×2`). In the dropdowns, any coffee from that box is tagged **· in last box**, so you can spot a repeat before saving. A customer's first dealer's choice order says so instead.
+- Each dropdown arrives preset with a coffee Hiri suggests. The suggestions spread the box across as many different coffees as the pool allows, skip decaf on `No Decaf` packs, and avoid the coffees the customer got in their last dealer's choice order when there are enough others. The suggested coffee is marked **— suggested** in each list.
+- Change any bag to what you actually packed, then click **Save picks**. Saving the suggestions unchanged is fine.
+- The suggestions stay the same when you reload the page. They only change when the pool changes (a coffee is added, archived or drafted).
+- Until the picks are saved, the order **can't be fulfilled, labelled, or marked ready for pickup or out for delivery**. Hiri shows "save the dealer's choice picks on this order before fulfilling it" if you try.
+- You can change saved picks later with **Update picks**. Every save shows on the order's activity timeline.
+- The packing slip lists the coffees under the pack. If you print it before saving, it shows the suggestions and is labelled "Suggested picks (not saved yet)", so reprint after saving if the slip goes in the box.
+
+Subscription renewals create a new order each time, so each shipment gets its own picks.

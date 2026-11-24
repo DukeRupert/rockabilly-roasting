@@ -40,6 +40,9 @@ type OrderService struct {
 	// without it the digest has nothing to summarise and says so rather than
 	// sending an empty report.
 	qbPreviews *store.QBPreviewStore
+	// picks gates fulfillment and local hand-off on saved dealer's choice
+	// picks. Stateless, so NewOrderService builds it.
+	picks *store.PickStore
 	// settings answers whether QuickBooks billing is live, and which items
 	// invoices bill against. Populated via WithQBPreviews alongside the
 	// previews, because the digest is what first needed both.
@@ -81,6 +84,7 @@ func NewOrderService(orders *store.OrderStore, audit *audit.AuditWriter, metrics
 		orders:  orders,
 		audit:   audit,
 		metrics: metrics,
+		picks:   store.NewPickStore(nil),
 	}
 }
 
@@ -463,6 +467,16 @@ func (s *OrderService) RefundOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 	return order, nil
 }
 
+// requirePicks refuses with ErrDealersChoicePicksMissing until every dealer's
+// choice line on the order has saved picks.
+func (s *OrderService) requirePicks(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) error {
+	items, err := s.orders.ListLineItems(ctx, tx, orderID)
+	if err != nil {
+		return fmt.Errorf("list line items: %w", err)
+	}
+	return requirePicksConfirmed(ctx, tx, s.picks, items)
+}
+
 // FulfillOrder marks an order as fulfilled and moves it to processing.
 func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
@@ -477,6 +491,10 @@ func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		order.FulfillmentStatus == domain.FulfillmentStatusShipped ||
 		order.FulfillmentStatus == domain.FulfillmentStatusDelivered {
 		return nil, ErrOrderAlreadyFulfilled
+	}
+
+	if err := s.requirePicks(ctx, tx, id); err != nil {
+		return nil, err
 	}
 
 	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusFulfilled)
@@ -820,6 +838,10 @@ func (s *OrderService) MarkReadyForPickup(ctx context.Context, tx pgx.Tx, id uui
 		// allowed
 	default:
 		return nil, fmt.Errorf("order cannot be marked ready: %w", ErrInvalidOrderStatus)
+	}
+
+	if err := s.requirePicks(ctx, tx, id); err != nil {
+		return nil, err
 	}
 
 	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusReadyForPickup)
@@ -1204,6 +1226,10 @@ func (s *OrderService) MarkOutForDelivery(ctx context.Context, tx pgx.Tx, id uui
 		// allowed
 	default:
 		return nil, fmt.Errorf("order cannot be marked out-for-delivery: %w", ErrInvalidOrderStatus)
+	}
+
+	if err := s.requirePicks(ctx, tx, id); err != nil {
+		return nil, err
 	}
 
 	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusShipped)

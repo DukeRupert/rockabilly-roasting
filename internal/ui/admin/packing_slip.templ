@@ -293,6 +293,20 @@ templ packingSlipSheet(props PackingSlipProps) {
 							if eli.VariantSKU != "" {
 								<div class="sku">SKU { eli.VariantSKU }</div>
 							}
+							if len(eli.Picks) > 0 {
+								<div class="variant" style="margin-top: 4px;">
+									if eli.PicksSuggested {
+										Suggested picks (not saved yet):
+									} else {
+										In this box:
+									}
+								</div>
+								<ol class="variant" style="margin: 2px 0 0 18px; padding: 0;">
+									for _, title := range eli.Picks {
+										<li>{ title }</li>
+									}
+								</ol>
+							}
 						</td>
 						<td class="right">{ fmt.Sprintf("%d", eli.LineItem.Quantity) }</td>
 						<td class="right">{ formatCents(eli.LineItem.UnitPrice) }</td>

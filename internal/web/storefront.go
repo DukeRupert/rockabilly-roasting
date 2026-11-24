@@ -773,6 +773,9 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var defaultSKU string
 	var plans []domain.SubscriptionPlan
 	var coffeeAttrs *storefront.CoffeeAttrs
+	var dealersChoice bool
+	var dealersChoiceSizes []int
+	var dealersChoiceDecafChoice bool
 	var prevNav, nextNav *storefront.ProductNav
 	var roastBased bool
 
@@ -804,6 +807,13 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			return attrErr
 		}
 		coffeeAttrs = buildCoffeeAttrs(attrVals)
+
+		pickRules, prErr := d.DealersChoiceService.ListOfferedRules(ctx, tx, product.ID)
+		if prErr != nil {
+			return prErr
+		}
+		dealersChoice = len(pickRules) > 0
+		dealersChoiceSizes, dealersChoiceDecafChoice = dealersChoiceOffer(pickRules)
 
 		// Prefer roast-based recommendations when this product has a roast
 		// level. Falls back to created_at neighbors so the section still
@@ -957,6 +967,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		CartCount:         d.cartItemCountFromCookie(r),
 		SubscriptionPlans: plans,
 		Coffee:            coffeeAttrs,
+		DealersChoice:     dealersChoice,
 		PrevProduct:       prevNav,
 		NextProduct:       nextNav,
 		RoastBased:        roastBased,
@@ -964,6 +975,10 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		CanonicalURL:      d.BaseURL + r.URL.Path,
 		OGImage:           ogImage,
 		BaseURL:           d.BaseURL,
+
+		DealersChoiceSizes:       dealersChoiceSizes,
+		DealersChoiceDecafChoice: dealersChoiceDecafChoice,
+		DealersChoiceGrind:       hasGrindOption(options),
 	}
 
 	if IsHTMX(r) {

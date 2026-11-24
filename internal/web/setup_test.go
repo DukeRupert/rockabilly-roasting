@@ -64,5 +64,7 @@ func newTestDeps() *Deps {
 		CartService:    cart,
 		PricingService: pricing,
 		OrderService:   app.NewOrderService(store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry()),
+
+		DealersChoiceService: app.NewDealersChoiceService(store.NewPickStore(nil), store.NewOrderStore(nil), store.NewCatalogStore(), audit.NewAuditWriter()),
 	}
 }

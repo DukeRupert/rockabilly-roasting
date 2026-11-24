@@ -22,7 +22,7 @@ import (
 //  3. Write tx — persist shipment + audit + enqueue StoreLabelToR2 job
 //
 // Phase 1 errors that are deterministic (no box preset, no shippable items,
-// missing variant weight) terminate the job with a non-retryable error so a
+// missing variant weight, unsaved dealer's choice picks) terminate the job with a non-retryable error so a
 // retry won't keep re-failing on the same bad state. Phase 2 errors retry
 // per River's default backoff (Shippo flakiness is the expected case).
 type BuyLabelWorker struct {
@@ -116,5 +116,6 @@ func (w *BuyLabelWorker) Work(ctx context.Context, job *river.Job[BuyLabelArgs])
 func isDeterministicPrepFailure(err error) bool {
 	return errors.Is(err, app.ErrNoBoxPreset) ||
 		errors.Is(err, app.ErrShipmentNoPhysicalItems) ||
-		errors.Is(err, app.ErrShipmentWeightUnknown)
+		errors.Is(err, app.ErrShipmentWeightUnknown) ||
+		errors.Is(err, app.ErrDealersChoicePicksMissing)
 }

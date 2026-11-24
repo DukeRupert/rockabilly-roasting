@@ -47,6 +47,7 @@ type Deps struct {
 	CatalogService       *app.CatalogService
 	CheckoutService      *app.CheckoutService
 	FulfillmentService   *app.FulfillmentService
+	DealersChoiceService *app.DealersChoiceService
 	RouteService         *app.RouteService
 	SubscriptionService  *app.SubscriptionService
 	DiscountService      *app.DiscountService
@@ -498,6 +499,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/channels", deps.handleAdminVariantChannels)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/wholesale-moq", deps.handleAdminVariantWholesaleMOQ)
+	adminMux.Handle("POST /admin/catalog/{id}/variants/{variantID}/picks", deps.requirePermission(auth.PermManageProducts, http.HandlerFunc(deps.handleAdminVariantPickRule)))
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/archive", deps.handleAdminVariantArchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/unarchive", deps.handleAdminVariantUnarchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
@@ -545,6 +547,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
 	adminMux.HandleFunc("GET /admin/orders/{id}/invoice", deps.handleAdminOrderInvoice)
 	adminMux.HandleFunc("POST /admin/orders/{id}/line-items/{lineItemID}/variant", deps.handleAdminOrderLineItemVariantUpdate)
+	adminMux.Handle("POST /admin/orders/{id}/line-items/{lineItemID}/picks", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminOrderPicksSave)))
 
 	// Admin customers
 	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)

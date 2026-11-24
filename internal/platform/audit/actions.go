@@ -118,6 +118,7 @@ const (
 	AuditOrderShippingMethodChanged  = "order.shipping_method_changed"
 	AuditOrderSwitchedToPickup       = "order.switched_to_pickup"
 	AuditOrderInternalNoteUpdated    = "order.internal_note_updated"
+	AuditOrderDealersChoicePicked    = "order.dealers_choice_picked"
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"
@@ -131,6 +132,10 @@ const (
 	AuditVariantUnarchived   = "variant.unarchived"
 	AuditVariantDeleted      = "variant.deleted"
 	AuditVariantPriceUpdated = "variant.price_updated"
+
+	// AuditVariantPickRuleUpdated records a variant being made (or unmade) a
+	// dealer's choice pack. Recorded against the product.
+	AuditVariantPickRuleUpdated = "variant.pick_rule_updated"
 
 	// Subscription actions
 	AuditSubscriptionCreated               = "subscription.created"

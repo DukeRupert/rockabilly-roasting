@@ -189,10 +189,11 @@ func (s *PickStore) ReplacePicks(ctx context.Context, tx pgx.Tx, lineItemID uuid
 
 // ListCandidates returns every coffee that can go in a dealer's choice box: an
 // active, public product sold in a 12oz bag on the retail channel, that is not
-// itself a dealer's choice pack. IsDecaf comes from the product's
-// caffeine-level attribute (value "decaf"), the one the product page reads for
-// its decaf badge. The catalog's decaf filter uses a separate is-decaf key; a
-// coffee tagged only there is not treated as decaf here.
+// itself a dealer's choice pack. A coffee is decaf when either attribute says
+// so: is-decaf = "true" (the catalog's decaf filter, and how production tags
+// its decaf) or caffeine-level = "decaf" (the product page's decaf badge).
+// Reading both means a decaf tagged only one way still stays out of a
+// no-decaf pack.
 //
 // "Sold in a 12oz bag" means a live, retail-available variant with an option
 // value reading 12oz (any spacing or case, optional trailing dot). A coffee
@@ -206,8 +207,8 @@ func (s *PickStore) ListCandidates(ctx context.Context, tx pgx.Tx) (_ []domain.P
 		             FROM product_attribute_values pav
 		             JOIN attribute_keys ak ON ak.id = pav.attribute_key_id
 		            WHERE pav.product_id = p.id
-		              AND ak.slug = 'caffeine-level'
-		              AND lower(pav.value) = 'decaf'
+		              AND (   (ak.slug = 'caffeine-level' AND lower(pav.value) = 'decaf')
+		                   OR (ak.slug = 'is-decaf' AND pav.value = 'true'))
 		       ) AS is_decaf
 		  FROM products p
 		 WHERE p.status = 'active'

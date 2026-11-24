@@ -418,6 +418,13 @@ type LineItem struct {
 	Metadata      json.RawMessage `json:"metadata"`
 }
 
+type LineItemPick struct {
+	LineItemID uuid.UUID `json:"line_item_id"`
+	Position   int32     `json:"position"`
+	ProductID  uuid.UUID `json:"product_id"`
+	PickedAt   time.Time `json:"picked_at"`
+}
+
 type MagicLinkToken struct {
 	ID         uuid.UUID          `json:"id"`
 	CustomerID uuid.UUID          `json:"customer_id"`
@@ -931,6 +938,14 @@ type Variant struct {
 type VariantOptionValue struct {
 	VariantID            uuid.UUID `json:"variant_id"`
 	ProductOptionValueID uuid.UUID `json:"product_option_value_id"`
+}
+
+type VariantPickRule struct {
+	VariantID    uuid.UUID `json:"variant_id"`
+	PickCount    int32     `json:"pick_count"`
+	ExcludeDecaf bool      `json:"exclude_decaf"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type WebhookEvent struct {

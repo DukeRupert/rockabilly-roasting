@@ -234,6 +234,28 @@ func (s *RouteService) ActivateRoute(ctx context.Context, tx pgx.Tx, id uuid.UUI
 		return nil, ErrRouteEmpty
 	}
 
+	// The van is the last point staff touch a local delivery: from here the
+	// driver's Delivered tap moves the order straight to delivered, and
+	// blocking that at the customer's door helps no one. So every dealer's
+	// choice pack on the route must have its picks saved before it leaves.
+	picks := store.NewPickStore(nil)
+	for _, stop := range stops {
+		items, err := s.orders.ListLineItems(ctx, tx, stop.OrderID)
+		if err != nil {
+			return nil, fmt.Errorf("activate route: list line items: %w", err)
+		}
+		if err := requirePicksConfirmed(ctx, tx, picks, items); err != nil {
+			if !errors.Is(err, ErrDealersChoicePicksMissing) {
+				return nil, err
+			}
+			number := stop.OrderID.String()[:8]
+			if o, oErr := s.orders.GetOrderByIDAsStaff(ctx, tx, stop.OrderID); oErr == nil {
+				number = o.Number
+			}
+			return nil, fmt.Errorf("order %s: %w", number, ErrRoutePicksMissing)
+		}
+	}
+
 	token, err := newShareToken()
 	if err != nil {
 		return nil, err

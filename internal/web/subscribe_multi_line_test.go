@@ -496,6 +496,30 @@ func TestSubscribeConfirm_AOneLineSignupKeepsBothFields(t *testing.T) {
 	assert.Equal(t, resp.SubscriptionIDs[0], resp.SubscriptionID)
 }
 
+func TestSubscribeConfirm_CarriesThePurchaseForAnalytics(t *testing.T) {
+	// The success screen reports the signup to GA4 and Google Ads from this
+	// payload, so it has to name the order, its real total and every line.
+	f := newMultiLineFixture(t)
+	d, fake := newSubscribePaymentDeps(t)
+	withRiver(t, d)
+
+	intentID, _ := signUp(t, d, fake, f.twoLines())
+	resp := postSubscribeConfirm(t, d, intentID)
+
+	order, _ := orderForIntent(t, d, intentID)
+	require.NotNil(t, resp.Purchase)
+	assert.Equal(t, order.Number, resp.Purchase.TransactionID)
+	assert.Equal(t, order.Total, resp.Purchase.ValueCents)
+	assert.Equal(t, order.CurrencyCode, resp.Purchase.Currency)
+	assert.Len(t, resp.Purchase.Items, 2)
+
+	t.Run("a confirm that lost the race still carries it", func(t *testing.T) {
+		again := postSubscribeConfirm(t, d, intentID)
+		require.NotNil(t, again.Purchase)
+		assert.Equal(t, order.Number, again.Purchase.TransactionID)
+	})
+}
+
 func TestPaymentIntentSucceededWebhook_ActivatesEveryLine(t *testing.T) {
 	f := newMultiLineFixture(t)
 	d, fake := newSubscribePaymentDeps(t)

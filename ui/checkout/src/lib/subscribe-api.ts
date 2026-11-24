@@ -55,16 +55,35 @@ export interface SubscribeConfirmRequest {
   payment_intent_id: string;
 }
 
+export interface SubscribePurchaseItem {
+  item_id: string;
+  item_name: string;
+  item_variant?: string;
+  item_category?: string;
+  price_cents: number;
+  quantity: number;
+}
+
+export interface SubscribePurchase {
+  transaction_id: string;
+  currency: string;
+  value_cents: number;
+  tax_cents: number;
+  shipping_cents: number;
+  items: SubscribePurchaseItem[];
+}
+
 export interface SubscribeConfirmResponse {
   /** Every subscription the signup started. */
   subscription_ids?: string[];
   /** Set only when there is exactly one. */
   subscription_id?: string;
   order_id: string;
-  /** The signup's first order, for the Google Ads conversion. */
-  order_number?: string;
-  total_cents?: number;
-  currency?: string;
+  /**
+   * The signup order's analytics payload (amounts in cents), handed to the
+   * layout's rrPurchase helper for GA4 and Google Ads.
+   */
+  purchase?: SubscribePurchase;
   /**
    * "active" when the subscription exists; "processing" when payment is
    * settling asynchronously and the webhook will activate it server-side.

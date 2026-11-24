@@ -294,3 +294,28 @@ Click "Delete" next to a category. You will be prompted to confirm. Products in 
 7. **Upload images** -- On the Media tab, upload product photos. The first image becomes the primary.
 8. **Add attributes** -- On the Attributes tab, assign the "Coffee Profile" set and fill in origin, roast level, tasting notes.
 9. **Activate** -- On the Details tab, toggle the Active switch to make the product visible on the storefront.
+
+## Dealer's Choice Packs
+
+A dealer's choice pack is a product where the customer buys a number of 12oz bags and the crew picks which coffees go in the box. It's an ordinary product with one extra setting per variant.
+
+### Setting one up
+
+1. Create the product as usual (for example **Dealer's Choice**) and give it a category, description and photo.
+2. On the **Variants** tab, add the options. Three work well:
+   - **Pack**: `3 Bags`, `4 Bags`, `6 Bags`
+   - **Grind**: the same grinds your coffees use
+   - **Decaf**: `Include Decaf`, `No Decaf`
+3. Create a variant for each combination and price them on the **Pricing** tab.
+4. Open **Dealer's choice pack** at the bottom of the Variants tab. For each variant, enter the number of bags (3, 4 or 6), tick **No decaf** on the `No Decaf` variants, and click **Save**.
+5. Turn on **Subscribable** if customers should be able to subscribe to it.
+
+A blank or zero bag count turns a variant back into an ordinary one.
+
+### Which coffees can be picked
+
+A coffee is in the pool when it is **active**, **public**, and has a live, retail-available **12oz** variant. A coffee counts as decaf when its **Caffeine** attribute (`caffeine-level`) is set to `decaf`. The catalog's separate decaf filter key (`is-decaf`) is not read here, so make sure every decaf has `caffeine-level` set before selling a `No Decaf` pack. Dealer's choice products are never picked into each other.
+
+The storefront's "How it works" section reads the bag counts and the no-decaf setting from these rules, so it only mentions sizes and choices the product actually sells.
+
+To take a coffee out of the pool, archive its 12oz variant or set the product to draft.

@@ -406,3 +406,56 @@ func TestFindOrCreateAddress_DoesNotMatchLegacyBadZIP(t *testing.T) {
 	}, testActor(customer.ID))
 	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
 }
+
+// TestCreateAddress_BlankCountryIsValidatedAsUS: a caller that leaves the
+// country blank still gets the US ZIP rule, not the anything-goes rule for
+// foreign codes.
+func TestCreateAddress_BlankCountryIsValidatedAsUS(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	customer := testutil.CreateCustomer(t, tx)
+
+	p := pocatello(customer.ID)
+	p.CountryCode = ""
+	p.PostalCode = "9"
+	_, err := svc.CreateAddress(context.Background(), tx, p, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
+}
+
+// TestFindOrCreateExactAddress_HonoursEveryLabelField is the reviewer's case:
+// adding a company or fixing capitalisation must produce a corrected row, not
+// match the row being corrected.
+func TestFindOrCreateExactAddress_HonoursEveryLabelField(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+
+	base, err := svc.CreateAddress(ctx, tx, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+
+	same, err := svc.FindOrCreateExactAddress(ctx, tx, customer.ID, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+	assert.Equal(t, base.ID, same.ID, "an identical submission reuses the row")
+
+	company := "Acme Coffee Co"
+	withCompany := pocatello(customer.ID)
+	withCompany.Company = &company
+	got, err := svc.FindOrCreateExactAddress(ctx, tx, customer.ID, withCompany, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.NotEqual(t, base.ID, got.ID)
+	require.NotNil(t, got.Company)
+	assert.Equal(t, company, *got.Company)
+
+	recased := pocatello(customer.ID)
+	recased.FirstName = "JAHNAVI"
+	got, err = svc.FindOrCreateExactAddress(ctx, tx, customer.ID, recased, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.NotEqual(t, base.ID, got.ID)
+	assert.Equal(t, "JAHNAVI", got.FirstName)
+
+	bad := pocatello(customer.ID)
+	bad.PostalCode = "9"
+	_, err = svc.FindOrCreateExactAddress(ctx, tx, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
+}

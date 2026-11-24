@@ -192,7 +192,7 @@ Use this when the address on an order is wrong: a typo spotted while packing, or
 
 ### When it is allowed
 
-The **Edit address** link appears under the address in the **Ship to** card while the order is still in the shop. That includes orders already marked fulfilled (packed). It is hidden once:
+The **Edit address** link appears under the address in the **Ship to** card while the order is still in the shop. That includes orders already marked fulfilled (packed). It is replaced by a short "Address locked" note saying why once:
 
 - a shipping label has been bought (refund the label first, then edit),
 - the order is a stop on an open delivery route (take it off the route first),

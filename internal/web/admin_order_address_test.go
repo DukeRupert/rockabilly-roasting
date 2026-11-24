@@ -56,12 +56,15 @@ func committedPackedOrder(t *testing.T) (*domain.Order, *domain.Address) {
 	return order, bad
 }
 
-func postAddressEdit(t *testing.T, d *Deps, orderID uuid.UUID, zip string) *httptest.ResponseRecorder {
+func postAddressEdit(t *testing.T, d *Deps, orderID uuid.UUID, zip string, extra ...func(url.Values)) *httptest.ResponseRecorder {
 	t.Helper()
 	form := url.Values{
 		"first_name": {"Jennifer"}, "last_name": {"Waltz"},
 		"line1": {"1221 W Tamarisk Ave"}, "city": {"Ridgecrest"},
 		"state": {"CA"}, "postal_code": {zip},
+	}
+	for _, f := range extra {
+		f(form)
 	}
 	r := httptest.NewRequest(http.MethodPost, "/admin/orders/"+orderID.String()+"/shipping-address", strings.NewReader(form.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -106,4 +109,36 @@ func TestAdminOrderShippingAddress_BadZIPFlashesAndChangesNothing(t *testing.T) 
 	assert.Equal(t, "Address not saved: enter a 5-digit ZIP code", loc.Query().Get("flash"))
 	id, _ := orderShipTo(t, order.ID)
 	assert.Equal(t, bad.ID, id)
+}
+
+// The review's probe: an edit that only adds a company must change the
+// order, not report success while matching the row it meant to fix.
+func TestAdminOrderShippingAddress_CompanyOnlyEditTakesEffect(t *testing.T) {
+	d := addressEditDeps()
+	order, _ := committedPackedOrder(t)
+	require.Equal(t, http.StatusSeeOther, postAddressEdit(t, d, order.ID, "93555").Code)
+	before, _ := orderShipTo(t, order.ID)
+
+	w := postAddressEdit(t, d, order.ID, "93555", func(v url.Values) { v.Set("company", "Acme Coffee Co") })
+
+	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	assert.Contains(t, w.Header().Get("Location"), "Ship-to+address+updated")
+	after, _ := orderShipTo(t, order.ID)
+	assert.NotEqual(t, before, after)
+	var company *string
+	require.NoError(t, testPool.QueryRow(context.Background(), `SELECT company FROM addresses WHERE id = $1`, after).Scan(&company))
+	require.NotNil(t, company)
+	assert.Equal(t, "Acme Coffee Co", *company)
+}
+
+func TestAdminOrderShippingAddress_UnchangedSubmitSaysSo(t *testing.T) {
+	d := addressEditDeps()
+	order, _ := committedPackedOrder(t)
+	require.Equal(t, http.StatusSeeOther, postAddressEdit(t, d, order.ID, "93555").Code)
+
+	w := postAddressEdit(t, d, order.ID, "93555")
+
+	loc, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "Nothing to save: that is already the ship-to address.", loc.Query().Get("flash"))
 }

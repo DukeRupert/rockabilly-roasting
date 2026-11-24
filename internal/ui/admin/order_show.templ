@@ -1443,6 +1443,8 @@ templ orderAddressCard(props OrderShowProps) {
 		}
 		if props.AddressLock == "" && props.ShippingAddress != nil {
 			@orderAddressEditForm(props)
+		} else if props.AddressLock != "" && props.ShippingAddress != nil && orderAddressLockWorthShowing(props.Order) {
+			<p class="mt-2 text-xs text-rr-muted">Address locked: { props.AddressLock }</p>
 		}
 		if props.BillingAddress != nil && !sameAddress(props.ShippingAddress, props.BillingAddress) {
 			<div class="mt-3 border-t border-rr-border pt-3">
@@ -1508,6 +1510,22 @@ templ addressField(id, name, label, value, autocomplete string, required bool) {
 			class="w-full border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 		/>
 	</div>
+}
+
+// orderAddressLockWorthShowing hides the lock note on orders that are plainly
+// finished (shipped, delivered, closed), where "can't edit" goes without
+// saying. It shows on open orders, where the reason (a bought label, a route
+// stop) tells staff what to undo first.
+func orderAddressLockWorthShowing(o *domain.Order) bool {
+	switch o.Status {
+	case domain.OrderStatusCancelled, domain.OrderStatusRefunded, domain.OrderStatusComplete:
+		return false
+	}
+	switch o.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		return true
+	}
+	return false
 }
 
 // addressOptional reads an optional address line for a form field.

@@ -320,6 +320,7 @@ func TestValidPostalCode(t *testing.T) {
 		{"letters", "9355A", "US", false},
 		{"short plus four", "93555-12", "US", false},
 		{"trailing hyphen", "93555-", "US", false},
+		{"letters in plus four", "93555-12AB", "US", false},
 		{"blank", "  ", "US", false},
 		{"non-US any shape", "SW1A 1AA", "GB", true},
 		{"non-US blank", "", "GB", false},

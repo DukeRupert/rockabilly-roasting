@@ -505,6 +505,8 @@ func equipmentValidationMessage(err error) (string, bool) {
 		return "That site is not on this customer's account. Pick one of theirs, or add a new one.", true
 	case errors.Is(err, app.ErrEquipmentSiteIncomplete):
 		return "A new site needs a street, city, state and ZIP.", true
+	case errors.Is(err, app.ErrInvalidPostalCode):
+		return "The new site's ZIP isn't valid. Enter a 5-digit ZIP.", true
 	case errors.Is(err, app.ErrEquipmentMakeRequired),
 		errors.Is(err, app.ErrInvalidEquipmentCategory),
 		errors.Is(err, app.ErrInvalidEquipmentOwnership):

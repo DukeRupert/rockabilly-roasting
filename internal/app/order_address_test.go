@@ -78,13 +78,19 @@ func TestChangeShippingAddress_PackedOrderMovesWithSubscriptions(t *testing.T) {
 		testutil.WithOrderStatus(domain.OrderStatusProcessing),
 		testutil.WithFulfillmentStatus(domain.FulfillmentStatusFulfilled))
 	live := liveSubscriptionAt(t, tx, f.customer.ID, f.bad.ID)
+	paused := liveSubscriptionAt(t, tx, f.customer.ID, f.bad.ID)
+	pastDue := liveSubscriptionAt(t, tx, f.customer.ID, f.bad.ID)
 	cancelled := liveSubscriptionAt(t, tx, f.customer.ID, f.bad.ID)
-	_, err := tx.Exec(ctx, `UPDATE subscriptions SET status = 'cancelled', cancelled_at = now() WHERE id = $1`, cancelled.ID)
+	_, err := tx.Exec(ctx, `UPDATE subscriptions SET status = 'paused' WHERE id = $1`, paused.ID)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `UPDATE subscriptions SET status = 'past_due' WHERE id = $1`, pastDue.ID)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `UPDATE subscriptions SET status = 'cancelled', cancelled_at = now() WHERE id = $1`, cancelled.ID)
 	require.NoError(t, err)
 
 	n, err := svc.LiveSubscriptionsAtShippingAddress(ctx, tx, f.order)
 	require.NoError(t, err)
-	assert.Equal(t, 1, n, "the cancelled subscription is not offered")
+	assert.Equal(t, 3, n, "active, paused and past-due will all renew; cancelled will not")
 
 	change, err := svc.ChangeShippingAddress(ctx, tx, f.order.ID, f.good.ID, true, testutil.TestActor())
 	require.NoError(t, err)
@@ -92,8 +98,10 @@ func TestChangeShippingAddress_PackedOrderMovesWithSubscriptions(t *testing.T) {
 	got := reloadOrder(t, tx, svc, f.order.ID)
 	assert.Equal(t, f.good.ID, got.ShippingAddressID)
 	assert.Equal(t, f.bad.ID, got.BillingAddressID, "billing is what Stripe charged; it stays")
-	assert.Equal(t, []uuid.UUID{live.ID}, change.MovedSubscriptions)
-	assert.Equal(t, f.good.ID, subscriptionAddress(t, tx, live.ID))
+	assert.ElementsMatch(t, []uuid.UUID{live.ID, paused.ID, pastDue.ID}, change.MovedSubscriptions)
+	for _, id := range []uuid.UUID{live.ID, paused.ID, pastDue.ID} {
+		assert.Equal(t, f.good.ID, subscriptionAddress(t, tx, id))
+	}
 	assert.Equal(t, f.bad.ID, subscriptionAddress(t, tx, cancelled.ID), "a cancelled subscription keeps its history")
 
 	var actions []string
@@ -175,4 +183,40 @@ func TestChangeShippingAddress_LockedStates(t *testing.T) {
 		_, err := svc.ChangeShippingAddress(ctx, tx, f.order.ID, f.good.ID, false, testutil.TestActor())
 		assert.ErrorIs(t, err, app.ErrOrderOnRoute)
 	})
+}
+
+func TestChangeShippingAddress_SameAddressRecordsNothing(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newAddressOrderService()
+	f := newAddressFixture(t, tx)
+
+	change, err := svc.ChangeShippingAddress(ctx, tx, f.order.ID, f.bad.ID, true, testutil.TestActor())
+	require.NoError(t, err)
+	assert.Empty(t, change.MovedSubscriptions)
+	var n int
+	require.NoError(t, tx.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE resource_id = $1 AND action = $2`,
+		f.order.ID, audit.AuditOrderShippingAddressChanged).Scan(&n))
+	assert.Zero(t, n)
+}
+
+func TestOrderHasPendingStop_IgnoresFinishedStopsAndRoutes(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	routes := store.NewRouteStore(nil)
+
+	delivered := newAddressFixture(t, tx, testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery))
+	onCompleted := newAddressFixture(t, tx, testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery))
+	route := planRouteOver(t, tx, time.Now().AddDate(0, 0, 4), delivered.order.ID)
+	_, err := tx.Exec(ctx, `UPDATE route_stops SET status = 'delivered' WHERE route_id = $1`, route.ID)
+	require.NoError(t, err)
+	done := planRouteOver(t, tx, time.Now().AddDate(0, 0, 5), onCompleted.order.ID)
+	_, err = tx.Exec(ctx, `UPDATE delivery_routes SET status = 'completed', completed_at = now() WHERE id = $1`, done.ID)
+	require.NoError(t, err)
+
+	for _, id := range []uuid.UUID{delivered.order.ID, onCompleted.order.ID} {
+		on, err := routes.OrderHasPendingStop(ctx, tx, id)
+		require.NoError(t, err)
+		assert.False(t, on)
+	}
 }

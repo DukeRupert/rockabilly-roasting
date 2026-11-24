@@ -476,9 +476,9 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Whether staff may correct the ship-to, and if not, why. A refusal
-		// the service names (label bought, on a route, left the shop) is shown
-		// in place of the form; anything else is a real failure.
+		// Whether staff may correct the ship-to, and if not, why. On an open
+		// order the reason the service names (label bought, on a route) is
+		// shown in place of the form; anything else is a real failure.
 		if editErr := d.OrderService.ShippingAddressEditable(ctx, tx, order); editErr != nil {
 			code, msg := mapError(editErr)
 			if code >= http.StatusInternalServerError {
@@ -1102,7 +1102,8 @@ func (d *Deps) handleAdminOrderConvertToLocal(w http.ResponseWriter, r *http.Req
 
 // handleAdminOrderShippingAddress corrects an order's ship-to from the edit
 // form on the order page. The address is saved to the order customer's
-// address book (reusing a matching row) and the order is pointed at it; with
+// address book (reusing a row only if it matches exactly, see
+// FindOrCreateExactAddress) and the order is pointed at it; with
 // move_subscriptions ticked, their live subscriptions at the old address move
 // too. Ungated like its sibling order actions.
 //
@@ -1148,6 +1149,7 @@ func (d *Deps) handleAdminOrderShippingAddress(w http.ResponseWriter, r *http.Re
 	}
 
 	var change *app.ShippingAddressChange
+	var unchanged bool
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		order, txErr := d.OrderService.GetOrderAsStaff(ctx, tx, id)
 		if txErr != nil {
@@ -1156,9 +1158,13 @@ func (d *Deps) handleAdminOrderShippingAddress(w http.ResponseWriter, r *http.Re
 		if order.CustomerID == nil {
 			return app.ErrOrderAddressLocked
 		}
-		addr, txErr := d.CustomerService.FindOrCreateAddress(ctx, tx, *order.CustomerID, params, staffActor(r))
+		addr, txErr := d.CustomerService.FindOrCreateExactAddress(ctx, tx, *order.CustomerID, params, staffActor(r))
 		if txErr != nil {
 			return txErr
+		}
+		if addr.ID == order.ShippingAddressID {
+			unchanged = true
+			return nil
 		}
 		change, txErr = d.OrderService.ChangeShippingAddress(ctx, tx, id, addr.ID, moveSubs, staffActor(r))
 		return txErr
@@ -1173,6 +1179,10 @@ func (d *Deps) handleAdminOrderShippingAddress(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if unchanged {
+		http.Redirect(w, r, back+"?flash="+url.QueryEscape("Nothing to save: that is already the ship-to address."), http.StatusSeeOther)
+		return
+	}
 	flash := "Ship-to address updated. Shipping and tax were not recalculated."
 	switch n := len(change.MovedSubscriptions); n {
 	case 0:

@@ -23,10 +23,9 @@ func newDealersChoiceService() *app.DealersChoiceService {
 
 // createCoffee makes an active, public product with a 12oz variant, which is
 // what puts a coffee in the dealer's choice pool. decaf tags it through the
-// caffeine-level attribute, the one the pool reads.
+// caffeine-level attribute, one of the two the pool reads.
 func createCoffee(t *testing.T, tx pgx.Tx, title string, decaf bool) *domain.Product {
 	t.Helper()
-	ctx := context.Background()
 	p := testutil.CreateProduct(t, tx,
 		testutil.WithProductTitle(title),
 		testutil.WithProductStatus(domain.ProductStatusActive),
@@ -35,16 +34,24 @@ func createCoffee(t *testing.T, tx pgx.Tx, title string, decaf bool) *domain.Pro
 	tag12oz(t, tx, p.ID, v.ID)
 
 	if decaf {
-		var setID, keyID uuid.UUID
-		require.NoError(t, tx.QueryRow(ctx,
-			`INSERT INTO attribute_sets (name, slug) VALUES ('Coffee', $1) RETURNING id`, "coffee-"+uuid.NewString()).Scan(&setID))
-		require.NoError(t, tx.QueryRow(ctx,
-			`INSERT INTO attribute_keys (attribute_set_id, name, slug) VALUES ($1, 'Caffeine', 'caffeine-level') RETURNING id`, setID).Scan(&keyID))
-		_, err := tx.Exec(ctx,
-			`INSERT INTO product_attribute_values (product_id, attribute_key_id, value) VALUES ($1, $2, 'decaf')`, p.ID, keyID)
-		require.NoError(t, err)
+		setAttribute(t, tx, p.ID, "caffeine-level", "decaf")
 	}
 	return p
+}
+
+// setAttribute gives a product one attribute value under a fresh attribute
+// set, so tests can tag decaf either of the two ways the pool reads.
+func setAttribute(t *testing.T, tx pgx.Tx, productID uuid.UUID, slug, value string) {
+	t.Helper()
+	ctx := context.Background()
+	var setID, keyID uuid.UUID
+	require.NoError(t, tx.QueryRow(ctx,
+		`INSERT INTO attribute_sets (name, slug) VALUES ('Coffee', $1) RETURNING id`, "coffee-"+uuid.NewString()).Scan(&setID))
+	require.NoError(t, tx.QueryRow(ctx,
+		`INSERT INTO attribute_keys (attribute_set_id, name, slug) VALUES ($1, $2, $2) RETURNING id`, setID, slug).Scan(&keyID))
+	_, err := tx.Exec(ctx,
+		`INSERT INTO product_attribute_values (product_id, attribute_key_id, value) VALUES ($1, $2, $3)`, productID, keyID, value)
+	require.NoError(t, err)
 }
 
 // tag12oz gives a variant a Size option value of "12 oz".
@@ -434,4 +441,32 @@ func TestDealersChoice_OfferedRulesSkipUnbuyableVariants(t *testing.T) {
 	require.Len(t, offered, 1)
 	assert.Equal(t, f.variantID, offered[0].VariantID)
 	assert.Equal(t, 3, offered[0].PickCount)
+}
+
+// Production tags its decaf with the catalog filter's is-decaf key, not
+// caffeine-level. Either tag must keep the coffee out of a no-decaf pack, and
+// is-decaf=false must not.
+func TestDealersChoice_IsDecafTagExcludedFromNoDecafPack(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	f := newDealersChoiceFixture(t, tx)
+
+	cascadia := createCoffee(t, tx, "Cascadia", false)
+	setAttribute(t, tx, cascadia.ID, "is-decaf", "true")
+	regular := createCoffee(t, tx, "Chop Top", false)
+	setAttribute(t, tx, regular.ID, "is-decaf", "false")
+
+	plans, err := f.svc.PlanOrderPicks(ctx, tx, f.order, mustLineItems(t, tx, f.order.ID))
+	require.NoError(t, err)
+	require.Len(t, plans, 1)
+	var offered []uuid.UUID
+	for _, o := range plans[0].Options {
+		offered = append(offered, o.ProductID)
+	}
+	assert.NotContains(t, offered, cascadia.ID, "is-decaf=true is decaf")
+	assert.NotContains(t, offered, f.decaf.ID, "caffeine-level=decaf is decaf")
+	assert.Contains(t, offered, regular.ID, "is-decaf=false is not decaf")
+
+	err = f.svc.SavePicks(ctx, tx, f.order.ID, f.lineID, f.ids(cascadia, f.coffees[0], f.coffees[1]), testutil.TestActor())
+	assert.ErrorIs(t, err, app.ErrInvalidPicks, "a no-decaf pack refuses an is-decaf coffee")
 }

@@ -314,7 +314,7 @@ A blank or zero bag count turns a variant back into an ordinary one.
 
 ### Which coffees can be picked
 
-A coffee is in the pool when it is **active**, **public**, and has a live, retail-available **12oz** variant. A coffee counts as decaf when its **Caffeine** attribute (`caffeine-level`) is set to `decaf`. The catalog's separate decaf filter key (`is-decaf`) is not read here, so make sure every decaf has `caffeine-level` set before selling a `No Decaf` pack. Dealer's choice products are never picked into each other.
+A coffee is in the pool when it is **active**, **public**, and has a live, retail-available **12oz** variant. A coffee counts as decaf when its `is-decaf` attribute (the catalog's decaf filter) is set to `true`, or its `caffeine-level` attribute is set to `decaf`. Either one is enough to keep it out of `No Decaf` packs. Dealer's choice products are never picked into each other.
 
 The storefront's "How it works" section is built from the rules on live, retail-available variants: it lists those bag counts, mentions grind only when the product has a Grind option, and mentions decaf only when the pack is sold both with and without it. Archived and wholesale-only variants are left out. An archived variant's rule is hidden from the setup panel; unarchive the variant to change it.
 

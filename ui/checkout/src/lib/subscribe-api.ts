@@ -61,6 +61,10 @@ export interface SubscribeConfirmResponse {
   /** Set only when there is exactly one. */
   subscription_id?: string;
   order_id: string;
+  /** The signup's first order, for the Google Ads conversion. */
+  order_number?: string;
+  total_cents?: number;
+  currency?: string;
   /**
    * "active" when the subscription exists; "processing" when payment is
    * settling asynchronously and the webhook will activate it server-side.

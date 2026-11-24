@@ -257,10 +257,22 @@ type subscribeConfirmResponse struct {
 	SubscriptionIDs []string `json:"subscription_ids,omitempty"`
 	SubscriptionID  string   `json:"subscription_id,omitempty"`
 	OrderID         string   `json:"order_id"`
+	// OrderNumber, TotalCents and Currency describe the signup's first order
+	// so the success screen can report the purchase to Google Ads.
+	OrderNumber string `json:"order_number"`
+	TotalCents  int    `json:"total_cents"`
+	Currency    string `json:"currency"`
 	// Status is "active" when the subscription exists, or "processing" when
 	// payment is still settling asynchronously — the payment_intent.succeeded
 	// webhook will activate the subscription once it clears.
 	Status string `json:"status"`
+}
+
+func (r *subscribeConfirmResponse) setOrder(order *domain.Order) {
+	r.OrderID = order.ID.String()
+	r.OrderNumber = order.Number
+	r.TotalCents = order.Total
+	r.Currency = order.CurrencyCode
 }
 
 // --- Handlers ---
@@ -1004,7 +1016,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
-			resp.OrderID = order.ID.String()
+			resp.setOrder(order)
 			resp.Status = "active"
 
 			if !transitioned {
@@ -1056,7 +1068,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return fmt.Errorf("get order for processing pi: %w", txErr)
 			}
-			resp.OrderID = order.ID.String()
+			resp.setOrder(order)
 			resp.Status = "processing"
 			return nil
 		})

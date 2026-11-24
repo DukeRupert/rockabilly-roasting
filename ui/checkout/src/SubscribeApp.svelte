@@ -11,6 +11,7 @@
     type SubscribeCatalogResponse,
     type SubscribeCatalogVariant,
     type SubscribeCatalogPlan,
+    type SubscribeConfirmResponse,
   } from './lib/subscribe-api';
   import { formatCents } from './lib/format';
   import { IntentSequencer, intentIdOf } from './lib/intent-sequencer';
@@ -203,6 +204,22 @@
     }
   }
 
+  // reportConversion tells Google Ads about the signup, through the helper the
+  // storefront layout defines. Once per order: a refresh or a repeated
+  // redirect-back must not count the same signup twice.
+  function reportConversion(result: SubscribeConfirmResponse) {
+    const w = window as unknown as {
+      rrAdsConversion?: (value: number, currency: string, transactionId: string) => void;
+    };
+    if (!result.order_number || !w.rrAdsConversion) return;
+    const key = 'rrAdsConversionFired:' + result.order_number;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {}
+    w.rrAdsConversion((result.total_cents || 0) / 100, result.currency || 'USD', result.order_number);
+  }
+
   // handleRedirectBack runs once on mount. If the URL carries Stripe's
   // redirect-back query params (payment_intent + redirect_status) the
   // customer is returning from an async payment method. The order was
@@ -233,6 +250,7 @@
     try {
       const result = await confirmSubscription({ payment_intent_id: redirectPI });
       confirmedSubscriptionIds = result.subscription_ids || (result.subscription_id ? [result.subscription_id] : []);
+      reportConversion(result);
       confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
       step = 'confirmation';
       window.history.replaceState({}, '', baseURL());
@@ -393,6 +411,7 @@
       try {
         const result = await confirmSubscription({ payment_intent_id: paymentIntent.id });
         confirmedSubscriptionIds = result.subscription_ids || (result.subscription_id ? [result.subscription_id] : []);
+        reportConversion(result);
         confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
       } catch {
         // The charge went through; the payment_intent.succeeded webhook will

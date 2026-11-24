@@ -257,6 +257,15 @@ type Querier interface {
 	ListVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) ([]VariantOptionValue, error)
 	ListVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]Variant, error)
 	ListWholesaleByStatus(ctx context.Context, arg ListWholesaleByStatusParams) ([]Customer, error)
+	// Every member of one box, locked: the customer's active and past-due
+	// subscriptions at one address on one renewal instant (domain.GroupIntoBoxes).
+	// Adding to a box holds these so a renewal cannot claim the box between the
+	// check and the insert.
+	LockSubscriptionBox(ctx context.Context, arg LockSubscriptionBoxParams) ([]Subscription, error)
+	// A customer's edit reads the row under a lock. A renewal claims before it
+	// reads, and its claim is an UPDATE, so the two serialise on this row: either
+	// the edit sees the claim and refuses, or the renewal waits and reads the edit.
+	LockSubscriptionForCustomer(ctx context.Context, arg LockSubscriptionForCustomerParams) (Subscription, error)
 	MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	MarkResetTokenUsed(ctx context.Context, id uuid.UUID) error
@@ -367,6 +376,7 @@ type Querier interface {
 	UpdateSubscriptionPlan(ctx context.Context, arg UpdateSubscriptionPlanParams) (Subscription, error)
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
+	UpdateSubscriptionQuantity(ctx context.Context, arg UpdateSubscriptionQuantityParams) (Subscription, error)
 	// A status change, only from the status the caller read. A change that landed
 	// in between (a cancel while a resume was deciding) leaves no row, so the
 	// later write cannot undo the earlier one.

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -433,6 +434,10 @@ type subscribeCatalogVariant struct {
 	ProductTitle string `json:"product_title"`
 	VariantLabel string `json:"variant_label"`
 	BasePrice    int    `json:"base_price"`
+
+	// For the account page, which works in ids rather than JSON.
+	variantID uuid.UUID
+	productID uuid.UUID
 }
 
 type subscribeCatalogPlan struct {
@@ -457,62 +462,11 @@ func (d *Deps) handleSubscribeCatalog(w http.ResponseWriter, r *http.Request) {
 		Plans:    []subscribeCatalogPlan{},
 	}
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		subscribable := true
-		activeStatus := domain.ProductStatusActive
-		// Paged to the end. A fixed limit would drop the rest of a larger
-		// catalog from the picker with nothing on the page saying so.
-		const pageSize = 200
-		var products []domain.Product
-		for offset := 0; ; offset += pageSize {
-			page, txErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
-				Status:       &activeStatus,
-				Subscribable: &subscribable,
-				Limit:        pageSize,
-				Offset:       offset,
-				Visibility:   d.retailVisibility(),
-			})
-			if txErr != nil {
-				return txErr
-			}
-			products = append(products, page...)
-			if len(page) < pageSize {
-				break
-			}
+		variants, plans, txErr := d.loadSubscribeCatalog(ctx, tx)
+		if txErr != nil {
+			return txErr
 		}
-
-		for _, product := range products {
-			// The retail channel's variants, as every storefront listing
-			// reads them: a wholesale-only size is not something a retail
-			// subscriber can be sold.
-			variants, vErr := d.CatalogService.ListActiveVariantsForChannel(ctx, tx, product.ID, domain.ChannelRetail)
-			if vErr != nil {
-				return vErr
-			}
-			for _, variant := range variants {
-				price, pErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
-				if pErr != nil {
-					if errors.Is(pErr, app.ErrPriceNotFound) {
-						continue
-					}
-					return pErr
-				}
-				label, lErr := d.CatalogService.VariantLabel(ctx, tx, variant.ID)
-				if lErr != nil {
-					label = ""
-				}
-				resp.Variants = append(resp.Variants, subscribeCatalogVariant{
-					VariantID:    variant.ID.String(),
-					ProductTitle: product.Title,
-					VariantLabel: label,
-					BasePrice:    price.Amount,
-				})
-			}
-		}
-
-		plans, pErr := d.SubscriptionService.ListActivePlans(ctx, tx)
-		if pErr != nil {
-			return pErr
-		}
+		resp.Variants = append(resp.Variants, variants...)
 		for _, plan := range plans {
 			resp.Plans = append(resp.Plans, subscribeCatalogPlan{
 				PlanID: plan.ID.String(), Name: plan.Name, DiscountPct: plan.DiscountPct,
@@ -525,6 +479,73 @@ func (d *Deps) handleSubscribeCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, http.StatusOK, resp)
+}
+
+// loadSubscribeCatalog is what a customer may put on subscription: every
+// subscribable, priced variant on the retail channel, and every active plan.
+// The /subscribe picker and the account page's "Add a coffee" both offer it,
+// so a coffee offered in one is offered in the other.
+func (d *Deps) loadSubscribeCatalog(ctx context.Context, tx pgx.Tx) ([]subscribeCatalogVariant, []domain.SubscriptionPlan, error) {
+	subscribable := true
+	activeStatus := domain.ProductStatusActive
+	// Paged to the end. A fixed limit would drop the rest of a larger catalog
+	// from the picker with nothing on the page saying so.
+	const pageSize = 200
+	var products []domain.Product
+	for offset := 0; ; offset += pageSize {
+		page, err := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
+			Status:       &activeStatus,
+			Subscribable: &subscribable,
+			Limit:        pageSize,
+			Offset:       offset,
+			Visibility:   d.retailVisibility(),
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		products = append(products, page...)
+		if len(page) < pageSize {
+			break
+		}
+	}
+
+	var out []subscribeCatalogVariant
+	for _, product := range products {
+		// The retail channel's variants, as every storefront listing reads
+		// them: a wholesale-only size is not something a retail subscriber can
+		// be sold.
+		variants, err := d.CatalogService.ListActiveVariantsForChannel(ctx, tx, product.ID, domain.ChannelRetail)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, variant := range variants {
+			price, err := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
+			if err != nil {
+				if errors.Is(err, app.ErrPriceNotFound) {
+					continue
+				}
+				return nil, nil, err
+			}
+			label, err := d.CatalogService.VariantLabel(ctx, tx, variant.ID)
+			if err != nil {
+				label = ""
+			}
+			out = append(out, subscribeCatalogVariant{
+				VariantID:    variant.ID.String(),
+				ProductTitle: product.Title,
+				VariantLabel: label,
+				BasePrice:    price.Amount,
+				variantID:    variant.ID,
+				productID:    product.ID,
+			})
+		}
+	}
+
+	plans, err := d.SubscriptionService.ListActivePlans(ctx, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, plans, nil
 }
 
 // handleSubscribeContext returns the session customer's contact + default

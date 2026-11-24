@@ -524,6 +524,11 @@ type AccountSubscriptionRow struct {
 	Variant      *domain.Variant
 	ThumbnailURL string
 	UnitPrice    *int
+	// BasePrice is the variant's price before the plan discount, and
+	// VariantLabel its grind and size ("Whole Bean · 12oz"); the Change form
+	// starts from both.
+	BasePrice    *int
+	VariantLabel string
 	// ShipsSeparately marks a member of a box that is renewed on its own (it
 	// is latched on a dead card), so it is its own order with its own shipping
 	// even though it is due with the box.
@@ -555,6 +560,11 @@ type AccountSubscriptionsProps struct {
 	// without it.
 	ResumeOrderOn time.Time
 	MerchantTZ    *time.Location
+	// Choices and Plans are what the Change and Add a coffee forms offer: the
+	// /subscribe picker's coffees and the active plans. With no choices, the
+	// Add form is not offered.
+	Choices []SubscriptionChoice
+	Plans   []domain.SubscriptionPlan
 }
 
 // skipUndoOffer reports whether this subscription can still be put back on the
@@ -715,9 +725,13 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 			if props.hasControls() {
 				@subscriptionHelp()
 			}
-			<div class="space-y-8">
+			<!-- The body boosts every form with show:window:top, which suits a
+			     navigation. A save here comes back to this same page, so the
+			     reader stays where they were and the card they changed redraws
+			     in place. Errors are toasts and swap nothing either way. -->
+			<div class="space-y-8" hx-swap="innerHTML show:none">
 				for _, box := range props.Boxes {
-					@accountSubscriptionBox(box, props.MerchantTZ, props.ResumeOrderOn)
+					@accountSubscriptionBox(box, props.MerchantTZ, props.ResumeOrderOn, props.options())
 				}
 				if len(props.Rows) > 0 {
 					<div class="space-y-4">
@@ -725,7 +739,7 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 							<h2 class="font-oswald font-bold text-chrome-deep text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Not shipping right now</h2>
 						}
 						for _, row := range props.Rows {
-							@accountSubscriptionCard(row, props.MerchantTZ, props.ResumeOrderOn)
+							@accountSubscriptionCard(row, props.MerchantTZ, props.ResumeOrderOn, props.options())
 						}
 					</div>
 				}
@@ -737,7 +751,8 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 // accountSubscriptionBox is one box: a heading naming the ship day, with the
 // whole-box skip and pause, over the members' own cards. The forms name the box
 // by its key, address and instant, because a box is derived and has no id.
-templ accountSubscriptionBox(box AccountSubscriptionBox, tz *time.Location, resumeOrderOn time.Time) {
+templ accountSubscriptionBox(box AccountSubscriptionBox, tz *time.Location, resumeOrderOn time.Time, opts subscriptionOptions) {
+	{{ canAdd := box.CanAdd && len(opts.Choices) > 0 && len(opts.Plans) > 0 }}
 	{{ boxInstant := box.Key.NextOrderAt.UTC().Format(time.RFC3339Nano) }}
 	{{ boxInputID := "box-skip-" + box.Key.ShippingAddressID.String() + box.Key.NextOrderAt.UTC().Format("20060102150405") }}
 	<section class="space-y-3" data-subscription-box={ box.Key.ShippingAddressID.String() + "@" + boxInstant }>
@@ -750,8 +765,11 @@ templ accountSubscriptionBox(box AccountSubscriptionBox, tz *time.Location, resu
 					</p>
 				}
 			</div>
-			if box.CanSkip || box.CanPauseAll {
+			if box.CanSkip || box.CanPauseAll || canAdd {
 				<div class="flex flex-wrap items-center gap-2">
+					if canAdd {
+						<button type="button" x-show="confirming !== 'add'" x-on:click="confirming = 'add'" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Add a coffee</button>
+					}
 					if box.CanSkip {
 						<button type="button" x-show="confirming !== 'skip'" x-on:click="confirming = 'skip'" class="font-oswald font-bold text-[11px] border-2 border-ink bg-cream-hi text-ink px-4 py-2 hover:bg-paper-warm transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Skip this shipment</button>
 					}
@@ -780,15 +798,18 @@ templ accountSubscriptionBox(box AccountSubscriptionBox, tz *time.Location, resu
 						<button type="button" x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 					</form>
 				}
+				if canAdd {
+					@boxAddForm(box, opts, tz)
+				}
 			}
 		</div>
 		for _, row := range box.Rows {
-			@accountSubscriptionCard(row, tz, resumeOrderOn)
+			@accountSubscriptionCard(row, tz, resumeOrderOn, opts)
 		}
 	</section>
 }
 
-templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, resumeOrderOn time.Time) {
+templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, resumeOrderOn time.Time, opts subscriptionOptions) {
 	{{ sub := row.Subscription }}
 	<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
 		<div class="flex items-start gap-5 mb-5">
@@ -804,8 +825,9 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					</div>
 				}
 			</div>
-			<!-- Title + meta -->
-			<div class="flex-1 min-w-0">
+			<!-- Title + meta. A saved Change swaps just this, by id, so the
+			     open drawer below stays put (subscriptionChangeForm). -->
+			<div id={ idAttr("sub-summary", sub.ID) } class="flex-1 min-w-0">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						if row.Product != nil {
@@ -878,6 +900,13 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 		<!-- Actions -->
 		if sub.Status == domain.SubscriptionStatusActive {
 			<div class="flex flex-wrap gap-2" x-data="{ confirming: '' }">
+				if canChange(sub) {
+					<button x-show="confirming !== 'change'" x-on:click="confirming = 'change'"
+						class="font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
+						style="letter-spacing:0.16em; text-transform:uppercase;">
+						Change
+					</button>
+				}
 				<button x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'"
 					class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
 					style="letter-spacing:0.16em; text-transform:uppercase;">
@@ -971,6 +1000,9 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					}
 					<button x-on:click="confirming = ''" class="mt-3 font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 				</div>
+				if canChange(sub) {
+					@subscriptionChangeForm(row, opts, tz)
+				}
 			</div>
 		}
 		if sub.Status == domain.SubscriptionStatusPaused {
@@ -999,6 +1031,10 @@ templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location, res
 					</form>
 					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 				</div>
+				if canChange(sub) {
+					<button x-show="confirming === ''" x-on:click="confirming = 'change'" class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Change</button>
+					@subscriptionChangeForm(row, opts, tz)
+				}
 				<!-- Cancel without resuming first: a paused subscription can end
 				     straight from here, with nothing booked on the way out. -->
 				<button x-show="confirming === ''" x-on:click="confirming = 'cancel'" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Cancel</button>
@@ -1064,6 +1100,7 @@ var subscriptionHelpLabels = []string{
 	"Skip a shipment", "Skip this shipment", "Undo skip",
 	"Pause", "Pause all", "Resume", "Cancel",
 	"Update payment method", "Retry payment",
+	"Change", "Add a coffee",
 }
 
 // subscriptionHelp tells the customer what they can change on this page and
@@ -1075,13 +1112,21 @@ templ subscriptionHelp() {
 		<summary class="cursor-pointer p-4 flex items-start justify-between gap-3">
 			<span>
 				<span class="block font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Need to change something?</span>
-				<span class="block font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">Skip, pause, cancel or swap your card right here. Want a different size, grind or schedule? Give the shop a shout.</span>
+				<span class="block font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">Change the grind, size, bags or schedule, add a coffee, skip, pause, cancel or swap your card, all right here.</span>
 			</span>
 			<svg class="size-4 shrink-0 mt-0.5 text-ink transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
 			</svg>
 		</summary>
 		<dl class="px-4 pb-4 space-y-3 font-oswald text-sm text-ink-soft" style="letter-spacing:0.04em;">
+			<div>
+				<dt class="font-bold text-ink">Change a coffee</dt>
+				<dd>Press <strong>Change</strong> on a coffee to switch its grind or size, how many bags, or how often it comes. It applies from your next shipment, and nothing is charged when you change it.</dd>
+			</div>
+			<div>
+				<dt class="font-bold text-ink">Add another coffee</dt>
+				<dd>Press <strong>Add a coffee</strong> above a shipment and it rides along in that box, charged when it ships, with no extra shipping.</dd>
+			</div>
 			<div>
 				<dt class="font-bold text-ink">Skip a shipment</dt>
 				<dd>Still got beans? Press <strong>Skip a shipment</strong> on a coffee to push it back, or <strong>Skip this shipment</strong> above a shipment to move everything in it. Nothing is charged for a skipped shipment. Changed your mind? Press <strong>Undo skip</strong> on the coffee, or use the link in the email we send.</dd>
@@ -1103,8 +1148,8 @@ templ subscriptionHelp() {
 				<dd>Edit the address on your <a href="/account/addresses" class="text-rust underline underline-offset-2 hover:text-rust-deep">Addresses</a> page, and every coffee shipping there follows it.</dd>
 			</div>
 			<div>
-				<dt class="font-bold text-ink">A different size, grind or schedule</dt>
-				<dd>We'll switch it for you. After a different coffee, or a different number of bags? We'll help you set that up. Email <a href="mailto:info@rockabillyroasting.com" class="text-rust underline underline-offset-2 hover:text-rust-deep">info@rockabillyroasting.com</a>.</dd>
+				<dt class="font-bold text-ink">Something else</dt>
+				<dd>Switching to a different coffee altogether? Add the new one, then cancel the old. Anything else, email <a href="mailto:info@rockabillyroasting.com" class="text-rust underline underline-offset-2 hover:text-rust-deep">info@rockabillyroasting.com</a> and we'll sort it.</dd>
 			</div>
 		</dl>
 	</details>

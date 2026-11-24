@@ -105,6 +105,29 @@ Each subscription shows:
 - The current status (Active, Paused, or Cancelled)
 - Your next order date (for active subscriptions)
 
+### Changing a Subscription
+
+Want a different grind or bag size, more or fewer bags, or a different schedule? Change it yourself.
+
+1. Go to **Account > Subscriptions**.
+2. Find the coffee and click **Change**.
+3. Pick the grind and size, how many bags, and how often. The price per shipment updates as you pick.
+4. Click **Save changes**.
+
+Nothing is charged when you save. Your changes ship with your next shipment, and we email you what changed. A new schedule starts after the shipment you already have booked -- that one still goes out on its date.
+
+You can change active and paused subscriptions. If a payment didn't go through, update your card and retry it first. Right around a renewal, while we are packing that shipment, changes wait a few minutes -- the page tells you to try again shortly.
+
+### Adding a Coffee to a Shipment
+
+Each upcoming shipment on your account page has an **Add a coffee** button.
+
+1. Click **Add a coffee** above the shipment.
+2. Pick the coffee, how many bags, and how often.
+3. Click **Add to this shipment**.
+
+The coffee rides along in that box and is charged when it ships, with no extra shipping and nothing charged today. On the same schedule as the rest of the box, it keeps shipping with it. On a different schedule, it goes out with this box once, then on its own days.
+
 ### Skipping a Shipment
 
 Still have beans on the shelf, or heading out of town for a couple of weeks? Skip ahead instead of pausing -- the subscription stays active and picks its rhythm back up on its own.
@@ -182,17 +205,17 @@ If your card cannot be charged on the renewal date, your subscription is marked 
 
 ### Multiple Subscriptions
 
-You can subscribe to multiple coffees. Each subscription is independent -- you can have one coffee on a 14-day schedule and another on a 30-day schedule. Each subscription renews as its own separate order, even if multiple subscriptions come due on the same day.
+You can subscribe to multiple coffees. Each one is its own subscription -- you can have one coffee on a 14-day schedule and another on a 30-day schedule. Coffees going to the same address on the same day ship together as one order with one shipping charge, and your account page shows them as one shipment. You can add another coffee to a shipment any time with **Add a coffee**.
 
 ---
 
 ## Frequently Asked Questions
 
 **Can I change which coffee I receive?**
-Product swaps are not yet available through self-service. To change your coffee, cancel your current subscription and start a new one with the coffee you prefer.
+A different grind or size of the same coffee, yes: click **Change**. For a different coffee altogether, click **Add a coffee** on the shipment, then cancel the old one.
 
-**Can I change my delivery frequency?**
-Frequency changes are not yet available through self-service. Cancel and re-subscribe with your preferred schedule.
+**Can I change my delivery frequency, or the number of bags?**
+Yes. Click **Change** on the subscription -- see [Changing a Subscription](#changing-a-subscription) above.
 
 **Can I skip just one delivery?**
 Yes. Go to **Account > Subscriptions** and click **Skip a shipment** -- see [Skipping a Shipment](#skipping-a-shipment) above. Nothing is charged for a skipped delivery, and the confirmation email has an undo link.

@@ -41,6 +41,10 @@ func subscriptionEventLabel(action string) string {
 		return "Plan changed"
 	case audit.AuditSubscriptionVariantChanged:
 		return "Grind changed"
+	case audit.AuditSubscriptionQuantityChanged:
+		return "Quantity changed"
+	case audit.AuditEmailSubscriptionChanged:
+		return "Change notification sent"
 	}
 	parts := strings.SplitN(action, ".", 2)
 	if len(parts) == 2 {

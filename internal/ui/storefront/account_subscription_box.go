@@ -22,6 +22,9 @@ type AccountSubscriptionBox struct {
 	SkipDefault          string
 	SkipMin, SkipMax     string
 	CanSkip, CanPauseAll bool
+	// CanAdd offers "Add a coffee". The service refuses a box with a past-due
+	// member or a full one, so the page does not offer it.
+	CanAdd bool
 }
 
 // BuildAccountSubscriptionsProps sorts a customer's subscription rows into the
@@ -41,7 +44,7 @@ func BuildAccountSubscriptionsProps(customer *domain.Customer, rows []AccountSub
 
 	boxed := map[uuid.UUID]bool{}
 	for _, box := range domain.GroupIntoBoxes(subs, tz) {
-		b := AccountSubscriptionBox{Key: box.Key, Day: box.Day, CanSkip: true, CanPauseAll: true}
+		b := AccountSubscriptionBox{Key: box.Key, Day: box.Day, CanSkip: true, CanPauseAll: true, CanAdd: true}
 		shortest := 0
 		for _, m := range box.Members {
 			row := byID[m.Subscription.ID]
@@ -51,13 +54,16 @@ func BuildAccountSubscriptionsProps(customer *domain.Customer, rows []AccountSub
 			// The service refuses the whole box when any member cannot go, so
 			// the page does not offer what would bounce.
 			if m.Subscription.Status != domain.SubscriptionStatusActive {
-				b.CanSkip, b.CanPauseAll = false, false
+				b.CanSkip, b.CanPauseAll, b.CanAdd = false, false, false
 			}
 			if row.Plan != nil {
 				if days := domain.SubscriptionIntervalDays(row.Plan.Interval, row.Plan.IntervalCount); days > 0 && (shortest == 0 || days < shortest) {
 					shortest = days
 				}
 			}
+		}
+		if len(b.Rows) >= maxBoxItems {
+			b.CanAdd = false
 		}
 		b.SkipMin, b.SkipMax, b.SkipDefault = boxSkipWindow(box.Key.NextOrderAt, box.Day, shortest, tz)
 		if b.SkipDefault == "" {

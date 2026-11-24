@@ -190,3 +190,69 @@ func TestSendPastDueEmail_RefusesAnotherCustomersSubscription(t *testing.T) {
 	assert.ErrorIs(t, err, app.ErrSubscriptionNotFound)
 	assert.Empty(t, sender.Sent)
 }
+
+func TestSendChangeEmail(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("an edit names the coffee and what moved", func(t *testing.T) {
+		svc, sender := newConfirmEmailService(t)
+		customer, addr := committedCustomer(t)
+		title := "Bonneville Blend " + uuid.NewString()[:8]
+		sub := committedSubscription(t, customer, addr, title, domain.SubscriptionIntervalEvery30Days)
+
+		require.NoError(t, svc.SendChangeEmail(ctx, testPool, app.SubscriptionChangeNotice{
+			SubscriptionID: sub.ID, CustomerID: customer.ID, OldQuantity: 1, NewQuantity: 3,
+		}))
+		require.Len(t, sender.Sent, 1)
+		msg := sender.Sent[0]
+		assert.Equal(t, customer.Email, msg.To)
+		assert.Equal(t, "Your subscription is updated", msg.Subject)
+		assert.Contains(t, msg.Text, title)
+		assert.Contains(t, msg.Text, "How many: 1 -> 3")
+		assert.NotContains(t, msg.Text, "How often", "only what changed is listed")
+	})
+
+	t.Run("a paused subscription ships the change when it resumes, not on a stale date", func(t *testing.T) {
+		svc, sender := newConfirmEmailService(t)
+		customer, addr := committedCustomer(t)
+		sub := committedSubscription(t, customer, addr, "Paused Blend "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+		stale := time.Now().AddDate(0, 0, -19)
+		_, err := testPool.Exec(ctx, `UPDATE subscriptions SET status = 'paused', next_order_at = $2 WHERE id = $1`, sub.ID, stale)
+		require.NoError(t, err)
+		require.NoError(t, svc.SendChangeEmail(ctx, testPool, app.SubscriptionChangeNotice{
+			SubscriptionID: sub.ID, CustomerID: customer.ID, OldQuantity: 1, NewQuantity: 3,
+			OldPlanID: &sub.PlanID, NewPlanID: &sub.PlanID, // a plan change, for the as-booked line
+		}))
+		require.Len(t, sender.Sent, 1)
+		for _, body := range []string{sender.Sent[0].Text, sender.Sent[0].HTML} {
+			assert.Contains(t, body, "ships when you resume")
+			assert.NotContains(t, body, stale.Format("January 2, 2006"), "pausing leaves next_order_at stale; the email must not quote it")
+			assert.NotContains(t, body, "goes out as booked", "nothing is booked while paused")
+		}
+		assert.Contains(t, sender.Sent[0].Text, "Next shipment: when you resume")
+	})
+
+	t.Run("an added coffee", func(t *testing.T) {
+		svc, sender := newConfirmEmailService(t)
+		customer, addr := committedCustomer(t)
+		sub := committedSubscription(t, customer, addr, "Crazy Mountain Decaf "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+
+		require.NoError(t, svc.SendChangeEmail(ctx, testPool, app.AddedNotice(sub)))
+		require.Len(t, sender.Sent, 1)
+		assert.Equal(t, "Added to your next shipment", sender.Sent[0].Subject)
+		assert.Contains(t, sender.Sent[0].Text, "How many: 1\n")
+	})
+
+	t.Run("refuses another customer's subscription", func(t *testing.T) {
+		svc, sender := newConfirmEmailService(t)
+		customer, _ := committedCustomer(t)
+		stranger, strangerAddr := committedCustomer(t)
+		theirs := committedSubscription(t, stranger, strangerAddr, "Theirs "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+
+		err := svc.SendChangeEmail(ctx, testPool, app.SubscriptionChangeNotice{
+			SubscriptionID: theirs.ID, CustomerID: customer.ID, OldQuantity: 1, NewQuantity: 2,
+		})
+		assert.ErrorIs(t, err, app.ErrSubscriptionNotFound)
+		assert.Empty(t, sender.Sent)
+	})
+}

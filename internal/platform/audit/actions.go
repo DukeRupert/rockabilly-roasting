@@ -143,6 +143,7 @@ const (
 	AuditSubscriptionShippingGrandfathered = "subscription.shipping_grandfathered_changed"
 	AuditSubscriptionVariantChanged        = "subscription.variant_changed"
 	AuditSubscriptionPlanChanged           = "subscription.plan_changed"
+	AuditSubscriptionQuantityChanged       = "subscription.quantity_changed"
 	AuditSubscriptionSkipped               = "subscription.skipped"
 	AuditSubscriptionSkipUndone            = "subscription.skip_undone"
 	// A renewal charged the card and has not yet written the order: the
@@ -345,6 +346,7 @@ const (
 	AuditEmailSubscriptionSkipped          = "email.subscription_skipped"
 	AuditEmailSubscriptionSkipUndone       = "email.subscription_skip_undone"
 	AuditEmailSubscriptionResumed          = "email.subscription_resumed"
+	AuditEmailSubscriptionChanged          = "email.subscription_changed"
 	AuditEmailSubscriptionEnded            = "email.subscription_ended"
 	AuditEmailRefundIssued                 = "email.refund_issued"
 	AuditEmailInvoiceSent                  = "email.invoice_sent"

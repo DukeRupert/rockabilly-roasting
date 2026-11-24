@@ -575,6 +575,34 @@ type SubscriptionSkipUndoneData struct {
 	AccountURL   string
 }
 
+// SubscriptionChangedData holds data for the notice sent when a customer
+// changes a subscription from their account, or adds a coffee to a box.
+// Nothing is charged when they do; the email says what changed and that it
+// arrives with NextShipOn's shipment. Rows list each change; Was is empty for
+// an added coffee. PlanChanged adds that the booked shipment keeps its date.
+// Paused has no shipment booked, whatever NextShipOn holds (pausing leaves
+// next_order_at where it was): the change ships when they resume.
+type SubscriptionChangedData struct {
+	CustomerName string
+	Added        bool
+	ProductName  string
+	Rows         []SubscriptionChangeRow
+	PlanChanged  bool
+	Paused       bool
+	NextShipOn   time.Time
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
+// SubscriptionChangeRow is one line of SubscriptionChangedData: what the field
+// is, what it was, and what it is now.
+type SubscriptionChangeRow struct {
+	Label string
+	Was   string
+	Now   string
+}
+
 // SubscriptionResumedData holds data for the notice sent when a paused
 // subscription is put back on. Resuming bills at the next renewal window rather
 // than a full interval out, so the customer is told the date their card is

@@ -84,10 +84,14 @@ type Subscription struct {
 	// RenewalKeyGeneration is raised by every refund of a renewal charge and
 	// is part of the renewal's idempotency key.
 	RenewalKeyGeneration int
-	PauseUntil           *time.Time
-	Metadata             map[string]any
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	// RenewalClaimedAt is when a renewal took its claim on this subscription,
+	// nil when none holds it. A claim older than the renewal lease belongs to a
+	// renewal whose process died.
+	RenewalClaimedAt *time.Time
+	PauseUntil       *time.Time
+	Metadata         map[string]any
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // RenewalBlocked reports whether this subscription looks live but can never be

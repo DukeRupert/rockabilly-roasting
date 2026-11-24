@@ -1,0 +1,50 @@
+{{define "subscription_changed.html"}}<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    {{if .Added}}
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Added to Your Next Shipment</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 16px;"><strong>{{.ProductName}}</strong> is riding along with your next shipment. Nothing's charged today &mdash; it's billed with the rest of the box when it goes out.</p>
+    {{else}}
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Your Subscription Is Updated</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 16px;">Here's what you changed on your <strong>{{.ProductName}}</strong> subscription. Nothing's charged today &mdash; {{if .Paused}}the change ships when you resume.{{else}}the change shows up in your next shipment.{{end}}</p>
+    {{end}}
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5DFD0;margin:0 0 24px;">
+      {{range .Rows}}
+      <tr>
+        <td style="padding:8px 12px;font-weight:bold;border-bottom:1px solid #E5DFD0;">{{.Label}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #E5DFD0;">{{if .Was}}<span style="color:#666;text-decoration:line-through;">{{.Was}}</span> &rarr; {{end}}<strong>{{.Now}}</strong></td>
+      </tr>
+      {{end}}
+      <tr style="background-color:#F5F0E6;">
+        <td style="padding:8px 12px;font-weight:bold;">Next shipment</td>
+        <td style="padding:8px 12px;"><strong>{{if .Paused}}When you resume{{else}}{{date .NextShipOn}}{{end}}</strong></td>
+      </tr>
+    </table>
+
+    {{if and .PlanChanged (not .Paused)}}<p style="margin:0 0 24px;">Your shipment on {{date .NextShipOn}} goes out as booked. The new rhythm picks up from there.</p>{{end}}
+
+    <p style="margin:0 0 24px;text-align:center;">
+      <a href="{{.AccountURL}}" style="display:inline-block;background-color:#C0271D;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:bold;border-radius:4px;">Manage your subscription</a>
+    </p>
+
+    <p style="margin:0;font-size:13px;color:#666;">Didn't mean to? Change it back from your account any time{{if not .Paused}} before {{date .NextShipOn}}{{end}}.</p>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

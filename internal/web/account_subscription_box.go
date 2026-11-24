@@ -20,16 +20,14 @@ import (
 // finds nothing and is answered as a per-row action on someone else's
 // subscription is, not found.
 
-// parseBoxKey reads a box's key off a submitted form.
+// parseBoxKey reads a box's key off a submitted form's body, never the query
+// string.
 func parseBoxKey(r *http.Request) (domain.SubscriptionBoxKey, bool) {
-	if err := r.ParseForm(); err != nil {
-		return domain.SubscriptionBoxKey{}, false
-	}
-	addr, err := uuid.Parse(r.FormValue("address_id"))
+	addr, err := uuid.Parse(r.PostFormValue("address_id"))
 	if err != nil {
 		return domain.SubscriptionBoxKey{}, false
 	}
-	at, err := time.Parse(time.RFC3339Nano, r.FormValue("next_order_at"))
+	at, err := time.Parse(time.RFC3339Nano, r.PostFormValue("next_order_at"))
 	if err != nil {
 		return domain.SubscriptionBoxKey{}, false
 	}

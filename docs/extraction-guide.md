@@ -47,7 +47,7 @@ jobs/     → app/, platform/*, domain/         (thin River workers)
 platform/ → domain/ only                      (infrastructure sub-packages)
 ```
 
-Dependencies flow **inward only**. This is a compile-time guarantee — preserve it.
+Dependencies flow **inward only**. Nothing enforces this (Go doesn't, and there is no archtest), so preserve it by hand. The repo's `CLAUDE.md` has the current import rules.
 
 ### Load-bearing patterns to carry over verbatim
 

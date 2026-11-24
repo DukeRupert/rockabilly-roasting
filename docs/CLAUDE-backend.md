@@ -32,16 +32,17 @@ internal/platform/  ← cross-cutting infrastructure (audit, metrics, sessions, 
 
 ### Import rules — enforce strictly
 
-Dependencies flow inward only. Never violate these boundaries:
+Dependencies flow inward only. Nothing enforces this (Go doesn't, and there is no archtest), so check it in review. Never violate these boundaries:
 
 ```
-web/      may import: app/, platform/*, domain/, ui/
-ui/       may import: domain/ only
-jobs/     may import: app/, platform/*, domain/
-app/      may import: store/, platform/audit, platform/metrics, domain/
-store/    may import: domain/ only
-platform/ may import: domain/ only (audit sub-package only)
-domain/   may import: nothing from this project
+web/            may import: app/, store/ (to open transactions), jobs/ (job args), platform/*, ui/, domain/
+ui/             may import: domain/, emailtemplates/, platform/ render helpers (audit, auth, help, media)
+jobs/           may import: app/, store/ (to open transactions), platform/*, domain/
+app/            may import: store/, platform/*, emailtemplates/, domain/
+store/          may import: domain/ only
+platform/*      may import: domain/ only
+emailtemplates/ may import: nothing from this project
+domain/         may import: nothing from this project
 ```
 
 **If you find yourself needing to import `web/` from `app/`, stop.** The logic belongs in the handler, not the service. If you need to import `app/` from `store/`, stop — the store executes queries, it does not make business decisions.

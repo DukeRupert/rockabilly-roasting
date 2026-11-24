@@ -3,6 +3,7 @@ package storefront
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -38,6 +39,13 @@ type ProductDetailProps struct {
 	CartCount         int
 	SubscriptionPlans []domain.SubscriptionPlan
 	Coffee            *CoffeeAttrs // nil if not a coffee product
+	// DealersChoice is true when the product is a dealer's choice pack: the
+	// crew picks the coffees at packing time. Adds the how-it-works section.
+	DealersChoice bool
+	// DealersChoiceSizes are the bag counts the pack is sold in, smallest
+	// first; DealersChoiceNoDecaf is true when a no-decaf variant exists.
+	DealersChoiceSizes   []int
+	DealersChoiceNoDecaf bool
 	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
 	NextProduct       *ProductNav
 	RoastBased        bool // true when PrevProduct/NextProduct were picked on the lighter/darker roast axis
@@ -450,7 +458,7 @@ templ ProductContent(props ProductDetailProps) {
 						<svg class="size-4 text-rust" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
 							<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
 						</svg>
-						if props.Coffee != nil {
+						if props.Coffee != nil || props.DealersChoice {
 							<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Roasted to order &middot; ships within 48 hours</p>
 						} else {
 							<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Ships within 48 hours</p>
@@ -461,6 +469,9 @@ templ ProductContent(props ProductDetailProps) {
 			<!-- Tasting profile -->
 			if props.Coffee != nil && hasTastingProfile(props.Coffee) {
 				@tastingProfile(props.Coffee)
+			}
+			if props.DealersChoice {
+				@dealersChoiceHowItWorks(props.DealersChoiceSizes, props.DealersChoiceNoDecaf)
 			}
 			<!-- Try another roast (or generic prev/next when no roast data) -->
 			if props.PrevProduct != nil && props.NextProduct != nil {
@@ -548,6 +559,76 @@ templ optionPillGroup(opt OptionWithValues, defaultIDs map[string]bool) {
 			}
 		</div>
 	</fieldset>
+}
+
+// bagSizesSentence reads the pack sizes out in words: "Three, four, or six
+// 12oz bags." Numbers past twelve stay as digits.
+func bagSizesSentence(sizes []int) string {
+	words := []string{"", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"}
+	names := make([]string, len(sizes))
+	for i, n := range sizes {
+		if n > 0 && n < len(words) {
+			names[i] = words[n]
+		} else {
+			names[i] = fmt.Sprintf("%d", n)
+		}
+	}
+	var list string
+	switch len(names) {
+	case 0:
+		return "Choose how many 12oz bags."
+	case 1:
+		list = names[0]
+	case 2:
+		list = names[0] + " or " + names[1]
+	default:
+		list = strings.Join(names[:len(names)-1], ", ") + ", or " + names[len(names)-1]
+	}
+	if len(sizes) == 1 && sizes[0] == 1 {
+		return strings.ToUpper(list[:1]) + list[1:] + " 12oz bag."
+	}
+	return strings.ToUpper(list[:1]) + list[1:] + " 12oz bags."
+}
+
+func grindSentence(noDecaf bool) string {
+	if noDecaf {
+		return "Pick your grind, and tell us if decaf's off the table."
+	}
+	return "Pick your grind."
+}
+
+// dealersChoiceHowItWorks explains the pack on a dealer's choice product: what
+// the customer chooses, what the crew chooses, and how they find out what came
+// in the box. The product description (set in the admin) carries the pitch;
+// this carries the mechanics, so the description can stay short.
+templ dealersChoiceHowItWorks(sizes []int, noDecaf bool) {
+	<section class="mt-16 pt-10 border-t-2 border-ink" aria-labelledby="dealers-choice-how">
+		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">How it works</p>
+		<h2 id="dealers-choice-how" class="font-slab text-ink uppercase leading-[0.95] mt-2 mb-10" style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing:-0.005em;">
+			Dealer's
+			<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">choice.</span>
+		</h2>
+		<ol class="grid grid-cols-1 gap-6 md:grid-cols-3">
+			<li class="border-2 border-ink bg-cream-hi p-6 shadow-stamp">
+				<p class="font-special text-rust text-sm">No. 1</p>
+				<h3 class="mt-2 font-oswald font-bold text-ink text-lg uppercase" style="letter-spacing:0.06em;">You call the size</h3>
+				<p class="mt-2 font-oswald text-ink-soft text-base leading-relaxed">{ bagSizesSentence(sizes) + " " + grindSentence(noDecaf) }</p>
+			</li>
+			<li class="border-2 border-ink bg-cream-hi p-6 shadow-stamp">
+				<p class="font-special text-rust text-sm">No. 2</p>
+				<h3 class="mt-2 font-oswald font-bold text-ink text-lg uppercase" style="letter-spacing:0.06em;">We deal the hand</h3>
+				<p class="mt-2 font-oswald text-ink-soft text-base leading-relaxed">The crew pulls from what's on the roaster right now and spreads your box across as many coffees as the shelf allows — single origins, blends, whatever's running hot.</p>
+			</li>
+			<li class="border-2 border-ink bg-cream-hi p-6 shadow-stamp">
+				<p class="font-special text-rust text-sm">No. 3</p>
+				<h3 class="mt-2 font-oswald font-bold text-ink text-lg uppercase" style="letter-spacing:0.06em;">Every bag's named</h3>
+				<p class="mt-2 font-oswald text-ink-soft text-base leading-relaxed">Your packing slip lists what's in the box, so when one becomes your new favorite you know exactly what to reorder.</p>
+			</li>
+		</ol>
+		<p class="mt-8 max-w-2xl font-oswald text-ink-soft text-base leading-relaxed">
+			Subscribe and every shipment is a fresh deal. We keep track of what you got last time and steer clear of it while there's something new to pour.
+		</p>
+	</section>
 }
 
 templ tastingProfile(attrs *CoffeeAttrs) {

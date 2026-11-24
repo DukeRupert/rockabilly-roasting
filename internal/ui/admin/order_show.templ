@@ -18,6 +18,11 @@ type EnrichedLineItem struct {
 	VariantSKU      string
 	CurrentLabel    string
 	SiblingVariants []SiblingVariant
+	// Picks names the coffees in a dealer's choice pack, one per bag. Filled
+	// for the packing slip only. PicksSuggested is true while they are still
+	// Hiri's suggestions rather than saved picks.
+	Picks          []string
+	PicksSuggested bool
 }
 
 // SiblingVariant is one selectable option in the line-item grind/variant
@@ -88,6 +93,12 @@ type OrderShowProps struct {
 	// An order covering several leaves the stamp null, so the stamp alone
 	// would show none of them.
 	SubscriptionIDs []uuid.UUID
+	// DealersChoice lists the order's dealer's choice packs, if any, with the
+	// dropdowns staff use to record what went in each box.
+	DealersChoice []DealersChoiceLine
+	// DealersChoicePrevious is the customer's last dealer's choice box, shown
+	// above the dropdowns so staff can check for repeats. Nil when none.
+	DealersChoicePrevious *domain.PreviousPicks
 }
 
 // maxLabelPolls bounds the auto-refresh that runs after a label is queued: the
@@ -758,6 +769,11 @@ templ orderShipmentsBlock(props OrderShowProps) {
 templ orderActionRail(props OrderShowProps) {
 	@railCard("Next action") {
 		<div class="flex flex-col gap-2">
+			if dealersChoicePending(props.DealersChoice) && hasForwardAction(props) && !canMarkOrderPaid(props.Order) {
+				<p class="text-sm text-rr-body">
+					Save the <a href="#dealers-choice" class="font-semibold text-rr-red hover:text-rr-red-lt">dealer's choice picks</a> first. Fulfilling, labels, and hand-off unlock once they're saved.
+				</p>
+			}
 			if canMarkOrderPaid(props.Order) {
 				<form
 					method="post"
@@ -1250,6 +1266,9 @@ templ OrderShowContent(props OrderShowProps) {
 				@orderShipmentsBlock(props)
 			}
 			@orderLineItemsTable(props)
+			if len(props.DealersChoice) > 0 {
+				@orderDealersChoicePanel(props.Order.ID, props.DealersChoice, props.DealersChoicePrevious, props.MerchantTZ)
+			}
 			if len(props.Adjustments) > 0 {
 				@orderAdjustmentsTable(props)
 			}

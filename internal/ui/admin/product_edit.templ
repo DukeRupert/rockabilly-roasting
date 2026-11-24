@@ -39,6 +39,9 @@ type ProductEditProps struct {
 	Product            *domain.Product
 	Taxons             []domain.Taxon
 	Variants           []VariantWithOptions
+	// PickRules marks which variants are dealer's choice packs, keyed by
+	// variant ID. Loaded for the Variants tab only.
+	PickRules map[uuid.UUID]domain.PickRule
 	Options            []OptionWithValues
 	WholesaleCustomers []domain.Customer // candidates for a private (white-label) product
 	CustomerAccessIDs  []uuid.UUID       // customers granted access to a private product
@@ -322,6 +325,7 @@ templ productVariantsTab(props ProductEditProps) {
 	<div class="space-y-8">
 		@OptionsPanel(props.Product, props.Options)
 		@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, nil)
+		@DealersChoiceSetupPanel(props.Product.ID, props.Variants, props.PickRules)
 	</div>
 }
 

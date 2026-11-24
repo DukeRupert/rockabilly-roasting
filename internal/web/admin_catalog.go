@@ -295,6 +295,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var whiteLabelBase *domain.Product
 	var whiteLabelBaseChoices []admin.WhiteLabelBaseOption
 	var whiteLabelChildren []domain.Product
+	var pickRules map[uuid.UUID]domain.PickRule
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -384,6 +385,10 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 				return txErr
 			}
 			variants, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
+			if txErr != nil {
+				return txErr
+			}
+			pickRules, txErr = d.DealersChoiceService.ListRulesByProduct(ctx, tx, id)
 			return txErr
 
 		case "pricing":
@@ -468,6 +473,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		WhiteLabelBase:        whiteLabelBase,
 		WhiteLabelBaseChoices: whiteLabelBaseChoices,
 		WhiteLabelChildren:    whiteLabelChildren,
+		PickRules:             pickRules,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content

@@ -307,6 +307,16 @@ func customerCanChange(sub *domain.Subscription, now time.Time) error {
 	if renewalHeld(sub, now) {
 		return ErrSubscriptionRenewing
 	}
+	// Due and not yet claimed: the next renewal run takes it as it stands. A
+	// renewal that timed out at Stripe releases its claim with nothing
+	// recorded, and its retry charges under the same idempotency key, which
+	// does not cover the amount: an edit in between would make every retry a
+	// reused key with different parameters, the card charged once and no
+	// order written. AddToBox refuses a due box the same way. A paused
+	// subscription is not renewed, whatever its next_order_at says.
+	if sub.Status == domain.SubscriptionStatusActive && !sub.NextOrderAt.After(now) {
+		return ErrSubscriptionRenewing
+	}
 	return nil
 }
 

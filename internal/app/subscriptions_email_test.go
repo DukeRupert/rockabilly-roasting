@@ -212,6 +212,26 @@ func TestSendChangeEmail(t *testing.T) {
 		assert.NotContains(t, msg.Text, "How often", "only what changed is listed")
 	})
 
+	t.Run("a paused subscription ships the change when it resumes, not on a stale date", func(t *testing.T) {
+		svc, sender := newConfirmEmailService(t)
+		customer, addr := committedCustomer(t)
+		sub := committedSubscription(t, customer, addr, "Paused Blend "+uuid.NewString()[:8], domain.SubscriptionIntervalEvery30Days)
+		stale := time.Now().AddDate(0, 0, -19)
+		_, err := testPool.Exec(ctx, `UPDATE subscriptions SET status = 'paused', next_order_at = $2 WHERE id = $1`, sub.ID, stale)
+		require.NoError(t, err)
+		require.NoError(t, svc.SendChangeEmail(ctx, testPool, app.SubscriptionChangeNotice{
+			SubscriptionID: sub.ID, CustomerID: customer.ID, OldQuantity: 1, NewQuantity: 3,
+			OldPlanID: &sub.PlanID, NewPlanID: &sub.PlanID, // a plan change, for the as-booked line
+		}))
+		require.Len(t, sender.Sent, 1)
+		for _, body := range []string{sender.Sent[0].Text, sender.Sent[0].HTML} {
+			assert.Contains(t, body, "ships when you resume")
+			assert.NotContains(t, body, stale.Format("January 2, 2006"), "pausing leaves next_order_at stale; the email must not quote it")
+			assert.NotContains(t, body, "goes out as booked", "nothing is booked while paused")
+		}
+		assert.Contains(t, sender.Sent[0].Text, "Next shipment: when you resume")
+	})
+
 	t.Run("an added coffee", func(t *testing.T) {
 		svc, sender := newConfirmEmailService(t)
 		customer, addr := committedCustomer(t)

@@ -580,12 +580,15 @@ type SubscriptionSkipUndoneData struct {
 // Nothing is charged when they do; the email says what changed and that it
 // arrives with NextShipOn's shipment. Rows list each change; Was is empty for
 // an added coffee. PlanChanged adds that the booked shipment keeps its date.
+// Paused has no shipment booked, whatever NextShipOn holds (pausing leaves
+// next_order_at where it was): the change ships when they resume.
 type SubscriptionChangedData struct {
 	CustomerName string
 	Added        bool
 	ProductName  string
 	Rows         []SubscriptionChangeRow
 	PlanChanged  bool
+	Paused       bool
 	NextShipOn   time.Time
 	StoreName    string
 	StoreURL     string

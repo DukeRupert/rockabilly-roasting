@@ -692,6 +692,7 @@ func (s *SubscriptionService) SendChangeEmail(ctx context.Context, pool *pgxpool
 	}
 	data.CustomerName = customer.FirstName
 	data.NextShipOn = sub.NextOrderAt
+	data.Paused = sub.Status == domain.SubscriptionStatusPaused
 	data.StoreName = s.email.StoreName
 	data.StoreURL = s.email.BaseURL
 	data.AccountURL = s.email.BaseURL + "/account/subscriptions"

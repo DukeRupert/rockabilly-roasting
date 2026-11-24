@@ -202,6 +202,14 @@ func TestEditSubscription(t *testing.T) {
 			want: app.ErrSubscriptionRenewing,
 		},
 		{
+			name: "due and not yet claimed: the next renewal run takes it as it stands",
+			setup: func(t *testing.T, tx pgx.Tx, f manageFixture) (uuid.UUID, app.EditSubscriptionParams) {
+				execT(t, tx, `UPDATE subscriptions SET next_order_at = now() - interval '1 minute' WHERE id = $1`, f.sub.ID)
+				return f.customer.ID, app.EditSubscriptionParams{Quantity: ptr(2)}
+			},
+			want: app.ErrSubscriptionRenewing,
+		},
+		{
 			name: "quantity over ten",
 			setup: func(t *testing.T, tx pgx.Tx, f manageFixture) (uuid.UUID, app.EditSubscriptionParams) {
 				return f.customer.ID, app.EditSubscriptionParams{Quantity: ptr(11)}
@@ -257,7 +265,9 @@ func TestEditSubscription(t *testing.T) {
 	t.Run("a paused subscription can be changed", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		f := newManageFixture(t, tx)
-		execT(t, tx, `UPDATE subscriptions SET status = 'paused' WHERE id = $1`, f.sub.ID)
+		// Pausing leaves next_order_at where it was, so a paused subscription's
+		// is often in the past. It is not renewed, so that does not hold it.
+		execT(t, tx, `UPDATE subscriptions SET status = 'paused', next_order_at = now() - interval '19 days' WHERE id = $1`, f.sub.ID)
 
 		_, err := svc.EditSubscription(ctx, tx, f.sub.ID, f.customer.ID, app.EditSubscriptionParams{Quantity: ptr(2)}, actor)
 		require.NoError(t, err)

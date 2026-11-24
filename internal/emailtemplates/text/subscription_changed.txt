@@ -7,16 +7,16 @@ Hi {{.CustomerName}},
 
 Hi {{.CustomerName}},
 
-Here's what you changed on your {{.ProductName}} subscription. Nothing's charged today -- the change shows up in your next shipment.
+Here's what you changed on your {{.ProductName}} subscription. Nothing's charged today -- {{if .Paused}}the change ships when you resume.{{else}}the change shows up in your next shipment.{{end}}
 {{end}}
 {{range .Rows}}{{.Label}}: {{if .Was}}{{.Was}} -> {{end}}{{.Now}}
-{{end}}Next shipment: {{date .NextShipOn}}
-{{if .PlanChanged}}
+{{end}}Next shipment: {{if .Paused}}when you resume{{else}}{{date .NextShipOn}}{{end}}
+{{if and .PlanChanged (not .Paused)}}
 Your shipment on {{date .NextShipOn}} goes out as booked. The new rhythm picks up from there.
 {{end}}
 Manage your subscription: {{.AccountURL}}
 
-Didn't mean to? Change it back from your account any time before {{date .NextShipOn}}.
+Didn't mean to? Change it back from your account any time{{if not .Paused}} before {{date .NextShipOn}}{{end}}.
 
 {{.StoreName}}
 {{.StoreURL}}

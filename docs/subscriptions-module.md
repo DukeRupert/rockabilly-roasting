@@ -157,11 +157,19 @@ simply arrives with the next shipment, and one email says what changed.
   `LockBox`). A renewal claims before it reads, and its claim is an UPDATE, so
   the two serialise: the change sees the claim and is refused
   (`ErrSubscriptionRenewing`, "try again in a few minutes"), or the renewal
-  waits and reads the change. A box that is already due is refused too, since
-  an added coffee would miss the batch and ship alone.
+  waits and reads the change. An active subscription or box that is already
+  due is refused too, claimed or not: an added coffee would miss the batch and
+  ship alone, and an edit could land between a renewal that timed out at
+  Stripe and its retry, which charges under the same idempotency key. The key
+  does not cover the amount, so every retry would fail as a reused key with
+  different parameters, the card charged once and no order written. A paused
+  subscription is not renewed, so a stale `next_order_at` does not hold it.
 - **The email carries what changed.** The job holds the old and new values
   captured at the change, so a second change a moment later cannot rewrite
-  what the first email says.
+  the was/now rows of the first email. The coffee's name and the next ship
+  date are read when it sends. A paused subscription's email says the change
+  ships when they resume rather than quoting its `next_order_at`, which
+  pausing leaves where it was.
 
 ## 3. Rules worth knowing before changing anything
 

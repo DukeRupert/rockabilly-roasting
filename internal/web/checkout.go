@@ -1320,10 +1320,9 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 	var analytics storefront.OrderConfirmedAnalytics
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		// scoping: guest-safe by design — callers gate access before calling.
-		// handleOrderConfirmed requires the single-use rr_last_order cookie to
-		// match the order number; handleSubscribeConfirm requires the Stripe
-		// PaymentIntent id, a server-issued secret only the buyer's browser holds.
+		// scoping: guest-safe by design — callers gate access: handleOrderConfirmed
+		// on the single-use rr_last_order cookie, handleSubscribeConfirm on the
+		// buyer's Stripe PaymentIntent id (as retail checkout confirm does).
 		order, txErr := d.OrderService.GetOrderByNumberAsStaff(ctx, tx, orderNumber)
 		if txErr != nil {
 			return fmt.Errorf("get order: %w", txErr)

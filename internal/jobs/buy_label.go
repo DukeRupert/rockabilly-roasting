@@ -116,5 +116,6 @@ func (w *BuyLabelWorker) Work(ctx context.Context, job *river.Job[BuyLabelArgs])
 func isDeterministicPrepFailure(err error) bool {
 	return errors.Is(err, app.ErrNoBoxPreset) ||
 		errors.Is(err, app.ErrShipmentNoPhysicalItems) ||
-		errors.Is(err, app.ErrShipmentWeightUnknown)
+		errors.Is(err, app.ErrShipmentWeightUnknown) ||
+		errors.Is(err, app.ErrDealersChoicePicksMissing)
 }

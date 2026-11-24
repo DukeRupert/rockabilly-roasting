@@ -26,6 +26,9 @@ type FulfillmentService struct {
 	labelProvider shipping.LabelProvider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
+	// picks gates label purchase on saved dealer's choice picks. Stateless,
+	// so the constructor builds it rather than every caller passing one.
+	picks *store.PickStore
 }
 
 // NewFulfillmentService creates a new FulfillmentService.
@@ -50,6 +53,7 @@ func NewFulfillmentService(
 		labelProvider: labelProvider,
 		audit:         audit,
 		metrics:       metrics,
+		picks:         store.NewPickStore(nil),
 	}
 }
 
@@ -218,6 +222,9 @@ func (s *FulfillmentService) PrepareLabelRequest(
 	items, err := s.orders.ListLineItems(ctx, tx, order.ID)
 	if err != nil {
 		return zero, fmt.Errorf("list line items: %w", err)
+	}
+	if err := requirePicksConfirmed(ctx, tx, s.picks, items); err != nil {
+		return zero, err
 	}
 
 	// Filter to physical items and gather weights.

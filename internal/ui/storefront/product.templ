@@ -1049,6 +1049,7 @@ templ purchaseModeScript() {
 			}
 
 			function updateQtyButtons() {
+				if (!qtyInput) return;
 				var val = parseInt(qtyInput.value, 10) || 1;
 				if (qtyMinus) qtyMinus.disabled = val <= 1;
 				if (qtyPlus) qtyPlus.disabled = val >= 10;

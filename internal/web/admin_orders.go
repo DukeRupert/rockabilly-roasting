@@ -1698,6 +1698,8 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if form.ShippingPostalCode == "" {
 		errs["shipping_postal_code"] = "Postal code is required"
+	} else if !domain.ValidPostalCode(form.ShippingPostalCode, form.Country()) {
+		errs["shipping_postal_code"] = "Enter a 5-digit ZIP code"
 	}
 
 	subtotal, ok := parseDollars(form.Subtotal)

@@ -459,6 +459,21 @@ func normalizeAddressParams(p store.CreateAddressParams) store.CreateAddressPara
 	return p
 }
 
+// validateAddressParams refuses an address no carrier could deliver to. It
+// runs after normalizeAddressParams, on every path that writes an address row,
+// so a form that forgets to check cannot store one. A blank country is read as
+// US, the only country the shop's forms submit.
+func validateAddressParams(p store.CreateAddressParams) error {
+	country := p.CountryCode
+	if country == "" {
+		country = "US"
+	}
+	if !domain.ValidPostalCode(p.PostalCode, country) {
+		return ErrInvalidPostalCode
+	}
+	return nil
+}
+
 // addressForKey projects create-params onto the domain.Address shape so they
 // can be keyed against stored rows. Only the fields domain.AddressKey reads are
 // carried across.
@@ -488,6 +503,9 @@ func addressForKey(p store.CreateAddressParams) domain.Address {
 // non-canonical address and none has to remember to ask.
 func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	p = normalizeAddressParams(p)
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 
 	addr, err := s.customers.CreateAddress(ctx, tx, p)
 	if err != nil {
@@ -544,6 +562,11 @@ func (s *CustomerService) FindOrCreateAddress(ctx context.Context, tx pgx.Tx, cu
 	p.CustomerID = &customerID
 
 	p = normalizeAddressParams(p)
+	// Validate before matching, not only in CreateAddress: a legacy row that
+	// already holds a bad ZIP would otherwise be matched and handed back.
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 	key := domain.AddressKey(addressForKey(p))
 
 	existing, err := s.customers.ListAddresses(ctx, tx, customerID)
@@ -587,6 +610,9 @@ func (s *CustomerService) ListAddresses(ctx context.Context, tx pgx.Tx, customer
 // start a fresh duplicate lineage on the customer's next order.
 func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	p = normalizeAddressParams(p)
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 
 	addr, err := s.customers.UpdateAddress(ctx, tx, id, customerID, p)
 	if err != nil {

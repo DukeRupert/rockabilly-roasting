@@ -95,6 +95,34 @@ func NormalizePostalCode(s, countryCode string) string {
 	return base
 }
 
+// ValidPostalCode reports whether s is a usable postal code for countryCode.
+//
+// For the US that means a five-digit ZIP, or a ZIP+4 written with its hyphen
+// ("83201-6529"). Anything else is a code no carrier can deliver to: an order
+// placed with the ZIP "9" was priced against a ZIP that does not exist, and
+// its subscriptions would have renewed to it.
+//
+// Outside the US there is no single shape worth enforcing, so any non-blank
+// value passes.
+//
+// This is the validation NormalizePostalCode deliberately does not do. Keep
+// the two separate: normalizing is safe to apply to every stored row, while
+// rejecting is only safe at the point a person can still fix what they typed.
+func ValidPostalCode(s, countryCode string) bool {
+	folded := strings.ToUpper(foldSpace(s))
+	if folded == "" {
+		return false
+	}
+	if NormalizeCountryCode(countryCode) != "US" {
+		return true
+	}
+	base, plus, found := strings.Cut(folded, "-")
+	if len(base) != 5 || !allDigits(base) {
+		return false
+	}
+	return !found || (len(plus) == 4 && allDigits(plus))
+}
+
 // NormalizeCountryCode canonicalizes an ISO country code by trimming and
 // uppercasing. It does not map country names onto codes: this is a
 // single-country shop whose forms submit a code directly, and guessing at

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/store"
@@ -357,4 +358,51 @@ func TestFindOrCreateAddress_KeyAgreesWithDomain(t *testing.T) {
 		State: p.State, PostalCode: p.PostalCode, CountryCode: p.CountryCode,
 	})
 	assert.Equal(t, want, domain.AddressKey(*addr))
+}
+
+// TestAddressWrites_RejectTruncatedZIP covers the production order whose ZIP
+// was "9": every service path that writes an address row refuses it, so no
+// checkout, account form or admin form can store one.
+func TestAddressWrites_RejectTruncatedZIP(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+
+	bad := pocatello(customer.ID)
+	bad.PostalCode = "9"
+
+	_, err := svc.CreateAddress(ctx, tx, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "create")
+
+	_, err = svc.FindOrCreateAddress(ctx, tx, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "find or create")
+
+	good, err := svc.CreateAddress(ctx, tx, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+	_, err = svc.UpdateAddress(ctx, tx, good.ID, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "update")
+
+	addrs, err := svc.ListAddresses(ctx, tx, customer.ID)
+	require.NoError(t, err)
+	require.Len(t, addrs, 1, "nothing bad was stored")
+	assert.Equal(t, "83201", addrs[0].PostalCode)
+}
+
+// TestFindOrCreateAddress_DoesNotMatchLegacyBadZIP pins that validation runs
+// before matching. The production row with ZIP "9" still exists in other
+// customers' history; a resubmission of it must be refused, not matched and
+// handed back as if it were deliverable.
+func TestFindOrCreateAddress_DoesNotMatchLegacyBadZIP(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+	legacy := testutil.CreateAddress(t, tx, customer.ID, testutil.WithAddressPostalCode("9"))
+
+	_, err := svc.FindOrCreateAddress(ctx, tx, customer.ID, store.CreateAddressParams{
+		CustomerID: &customer.ID, FirstName: legacy.FirstName, LastName: legacy.LastName,
+		Line1: legacy.Line1, City: legacy.City, State: legacy.State, PostalCode: "9", CountryCode: "US",
+	}, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
 }

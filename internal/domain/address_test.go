@@ -302,3 +302,31 @@ func TestAddressKey_NilAndEmptyLine2(t *testing.T) {
 	assert.Equal(t, AddressKey(nilLine2), AddressKey(emptyLine2))
 	assert.Equal(t, AddressKey(nilLine2), AddressKey(blankLine2))
 }
+
+func TestValidPostalCode(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		country string
+		want    bool
+	}{
+		{"five digits", "93555", "US", true},
+		{"zip plus four", "93555-1234", "US", true},
+		{"surrounding space", " 93555 ", "us", true},
+		{"the production typo", "9", "US", false},
+		{"four digits", "9355", "US", false},
+		{"six digits", "935551", "US", false},
+		{"nine digits unhyphenated", "935551234", "US", false},
+		{"letters", "9355A", "US", false},
+		{"short plus four", "93555-12", "US", false},
+		{"trailing hyphen", "93555-", "US", false},
+		{"blank", "  ", "US", false},
+		{"non-US any shape", "SW1A 1AA", "GB", true},
+		{"non-US blank", "", "GB", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ValidPostalCode(tt.in, tt.country))
+		})
+	}
+}

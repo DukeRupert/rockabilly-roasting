@@ -216,6 +216,10 @@ var (
 	// fields required to price + ship an order (street, city, state, ZIP).
 	// Surfaced to the buyer with a fix-it message rather than an opaque 500.
 	ErrAddressIncomplete = errors.New("address is missing required fields")
+	// ErrInvalidPostalCode refuses an address whose ZIP no carrier could
+	// deliver to (see domain.ValidPostalCode). Checked on every address write,
+	// so no form can store one.
+	ErrInvalidPostalCode = errors.New("enter a 5-digit ZIP code")
 
 	// ErrFulfillmentUnavailable signals the buyer picked a fulfillment method
 	// (e.g. local delivery) that isn't valid for their ship-to ZIP. Surfaced as

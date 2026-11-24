@@ -429,11 +429,13 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.State) == "" {
 		validationErrors["state"] = "State is required"
 	}
-	if strings.TrimSpace(req.PostalCode) == "" {
-		validationErrors["postal_code"] = "Postal code is required"
-	}
 	if strings.TrimSpace(req.Country) == "" {
 		req.Country = "US"
+	}
+	if strings.TrimSpace(req.PostalCode) == "" {
+		validationErrors["postal_code"] = "Postal code is required"
+	} else if !domain.ValidPostalCode(req.PostalCode, req.Country) {
+		validationErrors["postal_code"] = "Enter a 5-digit ZIP code"
 	}
 
 	if len(validationErrors) > 0 {

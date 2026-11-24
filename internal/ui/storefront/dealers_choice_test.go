@@ -17,3 +17,18 @@ func TestBagSizesSentence(t *testing.T) {
 		}
 	}
 }
+
+func TestChoiceSentence(t *testing.T) {
+	if got := choiceSentence(true, true); got != "Pick your grind, and tell us if decaf's off the table." {
+		t.Errorf("grind+decaf: %q", got)
+	}
+	if got := choiceSentence(true, false); got != "Pick your grind." {
+		t.Errorf("grind only: %q", got)
+	}
+	if got := choiceSentence(false, true); got != "Tell us if decaf's off the table." {
+		t.Errorf("decaf only: %q", got)
+	}
+	if got := choiceSentence(false, false); got != "" {
+		t.Errorf("neither: %q", got)
+	}
+}

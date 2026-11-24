@@ -42,10 +42,13 @@ type ProductDetailProps struct {
 	// DealersChoice is true when the product is a dealer's choice pack: the
 	// crew picks the coffees at packing time. Adds the how-it-works section.
 	DealersChoice bool
-	// DealersChoiceSizes are the bag counts the pack is sold in, smallest
-	// first; DealersChoiceNoDecaf is true when a no-decaf variant exists.
-	DealersChoiceSizes   []int
-	DealersChoiceNoDecaf bool
+	// DealersChoiceSizes are the bag counts a retail customer can buy,
+	// smallest first. DealersChoiceDecafChoice is true when the pack is sold
+	// both with and without decaf; DealersChoiceGrind when it has a grind
+	// option. The how-it-works copy only mentions choices that exist.
+	DealersChoiceSizes       []int
+	DealersChoiceDecafChoice bool
+	DealersChoiceGrind       bool
 	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
 	NextProduct       *ProductNav
 	RoastBased        bool // true when PrevProduct/NextProduct were picked on the lighter/darker roast axis
@@ -471,7 +474,7 @@ templ ProductContent(props ProductDetailProps) {
 				@tastingProfile(props.Coffee)
 			}
 			if props.DealersChoice {
-				@dealersChoiceHowItWorks(props.DealersChoiceSizes, props.DealersChoiceNoDecaf)
+				@dealersChoiceHowItWorks(props.DealersChoiceSizes, props.DealersChoiceGrind, props.DealersChoiceDecafChoice)
 			}
 			<!-- Try another roast (or generic prev/next when no roast data) -->
 			if props.PrevProduct != nil && props.NextProduct != nil {
@@ -590,18 +593,25 @@ func bagSizesSentence(sizes []int) string {
 	return strings.ToUpper(list[:1]) + list[1:] + " 12oz bags."
 }
 
-func grindSentence(noDecaf bool) string {
-	if noDecaf {
+// choiceSentence names the choices a pack really offers besides its size.
+func choiceSentence(grind, decafChoice bool) string {
+	switch {
+	case grind && decafChoice:
 		return "Pick your grind, and tell us if decaf's off the table."
+	case grind:
+		return "Pick your grind."
+	case decafChoice:
+		return "Tell us if decaf's off the table."
+	default:
+		return ""
 	}
-	return "Pick your grind."
 }
 
 // dealersChoiceHowItWorks explains the pack on a dealer's choice product: what
 // the customer chooses, what the crew chooses, and how they find out what came
 // in the box. The product description (set in the admin) carries the pitch;
 // this carries the mechanics, so the description can stay short.
-templ dealersChoiceHowItWorks(sizes []int, noDecaf bool) {
+templ dealersChoiceHowItWorks(sizes []int, grind bool, decafChoice bool) {
 	<section class="mt-16 pt-10 border-t-2 border-ink" aria-labelledby="dealers-choice-how">
 		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">How it works</p>
 		<h2 id="dealers-choice-how" class="font-slab text-ink uppercase leading-[0.95] mt-2 mb-10" style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing:-0.005em;">
@@ -612,7 +622,7 @@ templ dealersChoiceHowItWorks(sizes []int, noDecaf bool) {
 			<li class="border-2 border-ink bg-cream-hi p-6 shadow-stamp">
 				<p class="font-special text-rust text-sm">No. 1</p>
 				<h3 class="mt-2 font-oswald font-bold text-ink text-lg uppercase" style="letter-spacing:0.06em;">You call the size</h3>
-				<p class="mt-2 font-oswald text-ink-soft text-base leading-relaxed">{ bagSizesSentence(sizes) + " " + grindSentence(noDecaf) }</p>
+				<p class="mt-2 font-oswald text-ink-soft text-base leading-relaxed">{ strings.TrimSpace(bagSizesSentence(sizes) + " " + choiceSentence(grind, decafChoice)) }</p>
 			</li>
 			<li class="border-2 border-ink bg-cream-hi p-6 shadow-stamp">
 				<p class="font-special text-rust text-sm">No. 2</p>

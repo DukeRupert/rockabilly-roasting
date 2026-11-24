@@ -413,3 +413,25 @@ func TestDealersChoice_RouteActivationRefusedUntilPicksSaved(t *testing.T) {
 	_, err = svc.ActivateRoute(ctx, tx, saved.Route.ID, testutil.TestActor())
 	require.NoError(t, err)
 }
+
+// The storefront advertises pack sizes from ListOfferedRules, so an archived
+// or wholesale-only pack variant must not be offered.
+func TestDealersChoice_OfferedRulesSkipUnbuyableVariants(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	f := newDealersChoiceFixture(t, tx)
+
+	archived := testutil.CreateVariant(t, tx, f.packID)
+	require.NoError(t, f.svc.SetPickRule(ctx, tx, f.packID, archived.ID, 12, false, testutil.TestActor()))
+	_, err := tx.Exec(ctx, `UPDATE variants SET archived_at = now() WHERE id = $1`, archived.ID)
+	require.NoError(t, err)
+
+	wholesaleOnly := testutil.CreateVariant(t, tx, f.packID, testutil.WithChannelAvailability(false, true))
+	require.NoError(t, f.svc.SetPickRule(ctx, tx, f.packID, wholesaleOnly.ID, 24, false, testutil.TestActor()))
+
+	offered, err := f.svc.ListOfferedRules(ctx, tx, f.packID)
+	require.NoError(t, err)
+	require.Len(t, offered, 1)
+	assert.Equal(t, f.variantID, offered[0].VariantID)
+	assert.Equal(t, 3, offered[0].PickCount)
+}

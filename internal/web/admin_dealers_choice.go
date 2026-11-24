@@ -15,6 +15,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
+	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
 // dealersChoiceLines maps the service's pick plans onto the order page's view
@@ -160,17 +161,33 @@ func applyPackingSlipPicks(plans []app.LinePickPlan, items []admin.EnrichedLineI
 	}
 }
 
-// dealersChoiceOffer summarizes a pack product's rules for the storefront: the
-// distinct bag counts on offer, smallest first, and whether any variant leaves
-// decaf out. The how-it-works copy is built from these so it never promises a
-// size or a decaf choice the product isn't set up to sell.
-func dealersChoiceOffer(rules map[uuid.UUID]domain.PickRule) (sizes []int, noDecaf bool) {
+// dealersChoiceOffer summarizes the pick rules a storefront customer can buy
+// (see DealersChoiceService.ListOfferedRules): the distinct bag counts,
+// smallest first, and whether the customer gets a decaf choice, which needs
+// at least one variant with decaf and one without.
+func dealersChoiceOffer(rules []domain.PickRule) (sizes []int, decafChoice bool) {
+	var withDecaf, withoutDecaf bool
 	for _, r := range rules {
 		if !slices.Contains(sizes, r.PickCount) {
 			sizes = append(sizes, r.PickCount)
 		}
-		noDecaf = noDecaf || r.ExcludeDecaf
+		if r.ExcludeDecaf {
+			withoutDecaf = true
+		} else {
+			withDecaf = true
+		}
 	}
 	slices.Sort(sizes)
-	return sizes, noDecaf
+	return sizes, withDecaf && withoutDecaf
+}
+
+// hasGrindOption reports whether a product sells a grind choice, so the
+// storefront only tells customers to pick one when there is one to pick.
+func hasGrindOption(options []storefront.OptionWithValues) bool {
+	for _, o := range options {
+		if strings.Contains(strings.ToLower(o.Option.Name), "grind") && len(o.Values) > 0 {
+			return true
+		}
+	}
+	return false
 }

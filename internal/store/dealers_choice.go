@@ -74,6 +74,36 @@ func (s *PickStore) ListRulesByProduct(ctx context.Context, tx pgx.Tx, productID
 	return out, rows.Err()
 }
 
+// ListOfferedRulesByProduct returns the pick rules on a product's variants a
+// retail customer can actually buy: not archived and retail-available. The
+// storefront builds its copy from these, so an archived or wholesale-only pack
+// size is never advertised.
+func (s *PickStore) ListOfferedRulesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID) (_ []domain.PickRule, err error) {
+	defer trackQuery(s.metrics, "variant_pick_rules.list_offered", time.Now(), &err)
+	rows, err := tx.Query(ctx,
+		`SELECT r.variant_id, r.pick_count, r.exclude_decaf
+		   FROM variant_pick_rules r
+		   JOIN variants v ON v.id = r.variant_id
+		  WHERE v.product_id = $1
+		    AND v.archived_at IS NULL
+		    AND v.retail_available`,
+		productID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list offered pick rules: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.PickRule
+	for rows.Next() {
+		var r domain.PickRule
+		if err := rows.Scan(&r.VariantID, &r.PickCount, &r.ExcludeDecaf); err != nil {
+			return nil, fmt.Errorf("scan pick rule: %w", err)
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // UpsertRule creates or replaces a variant's pick rule.
 func (s *PickStore) UpsertRule(ctx context.Context, tx pgx.Tx, r domain.PickRule) (err error) {
 	defer trackQuery(s.metrics, "variant_pick_rules.upsert", time.Now(), &err)

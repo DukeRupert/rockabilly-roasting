@@ -9,6 +9,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
 func TestLabelRatesErrorMessage_DealersChoice(t *testing.T) {
@@ -17,15 +18,24 @@ func TestLabelRatesErrorMessage_DealersChoice(t *testing.T) {
 }
 
 func TestDealersChoiceOffer(t *testing.T) {
-	rules := map[uuid.UUID]domain.PickRule{
-		uuid.New(): {PickCount: 6},
-		uuid.New(): {PickCount: 3},
-		uuid.New(): {PickCount: 3, ExcludeDecaf: true},
-	}
-	sizes, noDecaf := dealersChoiceOffer(rules)
+	sizes, decafChoice := dealersChoiceOffer([]domain.PickRule{
+		{VariantID: uuid.New(), PickCount: 6},
+		{VariantID: uuid.New(), PickCount: 3},
+		{VariantID: uuid.New(), PickCount: 3, ExcludeDecaf: true},
+	})
 	assert.Equal(t, []int{3, 6}, sizes)
-	assert.True(t, noDecaf)
+	assert.True(t, decafChoice, "sold with and without decaf")
 
-	_, noDecaf = dealersChoiceOffer(map[uuid.UUID]domain.PickRule{uuid.New(): {PickCount: 4}})
-	assert.False(t, noDecaf, "no no-decaf variant, so the page must not offer it")
+	_, decafChoice = dealersChoiceOffer([]domain.PickRule{{PickCount: 4}})
+	assert.False(t, decafChoice, "no no-decaf variant, so there is no decaf choice to offer")
+
+	_, decafChoice = dealersChoiceOffer([]domain.PickRule{{PickCount: 4, ExcludeDecaf: true}})
+	assert.False(t, decafChoice, "every variant is no-decaf, so there is nothing to choose")
+}
+
+func TestHasGrindOption(t *testing.T) {
+	grind := storefront.OptionWithValues{Option: domain.ProductOption{Name: "Grind"}, Values: []domain.ProductOptionValue{{Value: "Drip"}}}
+	pack := storefront.OptionWithValues{Option: domain.ProductOption{Name: "Pack"}, Values: []domain.ProductOptionValue{{Value: "3 Bags"}}}
+	assert.True(t, hasGrindOption([]storefront.OptionWithValues{pack, grind}))
+	assert.False(t, hasGrindOption([]storefront.OptionWithValues{pack}))
 }

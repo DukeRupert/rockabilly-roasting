@@ -775,7 +775,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var coffeeAttrs *storefront.CoffeeAttrs
 	var dealersChoice bool
 	var dealersChoiceSizes []int
-	var dealersChoiceNoDecaf bool
+	var dealersChoiceDecafChoice bool
 	var prevNav, nextNav *storefront.ProductNav
 	var roastBased bool
 
@@ -808,12 +808,12 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		}
 		coffeeAttrs = buildCoffeeAttrs(attrVals)
 
-		pickRules, prErr := d.DealersChoiceService.ListRulesByProduct(ctx, tx, product.ID)
+		pickRules, prErr := d.DealersChoiceService.ListOfferedRules(ctx, tx, product.ID)
 		if prErr != nil {
 			return prErr
 		}
 		dealersChoice = len(pickRules) > 0
-		dealersChoiceSizes, dealersChoiceNoDecaf = dealersChoiceOffer(pickRules)
+		dealersChoiceSizes, dealersChoiceDecafChoice = dealersChoiceOffer(pickRules)
 
 		// Prefer roast-based recommendations when this product has a roast
 		// level. Falls back to created_at neighbors so the section still
@@ -976,8 +976,9 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		OGImage:           ogImage,
 		BaseURL:           d.BaseURL,
 
-		DealersChoiceSizes:   dealersChoiceSizes,
-		DealersChoiceNoDecaf: dealersChoiceNoDecaf,
+		DealersChoiceSizes:       dealersChoiceSizes,
+		DealersChoiceDecafChoice: dealersChoiceDecafChoice,
+		DealersChoiceGrind:       hasGrindOption(options),
 	}
 
 	if IsHTMX(r) {

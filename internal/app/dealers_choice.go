@@ -280,6 +280,12 @@ func (s *DealersChoiceService) ListRulesByProduct(ctx context.Context, tx pgx.Tx
 	return s.picks.ListRulesByProduct(ctx, tx, productID)
 }
 
+// ListOfferedRules returns the pick rules on a product's live, retail-available
+// variants: the pack sizes a storefront customer can buy right now.
+func (s *DealersChoiceService) ListOfferedRules(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.PickRule, error) {
+	return s.picks.ListOfferedRulesByProduct(ctx, tx, productID)
+}
+
 // SetPickRule makes a variant a dealer's choice pack of count bags, or turns it
 // back into an ordinary variant when count is zero.
 func (s *DealersChoiceService) SetPickRule(ctx context.Context, tx pgx.Tx, productID, variantID uuid.UUID, count int, excludeDecaf bool, actor Actor) error {

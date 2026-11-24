@@ -260,7 +260,7 @@ var (
 	// order on it has an unsaved dealer's choice pack. Wrapped with the order
 	// number, which is shown to staff.
 	ErrRoutePicksMissing = errors.New("save the dealer's choice picks for this order before the route goes out")
-	ErrPriceListNotFound         = errors.New("price list not found")
+	ErrPriceListNotFound = errors.New("price list not found")
 	// ErrPriceMoved means pricing an order's lines a second time did not give
 	// the answer they were submitted at.
 	//

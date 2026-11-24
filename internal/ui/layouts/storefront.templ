@@ -90,8 +90,23 @@ templ Storefront(props StorefrontProps) {
 				// would only fire on the very first load. We fire page_view manually below
 				// (and on htmx:pushedIntoHistory) so SPA-style nav is tracked.
 				gtag('config', 'G-5L4668EW6X', { send_page_view: false });
+				gtag('config', 'AW-18592387319');
 				window.rrTrack = function(name, params) {
 					try { gtag('event', name, params || {}); } catch (e) {}
+				};
+				// rrAdsConversion reports a completed purchase to Google Ads. Called
+				// from the order confirmation page and the subscription signup app;
+				// value is in dollars, transactionId is the order number (Ads uses it
+				// to drop duplicates).
+				window.rrAdsConversion = function(value, currency, transactionId) {
+					try {
+						gtag('event', 'conversion', {
+							send_to: 'AW-18592387319/givDCIigmb4dEPehxaFF',
+							value: value,
+							currency: currency || 'USD',
+							transaction_id: transactionId
+						});
+					} catch (e) {}
 				};
 				window.rrTrack('page_view', {
 					page_location: location.href,

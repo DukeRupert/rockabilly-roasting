@@ -142,6 +142,9 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 					shipping: (data.shipping_cents || 0) / 100,
 					items: items
 				});
+				if (window.rrAdsConversion) {
+					window.rrAdsConversion((data.value_cents || 0) / 100, data.currency || 'USD', data.transaction_id);
+				}
 			})();
 		</script>
 	}

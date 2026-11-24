@@ -59,6 +59,7 @@ var vendorsOnThePage = map[string]string{
 	"Intuit QuickBooks":  "platform/quickbooks — wholesale customers and invoices",
 	"Broadwave":          "platform/newsletter — footer signups",
 	"Google Analytics 4": "layouts/storefront.templ — the GA4 tag",
+	"Google Ads":         "layouts/storefront.templ — the AW conversion tag",
 	"Google Geocoding":   "platform/geocode/google.go — local-delivery addresses",
 	"Google Fonts":       "layouts/storefront.templ — the fonts.googleapis.com stylesheet",
 	"Cloudflare":         "media delivery, and platform/turnstile on the wholesale form",

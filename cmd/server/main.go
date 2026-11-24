@@ -543,6 +543,7 @@ func run() error {
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour).
 		WithOrderActionSigner(orderActionSigner)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
+	dealersChoiceSvc := app.NewDealersChoiceService(store.NewPickStore(metricsReg), orderStore, catalogStore, auditWriter)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	// Built before the checkout, which prices every order through it.
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
@@ -926,6 +927,7 @@ func run() error {
 		CatalogService:       catalogSvc,
 		CheckoutService:      checkoutSvc,
 		FulfillmentService:   fulfillmentSvc,
+		DealersChoiceService: dealersChoiceSvc,
 		SubscriptionService:  subscriptionSvc,
 		DiscountService:      discountSvc,
 		AuthService:          authSvc,

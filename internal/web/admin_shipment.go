@@ -201,6 +201,8 @@ func labelRatesErrorMessage(err error) string {
 		return "Order has no shippable items."
 	case errors.Is(err, app.ErrShipmentWeightUnknown):
 		return "A variant in this order is missing its weight."
+	case errors.Is(err, app.ErrDealersChoicePicksMissing):
+		return "Save the dealer's choice picks on this order before buying a label."
 	}
 	low := strings.ToLower(err.Error())
 	switch {

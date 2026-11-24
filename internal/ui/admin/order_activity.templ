@@ -42,6 +42,8 @@ func orderEventLabel(action string) string {
 		return "Out for local delivery"
 	case audit.AuditOrderLineItemVariantChanged:
 		return "Line item option changed"
+	case audit.AuditOrderDealersChoicePicked:
+		return "Dealer's choice picks saved"
 	case audit.AuditOrderShippingMethodChanged:
 		return "Shipping method changed"
 	case audit.AuditOrderSwitchedToPickup:

@@ -399,6 +399,8 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var activity []domain.AuditEntry
 	var localDeliveryEnabled, localPickupEnabled, shipToIsLocal bool
 	var subscriptionIDs []uuid.UUID
+	var dealersChoice []admin.DealersChoiceLine
+	var dealersChoicePrevious *domain.PreviousPicks
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -613,6 +615,15 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		plans, txErr := d.DealersChoiceService.PlanOrderPicks(ctx, tx, order, lineItems)
+		if txErr != nil {
+			return txErr
+		}
+		dealersChoice = dealersChoiceLines(plans, enrichedItems)
+		if len(plans) > 0 {
+			dealersChoicePrevious = plans[0].Previous
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -658,6 +669,9 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		LocalPickupEnabled:   localPickupEnabled,
 		ShipToIsLocal:        shipToIsLocal,
 		SubscriptionIDs:      subscriptionIDs,
+
+		DealersChoice:         dealersChoice,
+		DealersChoicePrevious: dealersChoicePrevious,
 
 		PaymentDueAt: orderPaymentDueAt(order, customer, d.MerchantTZ),
 		Activity:     activity,
@@ -1180,6 +1194,12 @@ func (d *Deps) loadPackingSlipProps(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		}
 		enrichedItems[i].CurrentLabel = label
 	}
+
+	plans, err := d.DealersChoiceService.PlanOrderPicks(ctx, tx, order, lineItems)
+	if err != nil {
+		return admin.PackingSlipProps{}, err
+	}
+	applyPackingSlipPicks(plans, enrichedItems)
 
 	return admin.PackingSlipProps{
 		Order:           order,

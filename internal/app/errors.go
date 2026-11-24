@@ -248,7 +248,15 @@ var (
 	// CatalogService.UpdateVariantWholesaleMOQ for why a minimum that is not a
 	// multiple of the multiple is rejected rather than silently rounded up.
 	ErrInvalidWholesaleMOQ = errors.New("invalid wholesale order quantity rule")
-	ErrPriceListNotFound   = errors.New("price list not found")
+
+	// Dealer's choice errors. ErrDealersChoicePicksMissing is shown to staff
+	// when they try to fulfill, label, or hand off an order whose pack has no
+	// saved picks, so it says what to do.
+	ErrDealersChoicePicksMissing = errors.New("save the dealer's choice picks on this order before fulfilling it")
+	ErrNotDealersChoice          = errors.New("this line item is not a dealer's choice pack")
+	ErrInvalidPicks              = errors.New("dealer's choice picks are incomplete or include a coffee that is not available")
+	ErrInvalidPickCount          = errors.New("bags per pack must be between 0 and 24")
+	ErrPriceListNotFound         = errors.New("price list not found")
 	// ErrPriceMoved means pricing an order's lines a second time did not give
 	// the answer they were submitted at.
 	//

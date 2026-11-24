@@ -39,12 +39,12 @@ Origins the browser actually fetches, and where they're loaded from:
 
 | Directive | Origins | Source |
 |---|---|---|
-| `script-src` | `js.sentry-cdn.com`, `www.googletagmanager.com`, `cdn.jsdelivr.net` (Alpine — storefront only), `challenges.cloudflare.com` (Turnstile), `js.stripe.com` (loaded by the Svelte checkout bundle) | `layouts/storefront.templ:55,67,246`, `storefront/wholesale_apply.templ:12` |
+| `script-src` | `js.sentry-cdn.com`, `www.googletagmanager.com`, `cdn.jsdelivr.net` (Alpine — storefront only), `challenges.cloudflare.com` (Turnstile), `js.stripe.com` (loaded by the Svelte checkout bundle), Google Ads (`www.googleadservices.com`, `googleads.g.doubleclick.net`, `www.google.com`) | `layouts/storefront.templ:55,67,246`, `storefront/wholesale_apply.templ:12` |
 | `style-src` | `fonts.googleapis.com` | layout heads (`storefront.templ:243`, `admin.templ:122`, `staff_login.templ:84`) |
 | `font-src` | `fonts.gstatic.com` | layout heads |
-| `img-src` | `cdn.rockabillyroasting.shop` (Cloudflare Image Transformations), GA pixels (`www.googletagmanager.com`, `www.google-analytics.com`), `data:` | `platform/media/media.go:34`, preconnect at `storefront.templ:242` |
-| `connect-src` | Sentry ingest (`*.sentry.io`), `www.google-analytics.com`, `api.stripe.com` | Sentry/GA init blocks, Stripe.js |
-| `frame-src` | `js.stripe.com`, `hooks.stripe.com` (Stripe Elements), `challenges.cloudflare.com` (Turnstile widget) | checkout, wholesale apply |
+| `img-src` | `cdn.rockabillyroasting.shop` (Cloudflare Image Transformations), GA pixels (`www.googletagmanager.com`, `www.google-analytics.com`), Google Ads conversion pixels (`www.googleadservices.com`, `googleads.g.doubleclick.net`, `www.google.com`), `data:` | `platform/media/media.go:34`, preconnect at `storefront.templ:242` |
+| `connect-src` | Sentry ingest (`*.sentry.io`), `www.google-analytics.com`, Google Ads (`www.googleadservices.com`, `googleads.g.doubleclick.net`, `www.google.com`), `api.stripe.com` | Sentry/GA/Ads init blocks, Stripe.js |
+| `frame-src` | `js.stripe.com`, `hooks.stripe.com` (Stripe Elements), `challenges.cloudflare.com` (Turnstile widget), `td.doubleclick.net` (Google Ads remarketing) | checkout, wholesale apply, Ads tag on every storefront page |
 
 > **Inconsistency to note:** the storefront loads Alpine from the `cdn.jsdelivr.net`
 > CDN (`storefront.templ:246`) while the admin self-hosts it from
@@ -113,13 +113,17 @@ Content-Security-Policy-Report-Only:
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval'
     https://js.sentry-cdn.com https://www.googletagmanager.com
-    https://cdn.jsdelivr.net https://challenges.cloudflare.com https://js.stripe.com;
+    https://cdn.jsdelivr.net https://challenges.cloudflare.com https://js.stripe.com
+    https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' data: https://cdn.rockabillyroasting.shop
-    https://www.googletagmanager.com https://www.google-analytics.com;
-  connect-src 'self' https://*.sentry.io https://www.google-analytics.com https://api.stripe.com;
-  frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com;
+    https://www.googletagmanager.com https://www.google-analytics.com
+    https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com;
+  connect-src 'self' https://*.sentry.io https://www.google-analytics.com https://api.stripe.com
+    https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com;
+  frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com
+    https://td.doubleclick.net;
   frame-ancestors 'self';
   base-uri 'self';
   form-action 'self';

@@ -1320,9 +1320,9 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 	var analytics storefront.OrderConfirmedAnalytics
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		// scoping: guest-safe by design — the caller (handleOrderConfirmed) only
-		// invokes this when the single-use rr_last_order cookie matches the order
-		// number, so access is gated by the cookie rather than query scoping.
+		// scoping: guest-safe by design — callers gate access: handleOrderConfirmed
+		// on the single-use rr_last_order cookie, handleSubscribeConfirm on the
+		// buyer's Stripe PaymentIntent id (as retail checkout confirm does).
 		order, txErr := d.OrderService.GetOrderByNumberAsStaff(ctx, tx, orderNumber)
 		if txErr != nil {
 			return fmt.Errorf("get order: %w", txErr)

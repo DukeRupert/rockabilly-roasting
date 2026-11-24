@@ -100,6 +100,10 @@ var disclosedAs = map[string]string{
 	"fonts.gstatic.com":           "Google Fonts",
 	"www.googletagmanager.com":    "Google Analytics",
 	"www.google-analytics.com":    "Google Analytics",
+	"www.googleadservices.com":    "Google Ads",
+	"googleads.g.doubleclick.net": "Google Ads",
+	"www.google.com":              "Google Ads",
+	"td.doubleclick.net":          "Google Ads",
 	"cdn.jsdelivr.net":            "jsDelivr",
 	"js.sentry-cdn.com":           "Sentry",
 	"cdn.rockabillyroasting.shop": "Cloudflare",
@@ -271,11 +275,11 @@ func vendorList(t *testing.T, html string) string {
 func TestGoogleCountMatchesTheProse(t *testing.T) {
 	html := renderPrivacy(t)
 
-	const claimed = "Google appears three times"
+	const claimed = "Google appears four times"
 	require.Contains(t, html, claimed, "the sentence this test pins has been reworded; update both together")
 
 	got := strings.Count(vendorList(t, html), "Google")
-	assert.Equal(t, 3, got,
+	assert.Equal(t, 4, got,
 		"the policy says %q but the vendor list names Google %d times", claimed, got)
 }
 
@@ -460,6 +464,7 @@ func TestEveryVendorOnThePageIsOnTheChecklist(t *testing.T) {
 var operatorInDomain = map[string]string{
 	"fonts.gstatic.com":           "Google serves its font files from gstatic",
 	"cdn.rockabillyroasting.shop": "our domain in front of Cloudflare R2",
+	"td.doubleclick.net":          "DoubleClick is Google's ad-serving domain; the Ads tag frames it for remarketing",
 }
 
 // alternation pulls the (?:a|b|c) members out of a pattern.
@@ -478,7 +483,7 @@ func TestDisclosedVendorsMatchTheirDomains(t *testing.T) {
 	// jsDelivr-filed-under-Cloudflare mutation green. Adding an exemption
 	// should cost a deliberate edit here, which is what every other guard in
 	// this file asks for.
-	require.Len(t, operatorInDomain, 2,
+	require.Len(t, operatorInDomain, 3,
 		"an exemption was added or removed — each one takes a host out of the attribution check below, so change this number in the same commit and say why in the map")
 	for host := range operatorInDomain {
 		require.Contains(t, disclosedAs, host,

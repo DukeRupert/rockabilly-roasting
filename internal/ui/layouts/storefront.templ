@@ -90,8 +90,52 @@ templ Storefront(props StorefrontProps) {
 				// would only fire on the very first load. We fire page_view manually below
 				// (and on htmx:pushedIntoHistory) so SPA-style nav is tracked.
 				gtag('config', 'G-5L4668EW6X', { send_page_view: false });
+				gtag('config', 'AW-18592387319');
+				// rrTrack sends to GA4 only. An event without send_to goes to every
+				// configured tag, which would hand Google Ads the product detail the
+				// privacy policy says it never gets.
 				window.rrTrack = function(name, params) {
-					try { gtag('event', name, params || {}); } catch (e) {}
+					var p = Object.assign({}, params || {}, { send_to: 'G-5L4668EW6X' });
+					try { gtag('event', name, p); } catch (e) {}
+				};
+				// rrPurchase reports a completed purchase to GA4 (purchase) and Google
+				// Ads (conversion). data is the server's purchase payload: amounts in
+				// cents, transaction_id is the order number. Used by the order
+				// confirmation page and the subscription signup app. Fires once per
+				// order per tab so a refresh or a repeated redirect-back can't double
+				// count.
+				window.rrPurchase = function(data) {
+					if (!data || !data.transaction_id) return;
+					var key = 'rrPurchaseFired:' + data.transaction_id;
+					try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
+					var currency = data.currency || 'USD';
+					var value = (data.value_cents || 0) / 100;
+					var items = (data.items || []).map(function(it) {
+						return {
+							item_id: it.item_id,
+							item_name: it.item_name,
+							item_variant: it.item_variant || undefined,
+							item_category: it.item_category || undefined,
+							price: (it.price_cents || 0) / 100,
+							quantity: it.quantity || 1
+						};
+					});
+					window.rrTrack('purchase', {
+						transaction_id: data.transaction_id,
+						currency: currency,
+						value: value,
+						tax: (data.tax_cents || 0) / 100,
+						shipping: (data.shipping_cents || 0) / 100,
+						items: items
+					});
+					try {
+						gtag('event', 'conversion', {
+							send_to: 'AW-18592387319/givDCIigmb4dEPehxaFF',
+							value: value,
+							currency: currency,
+							transaction_id: data.transaction_id
+						});
+					} catch (e) {}
 				};
 				window.rrTrack('page_view', {
 					page_location: location.href,

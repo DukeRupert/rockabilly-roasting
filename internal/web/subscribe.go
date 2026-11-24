@@ -257,6 +257,10 @@ type subscribeConfirmResponse struct {
 	SubscriptionIDs []string `json:"subscription_ids,omitempty"`
 	SubscriptionID  string   `json:"subscription_id,omitempty"`
 	OrderID         string   `json:"order_id"`
+	// Purchase is the signup order's analytics payload — the same shape the
+	// order confirmation page embeds — so the success screen can report the
+	// purchase to GA4 and Google Ads. Omitted if it fails to load.
+	Purchase *storefront.OrderConfirmedAnalytics `json:"purchase,omitempty"`
 	// Status is "active" when the subscription exists, or "processing" when
 	// payment is still settling asynchronously — the payment_intent.succeeded
 	// webhook will activate the subscription once it clears.
@@ -993,6 +997,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp subscribeConfirmResponse
+	var orderNumber string
 
 	switch pi.Status {
 	case payments.PaymentIntentStatusSucceeded:
@@ -1005,6 +1010,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 				return txErr
 			}
 			resp.OrderID = order.ID.String()
+			orderNumber = order.Number
 			resp.Status = "active"
 
 			if !transitioned {
@@ -1057,6 +1063,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("get order for processing pi: %w", txErr)
 			}
 			resp.OrderID = order.ID.String()
+			orderNumber = order.Number
 			resp.Status = "processing"
 			return nil
 		})
@@ -1076,6 +1083,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		recordRequestError(r.Context(), err, http.StatusInternalServerError)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to finalize subscription"})
 		return
+	}
+
+	// The analytics payload is best-effort: the signup has already succeeded,
+	// so a failed load costs the tracking event, not the response.
+	if orderNumber != "" {
+		if purchase, aErr := d.loadOrderAnalytics(ctx, orderNumber); aErr == nil {
+			resp.Purchase = purchase
+		} else {
+			logger.Warn("subscribe purchase analytics load failed", "error", aErr, "order_number", orderNumber)
+		}
 	}
 
 	d.Metrics.CheckoutCompleted.WithLabelValues("subscribe").Inc()

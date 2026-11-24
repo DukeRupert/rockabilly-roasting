@@ -118,30 +118,10 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 		<script>
 			(function() {
 				var node = document.getElementById('ga-purchase-data');
-				if (!node || !window.rrTrack) return;
+				if (!node || !window.rrPurchase) return;
 				var data;
 				try { data = JSON.parse(node.textContent); } catch (e) { return; }
-				// Idempotency: don't refire if we've already sent this transaction.
-				var key = 'rrPurchaseFired:' + data.transaction_id;
-				try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
-				var items = (data.items || []).map(function(it) {
-					return {
-						item_id: it.item_id,
-						item_name: it.item_name,
-						item_variant: it.item_variant || undefined,
-						item_category: it.item_category || undefined,
-						price: (it.price_cents || 0) / 100,
-						quantity: it.quantity || 1
-					};
-				});
-				window.rrTrack('purchase', {
-					transaction_id: data.transaction_id,
-					currency: data.currency || 'USD',
-					value: (data.value_cents || 0) / 100,
-					tax: (data.tax_cents || 0) / 100,
-					shipping: (data.shipping_cents || 0) / 100,
-					items: items
-				});
+				window.rrPurchase(data);
 			})();
 		</script>
 	}

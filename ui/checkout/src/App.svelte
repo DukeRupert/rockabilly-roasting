@@ -60,6 +60,13 @@
 
   let currentStepIndex = $derived(steps.findIndex((s) => s.key === step));
 
+  // Free-shipping nudge. Once totals are priced they are authoritative: the
+  // server omits the field for pickup/local delivery (already free), so the
+  // nudge disappears. Before that, the cart's figure (after any coupon) stands.
+  let freeShippingRemaining = $derived(
+    totals ? totals.free_shipping_remaining : cart?.free_shipping_remaining,
+  );
+
   $effect(() => {
     handleRedirectBack();
   });
@@ -124,6 +131,16 @@
     }
   }
 
+  // refreshCart re-reads the cart without the loading state, so pricing-derived
+  // fields (free_shipping_remaining) track coupon changes without a flash.
+  async function refreshCart() {
+    try {
+      cart = await getCart();
+    } catch {
+      // Display-only refresh; keep the cart we have.
+    }
+  }
+
   async function handleApplyCoupon(e: Event) {
     e.preventDefault();
     if (!cart || !couponInput.trim() || couponBusy) return;
@@ -140,6 +157,7 @@
       // Invalidate totals so the Payment step re-prices the order.
       totals = null;
       pricingVersion += 1;
+      refreshCart();
     } catch (err: any) {
       couponError = err.message || 'Failed to apply code. Please try again.';
     } finally {
@@ -156,6 +174,7 @@
       appliedCoupon = null;
       totals = null;
       pricingVersion += 1;
+      refreshCart();
     } catch (err: any) {
       couponError = err.message || 'Failed to remove code. Please try again.';
     } finally {
@@ -500,6 +519,18 @@
                 </div>
               {/if}
             </dl>
+            <div role="status" class="mt-2">
+              {#if freeShippingRemaining !== undefined && freeShippingRemaining > 0}
+                <p class="font-oswald text-rust text-xs" style="letter-spacing:0.06em;">
+                  You're {formatCents(freeShippingRemaining)} away from free shipping.
+                  <a href="/catalog" class="font-bold underline underline-offset-2 hover:text-ink">Keep shopping</a>
+                </p>
+              {:else if freeShippingRemaining === 0 && !totals}
+                <p class="font-oswald text-rust text-xs" style="letter-spacing:0.06em;">
+                  You've unlocked free shipping.
+                </p>
+              {/if}
+            </div>
             <div
               class="mt-4 pt-3 border-t-2 border-ink flex items-baseline justify-between"
             >

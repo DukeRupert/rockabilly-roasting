@@ -157,6 +157,34 @@ func TestShippingConfig_Calculate(t *testing.T) {
 	})
 }
 
+func TestShippingConfig_FreeShippingRemaining(t *testing.T) {
+	threshold := 5000
+	cfg := ShippingConfig{FlatRateCents: 600, FreeShippingThreshold: &threshold}
+
+	t.Run("under threshold reports the gap", func(t *testing.T) {
+		remaining, ok := cfg.FreeShippingRemaining(4000)
+		assert.True(t, ok)
+		assert.Equal(t, 1000, remaining)
+	})
+	t.Run("over threshold clamps to zero", func(t *testing.T) {
+		remaining, ok := cfg.FreeShippingRemaining(9000)
+		assert.True(t, ok)
+		assert.Equal(t, 0, remaining)
+	})
+	t.Run("agrees with CalculateForMethod at the boundary", func(t *testing.T) {
+		for _, sub := range []int{4999, 5000, 5001} {
+			remaining, _ := cfg.FreeShippingRemaining(sub)
+			assert.Equal(t, cfg.CalculateForMethod(sub, "90210", nil) == 0, remaining == 0, "subtotal %d", sub)
+		}
+	})
+	t.Run("no threshold is not ok", func(t *testing.T) {
+		c := cfg
+		c.FreeShippingThreshold = nil
+		_, ok := c.FreeShippingRemaining(1000)
+		assert.False(t, ok)
+	})
+}
+
 func TestShippingConfig_CalculateForMethod(t *testing.T) {
 	threshold := 5000
 	cfg := ShippingConfig{

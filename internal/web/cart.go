@@ -18,8 +18,9 @@ import (
 // freeShippingHint returns customer-facing messaging nudging the shopper toward
 // the free-shipping threshold, or "" if no threshold is set. qualifyingCents is
 // the subtotal after any applied coupon, matching what checkout prices
-// shipping on.
-func freeShippingHint(cfg *domain.ShippingConfig, qualifyingCents int) string {
+// shipping on. The cart page doesn't itemize the coupon, so when one applies
+// the copy says so; otherwise "$54 subtotal, $6.80 away" reads as an error.
+func freeShippingHint(cfg *domain.ShippingConfig, qualifyingCents int, couponApplied bool) string {
 	if cfg == nil {
 		return ""
 	}
@@ -29,6 +30,9 @@ func freeShippingHint(cfg *domain.ShippingConfig, qualifyingCents int) string {
 	}
 	if remaining == 0 {
 		return "You've unlocked free shipping."
+	}
+	if couponApplied {
+		return fmt.Sprintf("You're $%.2f away from free shipping after your coupon.", float64(remaining)/100)
 	}
 	return fmt.Sprintf("You're $%.2f away from free shipping.", float64(remaining)/100)
 }
@@ -220,7 +224,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 		Items:            items,
 		Subtotal:         subtotal,
 		CartCount:        cartCount,
-		FreeShippingHint: freeShippingHint(shippingConfig, subtotal-discountCents),
+		FreeShippingHint: freeShippingHint(shippingConfig, subtotal-discountCents, discountCents > 0),
 	}
 	if IsHTMX(r) {
 		storefront.CartContent(props).Render(ctx, w)   //nolint:errcheck

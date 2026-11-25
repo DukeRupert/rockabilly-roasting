@@ -62,9 +62,18 @@
 
   // Free-shipping nudge. Once totals are priced they are authoritative: the
   // server omits the field for pickup/local delivery (already free), so the
-  // nudge disappears. Before that, the cart's figure (after any coupon) stands.
+  // nudge disappears. Before that, the cart's figure (after any coupon) stands,
+  // except while a coupon change is being re-read: the old figure would be
+  // wrong, and announcing it via role=status only to flip it is worse than
+  // a moment of silence.
+  let cartPricingStale = $state(false);
+  let cartRefreshSeq = 0;
   let freeShippingRemaining = $derived(
-    totals ? totals.free_shipping_remaining : cart?.free_shipping_remaining,
+    totals
+      ? totals.free_shipping_remaining
+      : cartPricingStale
+        ? undefined
+        : cart?.free_shipping_remaining,
   );
 
   $effect(() => {
@@ -133,9 +142,17 @@
 
   // refreshCart re-reads the cart without the loading state, so pricing-derived
   // fields (free_shipping_remaining) track coupon changes without a flash.
+  // Only the latest refresh may land, so two quick coupon changes can't
+  // resolve out of order. A failed refresh leaves the nudge hidden rather
+  // than showing a figure we know is stale.
   async function refreshCart() {
+    const seq = ++cartRefreshSeq;
+    cartPricingStale = true;
     try {
-      cart = await getCart();
+      const fresh = await getCart();
+      if (seq !== cartRefreshSeq) return;
+      cart = fresh;
+      cartPricingStale = false;
     } catch {
       // Display-only refresh; keep the cart we have.
     }

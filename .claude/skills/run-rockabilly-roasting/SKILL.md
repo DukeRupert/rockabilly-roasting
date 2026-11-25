@@ -105,7 +105,15 @@ go test ./internal/web/ ./internal/domain/   # ok in ~6s
   renders "Nothing in the bag yet." Use `smoke` (curl jar) for cart state and
   Claude in Chrome for visual checks of cart/checkout.
 - **The cart page hides applied coupons**, but its free-shipping hint counts
-  them. A $54 cart with a 20% coupon reads "$6.80 away". That's correct, not a bug.
+  them. A $54 cart with a 20% coupon reads "$6.80 away from free shipping after
+  your coupon."
+- **Blanking `QB_*` only works while the DB has no saved QuickBooks app.** The
+  admin-saved config in `qb_app_config` / `qb_credentials` wins over env. Both
+  were empty on 2026-11-25. Recheck before trusting the blanks:
+  `app.sh psql -Atc "select count(*) from qb_app_config; select count(*) from qb_credentials"`.
+- **Counting payment intents:** every Stripe PI is one
+  `"path":"/api/checkout/payment-intent"` line in `/tmp/rr-run/server.log`, so
+  `rg -c` on it before and after an action shows whether checkout made duplicates.
 - **Don't `pkill -f rr-server`** from an agent shell. The pattern matches the
   shell's own command line and kills it (exit 144). The driver kills by PID
   from `/tmp/rr-run/server.pid`.

@@ -624,6 +624,14 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	if req.Country == "" {
 		req.Country = "US"
 	}
+	// The address write refuses this too (app.ErrInvalidPostalCode); checking
+	// here first gets the buyer a message that says which field to fix.
+	if !domain.ValidPostalCode(req.PostalCode, req.Country) {
+		JSON(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": "Enter a 5-digit ZIP code for your shipping address.",
+		})
+		return
+	}
 
 	// Phase 1: load plans + prices, find-or-create customer, save address, and
 	// price shipping + tax exactly like retail checkout (tx).

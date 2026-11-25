@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/store"
@@ -357,4 +358,104 @@ func TestFindOrCreateAddress_KeyAgreesWithDomain(t *testing.T) {
 		State: p.State, PostalCode: p.PostalCode, CountryCode: p.CountryCode,
 	})
 	assert.Equal(t, want, domain.AddressKey(*addr))
+}
+
+// TestAddressWrites_RejectTruncatedZIP covers the production order whose ZIP
+// was "9": every service path that writes an address row refuses it, so no
+// checkout, account form or admin form can store one.
+func TestAddressWrites_RejectTruncatedZIP(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+
+	bad := pocatello(customer.ID)
+	bad.PostalCode = "9"
+
+	_, err := svc.CreateAddress(ctx, tx, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "create")
+
+	_, err = svc.FindOrCreateAddress(ctx, tx, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "find or create")
+
+	good, err := svc.CreateAddress(ctx, tx, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+	_, err = svc.UpdateAddress(ctx, tx, good.ID, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode, "update")
+
+	addrs, err := svc.ListAddresses(ctx, tx, customer.ID)
+	require.NoError(t, err)
+	require.Len(t, addrs, 1, "nothing bad was stored")
+	assert.Equal(t, "83201", addrs[0].PostalCode)
+}
+
+// TestFindOrCreateAddress_DoesNotMatchLegacyBadZIP pins that validation runs
+// before matching. The production row with ZIP "9" still exists in other
+// customers' history; a resubmission of it must be refused, not matched and
+// handed back as if it were deliverable.
+func TestFindOrCreateAddress_DoesNotMatchLegacyBadZIP(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+	legacy := testutil.CreateAddress(t, tx, customer.ID, testutil.WithAddressPostalCode("9"))
+
+	_, err := svc.FindOrCreateAddress(ctx, tx, customer.ID, store.CreateAddressParams{
+		CustomerID: &customer.ID, FirstName: legacy.FirstName, LastName: legacy.LastName,
+		Line1: legacy.Line1, City: legacy.City, State: legacy.State, PostalCode: "9", CountryCode: "US",
+	}, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
+}
+
+// TestCreateAddress_BlankCountryIsValidatedAsUS: a caller that leaves the
+// country blank still gets the US ZIP rule, not the anything-goes rule for
+// foreign codes.
+func TestCreateAddress_BlankCountryIsValidatedAsUS(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	customer := testutil.CreateCustomer(t, tx)
+
+	p := pocatello(customer.ID)
+	p.CountryCode = ""
+	p.PostalCode = "9"
+	_, err := svc.CreateAddress(context.Background(), tx, p, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
+}
+
+// TestFindOrCreateExactAddress_HonoursEveryLabelField is the reviewer's case:
+// adding a company or fixing capitalisation must produce a corrected row, not
+// match the row being corrected.
+func TestFindOrCreateExactAddress_HonoursEveryLabelField(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerService()
+	ctx := context.Background()
+	customer := testutil.CreateCustomer(t, tx)
+
+	base, err := svc.CreateAddress(ctx, tx, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+
+	same, err := svc.FindOrCreateExactAddress(ctx, tx, customer.ID, pocatello(customer.ID), testActor(customer.ID))
+	require.NoError(t, err)
+	assert.Equal(t, base.ID, same.ID, "an identical submission reuses the row")
+
+	company := "Acme Coffee Co"
+	withCompany := pocatello(customer.ID)
+	withCompany.Company = &company
+	got, err := svc.FindOrCreateExactAddress(ctx, tx, customer.ID, withCompany, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.NotEqual(t, base.ID, got.ID)
+	require.NotNil(t, got.Company)
+	assert.Equal(t, company, *got.Company)
+
+	recased := pocatello(customer.ID)
+	recased.FirstName = "JAHNAVI"
+	got, err = svc.FindOrCreateExactAddress(ctx, tx, customer.ID, recased, testActor(customer.ID))
+	require.NoError(t, err)
+	assert.NotEqual(t, base.ID, got.ID)
+	assert.Equal(t, "JAHNAVI", got.FirstName)
+
+	bad := pocatello(customer.ID)
+	bad.PostalCode = "9"
+	_, err = svc.FindOrCreateExactAddress(ctx, tx, customer.ID, bad, testActor(customer.ID))
+	assert.ErrorIs(t, err, app.ErrInvalidPostalCode)
 }

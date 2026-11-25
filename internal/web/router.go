@@ -543,6 +543,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/{id}/out-for-delivery", deps.handleAdminOrderOutForDelivery)
 	adminMux.HandleFunc("POST /admin/orders/{id}/shipping-method", deps.handleAdminOrderShippingMethod)
 	adminMux.HandleFunc("POST /admin/orders/{id}/convert-to-local", deps.handleAdminOrderConvertToLocal)
+	adminMux.HandleFunc("POST /admin/orders/{id}/shipping-address", deps.handleAdminOrderShippingAddress)
 	adminMux.HandleFunc("POST /admin/orders/{id}/internal-note", deps.handleAdminOrderInternalNote)
 	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
 	adminMux.HandleFunc("GET /admin/orders/{id}/invoice", deps.handleAdminOrderInvoice)

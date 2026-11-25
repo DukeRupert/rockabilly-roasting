@@ -459,6 +459,23 @@ func normalizeAddressParams(p store.CreateAddressParams) store.CreateAddressPara
 	return p
 }
 
+// validateAddressParams refuses an address no carrier could deliver to. It
+// runs after normalizeAddressParams in every CustomerService method that
+// writes an address row, so a form that forgets to check cannot store one.
+// The one-off importers under cmd/ write through the store directly and are
+// not covered. A blank country is read as
+// US, the only country the shop's forms submit.
+func validateAddressParams(p store.CreateAddressParams) error {
+	country := p.CountryCode
+	if country == "" {
+		country = "US"
+	}
+	if !domain.ValidPostalCode(p.PostalCode, country) {
+		return ErrInvalidPostalCode
+	}
+	return nil
+}
+
 // addressForKey projects create-params onto the domain.Address shape so they
 // can be keyed against stored rows. Only the fields domain.AddressKey reads are
 // carried across.
@@ -488,6 +505,9 @@ func addressForKey(p store.CreateAddressParams) domain.Address {
 // non-canonical address and none has to remember to ask.
 func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	p = normalizeAddressParams(p)
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 
 	addr, err := s.customers.CreateAddress(ctx, tx, p)
 	if err != nil {
@@ -544,6 +564,11 @@ func (s *CustomerService) FindOrCreateAddress(ctx context.Context, tx pgx.Tx, cu
 	p.CustomerID = &customerID
 
 	p = normalizeAddressParams(p)
+	// Validate before matching, not only in CreateAddress: a legacy row that
+	// already holds a bad ZIP would otherwise be matched and handed back.
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 	key := domain.AddressKey(addressForKey(p))
 
 	existing, err := s.customers.ListAddresses(ctx, tx, customerID)
@@ -557,6 +582,57 @@ func (s *CustomerService) FindOrCreateAddress(ctx context.Context, tx pgx.Tx, cu
 	}
 
 	return s.CreateAddress(ctx, tx, p, actor)
+}
+
+// FindOrCreateExactAddress is FindOrCreateAddress for a person correcting an
+// address by hand. It reuses a saved row only when every field that prints
+// on a label is exactly what was typed (state, ZIP and country after
+// normalization), and creates a row otherwise.
+//
+// FindOrCreateAddress matches by domain.AddressKey, which ignores Company and
+// folds case and spacing. That is right for checkout dedup and wrong here: a
+// correction that only adds a company or fixes capitalisation would match the
+// row it set out to fix and change nothing.
+func (s *CustomerService) FindOrCreateExactAddress(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
+	if customerID == uuid.Nil {
+		return nil, fmt.Errorf("find or create exact address: customer id is required")
+	}
+	p.CustomerID = &customerID
+	p = normalizeAddressParams(p)
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
+
+	existing, err := s.customers.ListAddresses(ctx, tx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("find or create exact address: list addresses: %w", err)
+	}
+	for i := range existing {
+		if sameLabelFields(existing[i], p) {
+			return &existing[i], nil
+		}
+	}
+	return s.CreateAddress(ctx, tx, p, actor)
+}
+
+// sameLabelFields reports whether a stored address prints exactly as p would.
+// p must already be normalized. Absent and empty optional lines are equal.
+func sameLabelFields(a domain.Address, p store.CreateAddressParams) bool {
+	opt := func(v *string) string {
+		if v == nil {
+			return ""
+		}
+		return *v
+	}
+	return a.FirstName == p.FirstName &&
+		a.LastName == p.LastName &&
+		opt(a.Company) == opt(p.Company) &&
+		a.Line1 == p.Line1 &&
+		opt(a.Line2) == opt(p.Line2) &&
+		a.City == p.City &&
+		a.State == p.State &&
+		a.PostalCode == p.PostalCode &&
+		a.CountryCode == p.CountryCode
 }
 
 // GetAddress returns an address by ID, scoped to a customer.
@@ -587,6 +663,9 @@ func (s *CustomerService) ListAddresses(ctx context.Context, tx pgx.Tx, customer
 // start a fresh duplicate lineage on the customer's next order.
 func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	p = normalizeAddressParams(p)
+	if err := validateAddressParams(p); err != nil {
+		return nil, err
+	}
 
 	addr, err := s.customers.UpdateAddress(ctx, tx, id, customerID, p)
 	if err != nil {

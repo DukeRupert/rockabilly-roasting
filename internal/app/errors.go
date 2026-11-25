@@ -206,6 +206,16 @@ var (
 	// already has a live (non-refunded) label must have it refunded first.
 	ErrOrderHasActiveLabel = errors.New("order already has an active shipping label")
 
+	// ErrOrderAddressLocked refuses a ship-to change on an order that has left
+	// the shop, or never will (cancelled, refunded, complete), or has no
+	// customer whose address book it could point at.
+	ErrOrderAddressLocked = errors.New("this order's address can no longer be changed")
+
+	// ErrOrderOnRoute refuses a ship-to change on an order waiting as a stop on
+	// an open delivery route. The stop holds its own copy of the address and
+	// map pin, so changing the order alone would send the driver to the old one.
+	ErrOrderOnRoute = errors.New("this order is a stop on an open delivery route; take it off the route before changing its address")
+
 	// Taxon errors
 	ErrTaxonNotFound = errors.New("taxon not found")
 
@@ -216,6 +226,10 @@ var (
 	// fields required to price + ship an order (street, city, state, ZIP).
 	// Surfaced to the buyer with a fix-it message rather than an opaque 500.
 	ErrAddressIncomplete = errors.New("address is missing required fields")
+	// ErrInvalidPostalCode refuses an address whose ZIP no carrier could
+	// deliver to (see domain.ValidPostalCode). Checked on every address write,
+	// so no form can store one.
+	ErrInvalidPostalCode = errors.New("enter a 5-digit ZIP code")
 
 	// ErrFulfillmentUnavailable signals the buyer picked a fulfillment method
 	// (e.g. local delivery) that isn't valid for their ship-to ZIP. Surfaced as

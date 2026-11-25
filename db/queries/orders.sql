@@ -166,3 +166,16 @@ UPDATE orders
 SET internal_note = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: UpdateOrderShippingAddress :one
+-- Points an order at another of its own customer's addresses. The EXISTS
+-- refuses an address belonging to anyone else, so no caller can ship one
+-- customer's order to another customer's house; zero rows means refused.
+UPDATE orders o
+SET shipping_address_id = @address_id, updated_at = now()
+WHERE o.id = @id
+  AND EXISTS (
+    SELECT 1 FROM addresses a
+    WHERE a.id = @address_id AND a.customer_id = o.customer_id
+  )
+RETURNING o.*;

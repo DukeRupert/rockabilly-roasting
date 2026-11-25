@@ -35,6 +35,9 @@ type Querier interface {
 	CountActiveStaffByRole(ctx context.Context, role string) (int64, error)
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
+	// Subscriptions that will still renew to this address: everything not
+	// cancelled or expired. Paused ones count, because they resume to it.
+	CountLiveSubscriptionsAtAddress(ctx context.Context, arg CountLiveSubscriptionsAtAddressParams) (int64, error)
 	CountOrdersByCustomer(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
@@ -274,6 +277,9 @@ type Querier interface {
 	MarkSubscriptionRenewalRefunding(ctx context.Context, paymentIntentID string) error
 	MarkWebhookEventFailed(ctx context.Context, arg MarkWebhookEventFailedParams) error
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
+	// Moves every live subscription at one address to another, together, so the
+	// box they renew in (grouped by address) stays one box.
+	MoveLiveSubscriptionsToAddress(ctx context.Context, arg MoveLiveSubscriptionsToAddressParams) ([]uuid.UUID, error)
 	NextInvoiceNumber(ctx context.Context) (int32, error)
 	PruneExpiredSessions(ctx context.Context) (int64, error)
 	RecordDeadPaymentMethod(ctx context.Context, arg RecordDeadPaymentMethodParams) error
@@ -344,6 +350,10 @@ type Querier interface {
 	UpdateOrderInternalNote(ctx context.Context, arg UpdateOrderInternalNoteParams) (Order, error)
 	UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderPaymentStatusParams) (Order, error)
 	UpdateOrderRequestedDeliveryDate(ctx context.Context, arg UpdateOrderRequestedDeliveryDateParams) (Order, error)
+	// Points an order at another of its own customer's addresses. The EXISTS
+	// refuses an address belonging to anyone else, so no caller can ship one
+	// customer's order to another customer's house; zero rows means refused.
+	UpdateOrderShippingAddress(ctx context.Context, arg UpdateOrderShippingAddressParams) (Order, error)
 	UpdateOrderShippingMethod(ctx context.Context, arg UpdateOrderShippingMethodParams) (Order, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdateOrderStripePaymentIntentID(ctx context.Context, arg UpdateOrderStripePaymentIntentIDParams) (Order, error)

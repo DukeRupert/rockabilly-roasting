@@ -1036,6 +1036,10 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
 			d.renderWholesaleCheckout(w, r, customer, false, "That address is missing its street, city, state, or ZIP. Pick another saved address or enter a new one below.", http.StatusUnprocessableEntity)
 			return
+		case errors.Is(err, app.ErrInvalidPostalCode):
+			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
+			d.renderWholesaleCheckout(w, r, customer, false, "That ZIP code isn't valid. Enter a 5-digit ZIP and place the order again.", http.StatusUnprocessableEntity)
+			return
 		case errors.Is(err, app.ErrAddressNotFound):
 			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
 			d.renderWholesaleCheckout(w, r, customer, false, "That saved address is no longer available. Pick another or enter a new one below.", http.StatusUnprocessableEntity)

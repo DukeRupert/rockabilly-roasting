@@ -51,6 +51,8 @@ func subscriptionEventLabel(action string) string {
 		return "Grind changed"
 	case audit.AuditSubscriptionQuantityChanged:
 		return "Quantity changed"
+	case audit.AuditSubscriptionAddressChanged:
+		return "Ship-to address changed"
 	case audit.AuditEmailSubscriptionChanged:
 		return "Change notification sent"
 	}

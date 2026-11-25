@@ -99,6 +99,12 @@ type OrderShowProps struct {
 	// DealersChoicePrevious is the customer's last dealer's choice box, shown
 	// above the dropdowns so staff can check for repeats. Nil when none.
 	DealersChoicePrevious *domain.PreviousPicks
+	// AddressLock is why the ship-to cannot be corrected (label bought, on a
+	// delivery route, already left the shop). Empty means the edit form shows.
+	AddressLock string
+	// AddressSubscriptions counts the customer's live subscriptions that renew
+	// to this order's ship-to; the edit form offers to move them too.
+	AddressSubscriptions int
 }
 
 // maxLabelPolls bounds the auto-refresh that runs after a label is queued: the
@@ -1435,6 +1441,11 @@ templ orderAddressCard(props OrderShowProps) {
 		} else {
 			<p class="text-sm text-rr-muted">No shipping address on this order.</p>
 		}
+		if props.AddressLock == "" && props.ShippingAddress != nil {
+			@orderAddressEditForm(props)
+		} else if props.AddressLock != "" && props.ShippingAddress != nil && orderAddressLockWorthShowing(props.Order) {
+			<p class="mt-2 text-xs text-rr-muted">Address locked: { props.AddressLock }</p>
+		}
 		if props.BillingAddress != nil && !sameAddress(props.ShippingAddress, props.BillingAddress) {
 			<div class="mt-3 border-t border-rr-border pt-3">
 				<p class="label-font text-xs uppercase tracking-wide text-rr-muted">Bill to</p>
@@ -1448,6 +1459,88 @@ templ orderAddressCard(props OrderShowProps) {
 			}
 		}
 	}
+}
+
+// orderAddressEditForm corrects the ship-to on an order that has not left the
+// shop: a typo caught while packing, or a customer who wrote in. It saves to
+// the customer's address book and points the order (and, if ticked, their
+// subscriptions) at it; past orders keep the address they shipped to.
+templ orderAddressEditForm(props OrderShowProps) {
+	<details id="ship-to-edit" class="mt-3 border-t border-rr-border pt-3">
+		<summary class="cursor-pointer text-xs font-semibold text-rr-red hover:text-rr-red-lt">Edit address</summary>
+		<form
+			method="post"
+			action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-address", props.Order.ID.String())) }
+			class="mt-3 flex flex-col gap-2"
+		>
+			<div class="grid grid-cols-2 gap-2">
+				@addressField("addr-first-name", "first_name", "First name", props.ShippingAddress.FirstName, "shipping given-name", true)
+				@addressField("addr-last-name", "last_name", "Last name", props.ShippingAddress.LastName, "shipping family-name", true)
+			</div>
+			@addressField("addr-company", "company", "Company", addressOptional(props.ShippingAddress.Company), "shipping organization", false)
+			@addressField("addr-line1", "line1", "Street", props.ShippingAddress.Line1, "shipping address-line1", true)
+			@addressField("addr-line2", "line2", "Apt, suite", addressOptional(props.ShippingAddress.Line2), "shipping address-line2", false)
+			@addressField("addr-city", "city", "City", props.ShippingAddress.City, "shipping address-level2", true)
+			<div class="grid grid-cols-2 gap-2">
+				@addressField("addr-state", "state", "State", props.ShippingAddress.State, "shipping address-level1", true)
+				@addressField("addr-postal-code", "postal_code", "ZIP", props.ShippingAddress.PostalCode, "shipping postal-code", true)
+			</div>
+			if props.AddressSubscriptions > 0 {
+				<label class="mt-1 flex items-start gap-2 text-xs text-rr-heading">
+					<input type="checkbox" name="move_subscriptions" value="1" checked class="mt-0.5"/>
+					<span>{ addressSubscriptionsLabel(props.AddressSubscriptions) }</span>
+				</label>
+			}
+			<p class="text-xs text-rr-muted">Shipping and tax are not recalculated, and the customer is not emailed.</p>
+			<button type="submit" class="btn-secondary self-start text-xs">Save address</button>
+		</form>
+	</details>
+}
+
+templ addressField(id, name, label, value, autocomplete string, required bool) {
+	<div class="flex flex-col gap-0.5">
+		<label for={ id } class="text-xs text-rr-muted">{ label }</label>
+		<input
+			id={ id }
+			name={ name }
+			type="text"
+			value={ value }
+			autocomplete={ autocomplete }
+			required?={ required }
+			class="w-full border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+		/>
+	</div>
+}
+
+// orderAddressLockWorthShowing hides the lock note on orders that are plainly
+// finished (shipped, delivered, closed), where "can't edit" goes without
+// saying. It shows on open orders, where the reason (a bought label, a route
+// stop) tells staff what to undo first.
+func orderAddressLockWorthShowing(o *domain.Order) bool {
+	switch o.Status {
+	case domain.OrderStatusCancelled, domain.OrderStatusRefunded, domain.OrderStatusComplete:
+		return false
+	}
+	switch o.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		return true
+	}
+	return false
+}
+
+// addressOptional reads an optional address line for a form field.
+func addressOptional(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func addressSubscriptionsLabel(n int) string {
+	if n == 1 {
+		return "Also send this customer's subscription here. It renews to the old address otherwise."
+	}
+	return fmt.Sprintf("Also send this customer's %d subscriptions here. They renew to the old address otherwise.", n)
 }
 
 // orderShippingCard is where the method lives together with the controls that

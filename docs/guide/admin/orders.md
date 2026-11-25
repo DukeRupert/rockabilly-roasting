@@ -186,6 +186,35 @@ Cancelled and refunded are terminal states. Once an order reaches either, no fur
 
 ---
 
+## Correcting the Ship-To Address
+
+Use this when the address on an order is wrong: a typo spotted while packing, or a customer who wrote in with a fix.
+
+### When it is allowed
+
+The **Edit address** link appears under the address in the **Ship to** card while the order is still in the shop. That includes orders already marked fulfilled (packed). It is replaced by a short "Address locked" note saying why once:
+
+- a shipping label has been bought (refund the label first, then edit),
+- the order is a stop on an open delivery route (take it off the route first),
+- the order has shipped or been delivered, or is complete, cancelled or refunded.
+
+### How to edit
+
+1. Open the order and click **Edit address** in the **Ship to** card.
+2. Fix the fields. The ZIP must be 5 digits, or ZIP+4 with a hyphen.
+3. If the customer has subscriptions that ship to the same address, a box offers to move them too. It is ticked by default; untick it if only this order should change.
+4. Click **Save address**.
+
+### What happens
+
+- The corrected address is saved to the customer's address book and the order points at it. Past orders keep the address they shipped to.
+- Ticked subscriptions renew to the new address from now on.
+- The billing address, shipping charge and tax are **not** recalculated. If the correction changes what shipping or tax should have been, refund the difference separately.
+- The customer is not emailed.
+- The order's activity feed shows "Ship-to address changed", and each moved subscription records the change too.
+
+---
+
 ## Cancelling an Order
 
 ### When cancellation is allowed

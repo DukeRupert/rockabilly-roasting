@@ -143,3 +143,32 @@ func TestCheckoutApplyCoupon_OncePerCustomerUsesTheCustomerWhenKnown(t *testing.
 
 	assert.True(t, apply("").Valid, "an anonymous shopper cannot be checked yet")
 }
+
+// A code that takes the whole subtotal leaves nothing to tax. The spread used
+// to be skipped exactly when the discounted subtotal reached zero, so a free
+// order was taxed on its full price.
+func TestCheckoutPaymentIntent_FullDiscountChargesNoTax(t *testing.T) {
+	ctx := context.Background()
+	f := newCheckoutCouponFixture(t)
+	d, _ := newCheckoutPaymentDeps(t)
+	withFlatRateTax(t, 0.10)
+
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+	// Taxable address: the flat-rate calculator taxes Washington only.
+	addr := testutil.CreateAddress(t, tx, f.customer.ID,
+		testutil.WithAddressState("WA"), testutil.WithAddressPostalCode("98101"))
+	discount := testutil.CreateDiscount(t, tx, testutil.WithDiscountValue(100))
+	coupon := testutil.CreateCouponCode(t, tx, discount.ID,
+		testutil.WithCouponCode("FREE-"+uuid.New().String()[:8]))
+	orders := app.NewOrderService(store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry())
+	_, err = orders.UpdateCartDiscount(ctx, tx, f.cartID, &discount.ID, &coupon.ID)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit(ctx))
+	f.addressID = addr.ID
+
+	resp := decodeCheckoutIntentResponse(t, f.postIntent(t, d, ""))
+	require.Equal(t, 5000, resp.DiscountTotal)
+	assert.Zero(t, resp.TaxTotal)
+}

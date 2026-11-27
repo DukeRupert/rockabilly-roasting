@@ -754,17 +754,19 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				SignedInCustomerID: signedIn,
 				SubscriptionSignup: true,
 			})
-			switch msg, label, refused := couponRefusal(cErr); {
+			// No coupon_applied / coupon_rejected here. Those count the cart's
+			// code box, once per apply; this check reruns on every intent the
+			// page creates (each address or box change), so counting it would
+			// inflate the panel. The signup order and redemption are the record.
+			switch msg, _, refused := couponRefusal(cErr); {
 			case cErr == nil:
 				discountTotal = calculateDiscountAmount(discount, priced.Subtotal)
 				discountName = discount.Name
 				couponCode = cc.Code
-				d.Metrics.CouponApplied.Inc()
 			case refused:
-				d.Metrics.CouponRejected.WithLabelValues(label).Inc()
 				couponNotice = msg
 				if errors.Is(cErr, app.ErrCouponSignInRequired) {
-					couponSignInURL = checkoutSignInURL
+					couponSignInURL = subscribeSignInURL(lines)
 				}
 			default:
 				return fmt.Errorf("check signup coupon: %w", cErr)
@@ -788,7 +790,8 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			}
 			lineSubtotal := item.UnitPrice * item.Quantity
 			// A coupon is spread across the lines in proportion, as retail
-			// checkout spreads it, so tax is on what is actually charged.
+			// checkout spreads it, so tax is on what is actually charged — at
+			// 100% off, nothing.
 			if discountTotal > 0 && priced.Subtotal > 0 {
 				lineSubtotal = int(float64(lineSubtotal) * float64(discountedSubtotal) / float64(priced.Subtotal))
 			}
@@ -1175,6 +1178,18 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 
 	d.Metrics.CheckoutCompleted.WithLabelValues("subscribe").Inc()
 	JSON(w, http.StatusOK, resp)
+}
+
+// subscribeSignInURL sends a shopper to sign in and back to this same box: the
+// subscribe page rebuilds it from the line params, as boxQuery writes them in
+// SubscribeApp.svelte. The form's other fields are prefilled for a signed-in
+// customer from their account.
+func subscribeSignInURL(lines []subscribeLine) string {
+	q := url.Values{}
+	for _, l := range lines {
+		q.Add("line", fmt.Sprintf("%s:%s:%d", l.PlanID, l.VariantID, l.Quantity))
+	}
+	return "/account/login?next=" + url.QueryEscape("/subscribe?"+q.Encode())
 }
 
 // subscriptionConfirmEmail is the one confirmation job for a signup, naming

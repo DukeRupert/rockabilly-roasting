@@ -115,3 +115,59 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1 FROM subscriptions WHERE customer_id = $1
 );
+
+-- name: GetReferralDiscount :one
+SELECT * FROM discounts WHERE is_referral;
+
+-- name: MarkReferralDiscount :exec
+-- Marks one discount the referral offer. Run after ClearReferralDiscount in the
+-- same transaction: the one-offer index is a partial unique index, checked row
+-- by row and not deferrable, so a single UPDATE that unmarks one row and marks
+-- another fails whenever it reaches the new row first.
+UPDATE discounts SET is_referral = true, updated_at = now() WHERE id = $1;
+
+-- name: ClearReferralDiscount :exec
+UPDATE discounts SET is_referral = false, updated_at = now() WHERE is_referral;
+
+-- name: GetMemberCouponCode :one
+SELECT * FROM coupon_codes
+WHERE discount_id = $1 AND customer_id = $2
+ORDER BY created_at
+LIMIT 1;
+
+-- name: CreateReferralReward :one
+-- One per paid order; a capture that runs twice finds its own row.
+INSERT INTO referral_rewards (referrer_customer_id, referred_customer_id, coupon_code_id, order_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (order_id) DO NOTHING
+RETURNING *;
+
+-- name: VoidReferralRewardByOrderID :exec
+-- A cancelled order takes back the bag it earned, unless it already went out.
+UPDATE referral_rewards SET status = 'void'
+WHERE order_id = $1 AND status = 'owed';
+
+-- name: MarkReferralRewardSent :one
+UPDATE referral_rewards
+SET status = 'sent', sent_at = now(), sent_by = $2
+WHERE id = $1 AND status = 'owed'
+RETURNING *;
+
+-- name: ListReferralRewardsByStatus :many
+SELECT rr.*,
+       referrer.email      AS referrer_email,
+       referrer.first_name AS referrer_first_name,
+       referrer.last_name  AS referrer_last_name,
+       o.number            AS order_number,
+       cc.code             AS code
+FROM referral_rewards rr
+JOIN customers referrer ON referrer.id = rr.referrer_customer_id
+JOIN orders o           ON o.id = rr.order_id
+JOIN coupon_codes cc    ON cc.id = rr.coupon_code_id
+WHERE rr.status = $1
+ORDER BY rr.created_at
+LIMIT $2;
+
+-- name: CountReferralRewardsByReferrer :one
+SELECT count(*) FROM referral_rewards
+WHERE referrer_customer_id = $1 AND status <> 'void';

@@ -7,10 +7,20 @@ package sqlcgen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const clearReferralDiscount = `-- name: ClearReferralDiscount :exec
+UPDATE discounts SET is_referral = false, updated_at = now() WHERE is_referral
+`
+
+func (q *Queries) ClearReferralDiscount(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, clearReferralDiscount)
+	return err
+}
 
 const countCouponRedemptionsByDiscount = `-- name: CountCouponRedemptionsByDiscount :one
 SELECT count(*) FROM coupon_redemptions WHERE discount_id = $1
@@ -18,6 +28,18 @@ SELECT count(*) FROM coupon_redemptions WHERE discount_id = $1
 
 func (q *Queries) CountCouponRedemptionsByDiscount(ctx context.Context, discountID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countCouponRedemptionsByDiscount, discountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countReferralRewardsByReferrer = `-- name: CountReferralRewardsByReferrer :one
+SELECT count(*) FROM referral_rewards
+WHERE referrer_customer_id = $1 AND status <> 'void'
+`
+
+func (q *Queries) CountReferralRewardsByReferrer(ctx context.Context, referrerCustomerID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countReferralRewardsByReferrer, referrerCustomerID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -97,7 +119,7 @@ func (q *Queries) CreateCouponRedemption(ctx context.Context, arg CreateCouponRe
 const createDiscount = `-- name: CreateDiscount :one
 INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility, applies_to)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral
 `
 
 type CreateDiscountParams struct {
@@ -146,6 +168,44 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		&i.UsageLimit,
 		&i.Eligibility,
 		&i.AppliesTo,
+		&i.IsReferral,
+	)
+	return i, err
+}
+
+const createReferralReward = `-- name: CreateReferralReward :one
+INSERT INTO referral_rewards (referrer_customer_id, referred_customer_id, coupon_code_id, order_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (order_id) DO NOTHING
+RETURNING id, referrer_customer_id, referred_customer_id, coupon_code_id, order_id, status, sent_at, sent_by, created_at
+`
+
+type CreateReferralRewardParams struct {
+	ReferrerCustomerID uuid.UUID `json:"referrer_customer_id"`
+	ReferredCustomerID uuid.UUID `json:"referred_customer_id"`
+	CouponCodeID       uuid.UUID `json:"coupon_code_id"`
+	OrderID            uuid.UUID `json:"order_id"`
+}
+
+// One per paid order; a capture that runs twice finds its own row.
+func (q *Queries) CreateReferralReward(ctx context.Context, arg CreateReferralRewardParams) (ReferralReward, error) {
+	row := q.db.QueryRow(ctx, createReferralReward,
+		arg.ReferrerCustomerID,
+		arg.ReferredCustomerID,
+		arg.CouponCodeID,
+		arg.OrderID,
+	)
+	var i ReferralReward
+	err := row.Scan(
+		&i.ID,
+		&i.ReferrerCustomerID,
+		&i.ReferredCustomerID,
+		&i.CouponCodeID,
+		&i.OrderID,
+		&i.Status,
+		&i.SentAt,
+		&i.SentBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -312,7 +372,7 @@ func (q *Queries) GetCouponRedemptionByOrderID(ctx context.Context, orderID uuid
 }
 
 const getDiscountByID = `-- name: GetDiscountByID :one
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to FROM discounts WHERE id = $1
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral FROM discounts WHERE id = $1
 `
 
 func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error) {
@@ -333,6 +393,62 @@ func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, 
 		&i.UsageLimit,
 		&i.Eligibility,
 		&i.AppliesTo,
+		&i.IsReferral,
+	)
+	return i, err
+}
+
+const getMemberCouponCode = `-- name: GetMemberCouponCode :one
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes
+WHERE discount_id = $1 AND customer_id = $2
+ORDER BY created_at
+LIMIT 1
+`
+
+type GetMemberCouponCodeParams struct {
+	DiscountID uuid.UUID  `json:"discount_id"`
+	CustomerID *uuid.UUID `json:"customer_id"`
+}
+
+func (q *Queries) GetMemberCouponCode(ctx context.Context, arg GetMemberCouponCodeParams) (CouponCode, error) {
+	row := q.db.QueryRow(ctx, getMemberCouponCode, arg.DiscountID, arg.CustomerID)
+	var i CouponCode
+	err := row.Scan(
+		&i.ID,
+		&i.DiscountID,
+		&i.Code,
+		&i.CustomerID,
+		&i.RedeemedAt,
+		&i.RedeemedBy,
+		&i.CreatedAt,
+		&i.RedeemedByOrderID,
+	)
+	return i, err
+}
+
+const getReferralDiscount = `-- name: GetReferralDiscount :one
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral FROM discounts WHERE is_referral
+`
+
+func (q *Queries) GetReferralDiscount(ctx context.Context) (Discount, error) {
+	row := q.db.QueryRow(ctx, getReferralDiscount)
+	var i Discount
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Type,
+		&i.Value,
+		&i.MinimumOrderCents,
+		&i.StartsAt,
+		&i.ExpiresAt,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UsageLimit,
+		&i.Eligibility,
+		&i.AppliesTo,
+		&i.IsReferral,
 	)
 	return i, err
 }
@@ -411,6 +527,79 @@ func (q *Queries) ListCouponRedemptionsByDiscount(ctx context.Context, arg ListC
 	return items, nil
 }
 
+const listReferralRewardsByStatus = `-- name: ListReferralRewardsByStatus :many
+SELECT rr.id, rr.referrer_customer_id, rr.referred_customer_id, rr.coupon_code_id, rr.order_id, rr.status, rr.sent_at, rr.sent_by, rr.created_at,
+       referrer.email      AS referrer_email,
+       referrer.first_name AS referrer_first_name,
+       referrer.last_name  AS referrer_last_name,
+       o.number            AS order_number,
+       cc.code             AS code
+FROM referral_rewards rr
+JOIN customers referrer ON referrer.id = rr.referrer_customer_id
+JOIN orders o           ON o.id = rr.order_id
+JOIN coupon_codes cc    ON cc.id = rr.coupon_code_id
+WHERE rr.status = $1
+ORDER BY rr.created_at
+LIMIT $2
+`
+
+type ListReferralRewardsByStatusParams struct {
+	Status string `json:"status"`
+	Limit  int32  `json:"limit"`
+}
+
+type ListReferralRewardsByStatusRow struct {
+	ID                 uuid.UUID          `json:"id"`
+	ReferrerCustomerID uuid.UUID          `json:"referrer_customer_id"`
+	ReferredCustomerID uuid.UUID          `json:"referred_customer_id"`
+	CouponCodeID       uuid.UUID          `json:"coupon_code_id"`
+	OrderID            uuid.UUID          `json:"order_id"`
+	Status             string             `json:"status"`
+	SentAt             pgtype.Timestamptz `json:"sent_at"`
+	SentBy             *uuid.UUID         `json:"sent_by"`
+	CreatedAt          time.Time          `json:"created_at"`
+	ReferrerEmail      string             `json:"referrer_email"`
+	ReferrerFirstName  string             `json:"referrer_first_name"`
+	ReferrerLastName   string             `json:"referrer_last_name"`
+	OrderNumber        string             `json:"order_number"`
+	Code               string             `json:"code"`
+}
+
+func (q *Queries) ListReferralRewardsByStatus(ctx context.Context, arg ListReferralRewardsByStatusParams) ([]ListReferralRewardsByStatusRow, error) {
+	rows, err := q.db.Query(ctx, listReferralRewardsByStatus, arg.Status, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReferralRewardsByStatusRow{}
+	for rows.Next() {
+		var i ListReferralRewardsByStatusRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ReferrerCustomerID,
+			&i.ReferredCustomerID,
+			&i.CouponCodeID,
+			&i.OrderID,
+			&i.Status,
+			&i.SentAt,
+			&i.SentBy,
+			&i.CreatedAt,
+			&i.ReferrerEmail,
+			&i.ReferrerFirstName,
+			&i.ReferrerLastName,
+			&i.OrderNumber,
+			&i.Code,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markCouponCodeRedeemed = `-- name: MarkCouponCodeRedeemed :exec
 UPDATE coupon_codes
 SET redeemed_at = now(), redeemed_by = $2
@@ -425,6 +614,48 @@ type MarkCouponCodeRedeemedParams struct {
 func (q *Queries) MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error {
 	_, err := q.db.Exec(ctx, markCouponCodeRedeemed, arg.ID, arg.RedeemedBy)
 	return err
+}
+
+const markReferralDiscount = `-- name: MarkReferralDiscount :exec
+UPDATE discounts SET is_referral = true, updated_at = now() WHERE id = $1
+`
+
+// Marks one discount the referral offer. Run after ClearReferralDiscount in the
+// same transaction: the one-offer index is a partial unique index, checked row
+// by row and not deferrable, so a single UPDATE that unmarks one row and marks
+// another fails whenever it reaches the new row first.
+func (q *Queries) MarkReferralDiscount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markReferralDiscount, id)
+	return err
+}
+
+const markReferralRewardSent = `-- name: MarkReferralRewardSent :one
+UPDATE referral_rewards
+SET status = 'sent', sent_at = now(), sent_by = $2
+WHERE id = $1 AND status = 'owed'
+RETURNING id, referrer_customer_id, referred_customer_id, coupon_code_id, order_id, status, sent_at, sent_by, created_at
+`
+
+type MarkReferralRewardSentParams struct {
+	ID     uuid.UUID  `json:"id"`
+	SentBy *uuid.UUID `json:"sent_by"`
+}
+
+func (q *Queries) MarkReferralRewardSent(ctx context.Context, arg MarkReferralRewardSentParams) (ReferralReward, error) {
+	row := q.db.QueryRow(ctx, markReferralRewardSent, arg.ID, arg.SentBy)
+	var i ReferralReward
+	err := row.Scan(
+		&i.ID,
+		&i.ReferrerCustomerID,
+		&i.ReferredCustomerID,
+		&i.CouponCodeID,
+		&i.OrderID,
+		&i.Status,
+		&i.SentAt,
+		&i.SentBy,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const redeemCouponCode = `-- name: RedeemCouponCode :one
@@ -482,7 +713,7 @@ UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
     starts_at = $7, expires_at = $8, active = $9, eligibility = $10, applies_to = $11, updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral
 `
 
 type UpdateDiscountParams struct {
@@ -529,6 +760,18 @@ func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) 
 		&i.UsageLimit,
 		&i.Eligibility,
 		&i.AppliesTo,
+		&i.IsReferral,
 	)
 	return i, err
+}
+
+const voidReferralRewardByOrderID = `-- name: VoidReferralRewardByOrderID :exec
+UPDATE referral_rewards SET status = 'void'
+WHERE order_id = $1 AND status = 'owed'
+`
+
+// A cancelled order takes back the bag it earned, unless it already went out.
+func (q *Queries) VoidReferralRewardByOrderID(ctx context.Context, orderID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, voidReferralRewardByOrderID, orderID)
+	return err
 }

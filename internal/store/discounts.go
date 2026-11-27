@@ -143,7 +143,7 @@ type DiscountFilter struct {
 // List returns discounts matching the given filter (hand-written for dynamic WHERE).
 func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) ([]domain.Discount, error) {
 	query := `SELECT id, name, description, type, value, minimum_order_cents,
-	                 starts_at, expires_at, active, usage_limit, eligibility, applies_to, created_at, updated_at
+	                 starts_at, expires_at, active, usage_limit, eligibility, applies_to, is_referral, created_at, updated_at
 	          FROM discounts WHERE true`
 	args := []any{}
 	argN := 1
@@ -184,7 +184,7 @@ func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) (
 		var discountType, usageLimit, eligibility, appliesTo string
 		if err := rows.Scan(
 			&d.ID, &d.Name, &d.Description, &discountType, &value, &minimumOrderCents,
-			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &appliesTo, &d.CreatedAt, &d.UpdatedAt,
+			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &appliesTo, &d.IsReferral, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan discount: %w", err)
 		}
@@ -314,6 +314,11 @@ func (s *DiscountStore) ReleaseCouponCodeByOrderID(ctx context.Context, tx pgx.T
 	if err := q.DeleteCouponRedemptionByOrderID(ctx, orderID); err != nil {
 		return fmt.Errorf("release coupon redemption: %w", err)
 	}
+	// The free bag the order earned its referrer goes with it, unless it has
+	// already been sent.
+	if err := q.VoidReferralRewardByOrderID(ctx, orderID); err != nil {
+		return fmt.Errorf("void referral reward: %w", err)
+	}
 	return nil
 }
 
@@ -432,6 +437,7 @@ func discountFromRow(r sqlcgen.Discount) *domain.Discount {
 		UsageLimit:        domain.CouponUsageLimit(r.UsageLimit),
 		Eligibility:       domain.DiscountEligibility(r.Eligibility),
 		AppliesTo:         domain.DiscountAppliesTo(r.AppliesTo),
+		IsReferral:        r.IsReferral,
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,
 	}
@@ -458,5 +464,142 @@ func couponCodeFromRow(r sqlcgen.CouponCode) *domain.CouponCode {
 		RedeemedBy:        r.RedeemedBy,
 		RedeemedByOrderID: r.RedeemedByOrderID,
 		CreatedAt:         r.CreatedAt,
+	}
+}
+
+// --- Referrals ---
+
+// GetReferralDiscount returns the discount marked as the referral offer, or
+// pgx.ErrNoRows when none is.
+func (s *DiscountStore) GetReferralDiscount(ctx context.Context, tx pgx.Tx) (*domain.Discount, error) {
+	row, err := sqlcgen.New(tx).GetReferralDiscount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get referral discount: %w", err)
+	}
+	return discountFromRow(row), nil
+}
+
+// SetReferralDiscount makes id the referral offer, unmarking any other. Two
+// statements, unmark then mark: see MarkReferralDiscount in discounts.sql.
+func (s *DiscountStore) SetReferralDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	q := sqlcgen.New(tx)
+	if err := q.ClearReferralDiscount(ctx); err != nil {
+		return fmt.Errorf("clear referral discount: %w", err)
+	}
+	if err := q.MarkReferralDiscount(ctx, id); err != nil {
+		return fmt.Errorf("mark referral discount: %w", err)
+	}
+	return nil
+}
+
+// ClearReferralDiscount leaves no discount marked as the referral offer.
+func (s *DiscountStore) ClearReferralDiscount(ctx context.Context, tx pgx.Tx) error {
+	if err := sqlcgen.New(tx).ClearReferralDiscount(ctx); err != nil {
+		return fmt.Errorf("clear referral discount: %w", err)
+	}
+	return nil
+}
+
+// GetMemberCouponCode returns the code a customer owns on a discount, or
+// pgx.ErrNoRows.
+func (s *DiscountStore) GetMemberCouponCode(ctx context.Context, tx pgx.Tx, discountID, customerID uuid.UUID) (*domain.CouponCode, error) {
+	row, err := sqlcgen.New(tx).GetMemberCouponCode(ctx, sqlcgen.GetMemberCouponCodeParams{
+		DiscountID: discountID,
+		CustomerID: &customerID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get member coupon code: %w", err)
+	}
+	return couponCodeFromRow(row), nil
+}
+
+// CreateReferralRewardParams identifies the paid order a referral reward is for.
+type CreateReferralRewardParams struct {
+	ReferrerCustomerID uuid.UUID
+	ReferredCustomerID uuid.UUID
+	CouponCodeID       uuid.UUID
+	OrderID            uuid.UUID
+}
+
+// CreateReferralReward records a free bag owed. Returns pgx.ErrNoRows when the
+// order already has one (capture re-entered).
+func (s *DiscountStore) CreateReferralReward(ctx context.Context, tx pgx.Tx, p CreateReferralRewardParams) (*domain.ReferralReward, error) {
+	row, err := sqlcgen.New(tx).CreateReferralReward(ctx, sqlcgen.CreateReferralRewardParams{
+		ReferrerCustomerID: p.ReferrerCustomerID,
+		ReferredCustomerID: p.ReferredCustomerID,
+		CouponCodeID:       p.CouponCodeID,
+		OrderID:            p.OrderID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create referral reward: %w", err)
+	}
+	return referralRewardFromRow(row), nil
+}
+
+// MarkReferralRewardSent marks an owed reward sent. Returns pgx.ErrNoRows when
+// it is not owed (already sent, voided, or missing).
+func (s *DiscountStore) MarkReferralRewardSent(ctx context.Context, tx pgx.Tx, id uuid.UUID, staffID *uuid.UUID) (*domain.ReferralReward, error) {
+	row, err := sqlcgen.New(tx).MarkReferralRewardSent(ctx, sqlcgen.MarkReferralRewardSentParams{ID: id, SentBy: staffID})
+	if err != nil {
+		return nil, fmt.Errorf("mark referral reward sent: %w", err)
+	}
+	return referralRewardFromRow(row), nil
+}
+
+// ListReferralRewards returns rewards in one status, oldest first, with the
+// referrer, order and code the admin list shows.
+func (s *DiscountStore) ListReferralRewards(ctx context.Context, tx pgx.Tx, status domain.ReferralRewardStatus, limit int) ([]domain.ReferralRewardRow, error) {
+	rows, err := sqlcgen.New(tx).ListReferralRewardsByStatus(ctx, sqlcgen.ListReferralRewardsByStatusParams{
+		Status: string(status),
+		Limit:  int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list referral rewards: %w", err)
+	}
+	out := make([]domain.ReferralRewardRow, len(rows))
+	for i, r := range rows {
+		out[i] = domain.ReferralRewardRow{
+			ReferralReward: domain.ReferralReward{
+				ID:                 r.ID,
+				ReferrerCustomerID: r.ReferrerCustomerID,
+				ReferredCustomerID: r.ReferredCustomerID,
+				CouponCodeID:       r.CouponCodeID,
+				OrderID:            r.OrderID,
+				Status:             domain.ReferralRewardStatus(r.Status),
+				SentAt:             timestampFromPG(r.SentAt),
+				SentBy:             r.SentBy,
+				CreatedAt:          r.CreatedAt,
+			},
+			ReferrerEmail:     r.ReferrerEmail,
+			ReferrerFirstName: r.ReferrerFirstName,
+			ReferrerLastName:  r.ReferrerLastName,
+			OrderNumber:       r.OrderNumber,
+			Code:              r.Code,
+		}
+	}
+	return out, nil
+}
+
+// CountReferralRewards returns how many friends a member has brought in: every
+// reward that was not voided.
+func (s *DiscountStore) CountReferralRewards(ctx context.Context, tx pgx.Tx, referrerID uuid.UUID) (int, error) {
+	n, err := sqlcgen.New(tx).CountReferralRewardsByReferrer(ctx, referrerID)
+	if err != nil {
+		return 0, fmt.Errorf("count referral rewards: %w", err)
+	}
+	return int(n), nil
+}
+
+func referralRewardFromRow(r sqlcgen.ReferralReward) *domain.ReferralReward {
+	return &domain.ReferralReward{
+		ID:                 r.ID,
+		ReferrerCustomerID: r.ReferrerCustomerID,
+		ReferredCustomerID: r.ReferredCustomerID,
+		CouponCodeID:       r.CouponCodeID,
+		OrderID:            r.OrderID,
+		Status:             domain.ReferralRewardStatus(r.Status),
+		SentAt:             timestampFromPG(r.SentAt),
+		SentBy:             r.SentBy,
+		CreatedAt:          r.CreatedAt,
 	}
 }

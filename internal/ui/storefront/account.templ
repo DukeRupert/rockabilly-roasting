@@ -565,6 +565,29 @@ type AccountSubscriptionsProps struct {
 	// Add form is not offered.
 	Choices []SubscriptionChoice
 	Plans   []domain.SubscriptionPlan
+	// Referral is the member's code to share; nil when there is none to show.
+	Referral *AccountReferral
+}
+
+// AccountReferral is a member's referral card.
+type AccountReferral struct {
+	// Code is the member's own code on the referral offer.
+	Code string
+	// Offer is what a friend gets, e.g. "50% off".
+	Offer string
+	// Friends is how many friends have joined with the code.
+	Friends int
+}
+
+func referralFriendsLabel(n int) string {
+	switch n {
+	case 0:
+		return "No friends have joined with your code yet."
+	case 1:
+		return "1 friend has joined with your code."
+	default:
+		return fmt.Sprintf("%d friends have joined with your code.", n)
+	}
 }
 
 // skipUndoOffer reports whether this subscription can still be put back on the
@@ -680,6 +703,9 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 	@accountLayout("/account/subscriptions", props.Customer) {
 		@accountPageHeading("The daily grind", "Your subscriptions")
+		if props.Referral != nil {
+			@accountReferralCard(*props.Referral)
+		}
 		if len(props.Rows) == 0 && len(props.Boxes) == 0 {
 			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
 				<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
@@ -1368,4 +1394,29 @@ templ AccountAddressesPage(props AccountAddressesProps) {
 	@layouts.Storefront(layouts.StorefrontProps{Title: "Addresses", CartCount: props.CartCount}) {
 		@AccountAddressesContent(props)
 	}
+}
+
+// accountReferralCard gives a member their code to share. The copy button
+// writes to the clipboard where the browser allows it; the code is plain text
+// either way, so it can be read out or copied by hand.
+templ accountReferralCard(ref AccountReferral) {
+	<section aria-labelledby="referral-heading" class="mb-6 border-2 border-ink bg-cream-hi p-5 sm:p-6 shadow-stamp">
+		<h2 id="referral-heading" class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">Share the Daily Grind</h2>
+		<p class="mt-2 font-oswald text-ink-soft text-sm max-w-prose" style="letter-spacing:0.04em;">
+			Give a friend { ref.Offer } their first subscription order with your code. When they join, we&rsquo;ll send you a free bag.
+		</p>
+		<div class="mt-4 flex flex-wrap items-center gap-3" x-data="{ copied: false }">
+			<span class="font-special text-rust text-xl border-2 border-ink bg-paper px-4 py-2" style="letter-spacing:0.08em;">{ ref.Code }</span>
+			<button
+				type="button"
+				class="font-oswald font-bold text-[11px] text-ink border-2 border-ink bg-paper-warm px-4 py-2 hover:bg-ink hover:text-paper transition-colors"
+				style="letter-spacing:0.16em; text-transform:uppercase;"
+				data-code={ ref.Code }
+				@click="navigator.clipboard && navigator.clipboard.writeText($el.dataset.code).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
+			>
+				<span x-text="copied ? 'Copied' : 'Copy code'">Copy code</span>
+			</button>
+		</div>
+		<p class="mt-3 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">{ referralFriendsLabel(ref.Friends) }</p>
+	</section>
 }

@@ -92,3 +92,19 @@ Customers enter a code in the order summary at checkout. A code is accepted only
 If a code is refused, the customer sees a message saying why. The code is checked again when the payment is set up; if it no longer applies (for example, a once-per-customer code entered before checkout knew who the customer was), it's removed and the customer is told why before they pay.
 
 Coupon entry is rate-limited by IP address to prevent abuse.
+
+## Referral Program
+
+Each active Daily Grind member can share their own code. A friend who uses it gets the referral discount on their first subscription order, and the member earns a free bag.
+
+**Setting it up.** Create a discount for the friend's offer -- for the Daily Grind referral, 50% off, Once per customer, New subscribers only, First subscription order. Open it and choose **Use as the referral offer** in the Referral offer panel. Only one discount can be the referral offer; choosing another replaces it. To be chosen, a discount must be Once per customer (each member's code goes to many friends), for the First subscription order, and a percentage or fixed amount off. The panel lists anything a discount is missing.
+
+The code you typed when creating the discount stops working once it is the referral offer: the offer only works through a member's code, because the code is what says who referred the friend. So use a separate discount for referrals, not one whose code you've already shared, like WELCOME50. The confirmation names the code that will stop working.
+
+Members only see their code while the offer can be used: switched on, past its start date and through its last valid day. An expired offer's card disappears.
+
+**Members' codes.** Every member with an active subscription sees a "Share the Daily Grind" card on their subscriptions page with their own code (their first name and four characters, like LOGAN-7KQ2), a copy button, and how many friends have joined with it. A member can't use their own code. The discount's page shows how many member codes exist rather than listing them.
+
+**Free bags.** When a friend's first order with a member's code is paid, the member is owed a free bag. Go to **Admin > Discounts > Referrals** to see the bags owed, oldest first, with the member, their code and the friend's order. Send the bag, then choose **Mark sent**. If the friend's order is cancelled before the bag goes out, it drops off the list.
+
+**Ending the program.** Choose **Stop using as referral offer** on the discount. Members' codes stop working and the card disappears from their pages. Bags already earned stay on the Referrals page.

@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
+	"github.com/dukerupert/hiri/internal/platform/logging"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
@@ -402,6 +404,7 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	// window as of *now*, and a card sat on across the anchor hour will name
 	// one that has passed by the time it is clicked.
 	props.ResumeOrderOn = d.SubscriptionService.ResumeOrderDate(time.Now())
+	props.Referral = d.accountReferral(ctx, customer)
 
 	if IsHTMX(r) {
 		storefront.AccountSubscriptionsContent(props).Render(ctx, w) //nolint:errcheck
@@ -752,4 +755,43 @@ func (d *Deps) handleAccountAddressSetDefault(w http.ResponseWriter, r *http.Req
 	}
 
 	http.Redirect(w, r, "/account/addresses", http.StatusSeeOther)
+}
+
+// accountReferral is the member's referral card: their own code on the
+// referral offer, minted the first time they see it. Nil when there is nothing
+// to share (no offer, an inactive one, or a customer who is not an active
+// member). Its own transaction, because minting writes, and best-effort: a
+// failure costs the card, not the subscriptions page.
+func (d *Deps) accountReferral(ctx context.Context, customer *domain.Customer) *storefront.AccountReferral {
+	var card *storefront.AccountReferral
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		code, offer, txErr := d.DiscountService.MemberReferralCode(ctx, tx, customer)
+		if txErr != nil || code == nil {
+			return txErr
+		}
+		friends, txErr := d.DiscountService.ReferralFriendsCount(ctx, tx, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+		card = &storefront.AccountReferral{
+			Code:    code.Code,
+			Offer:   referralOfferLabel(offer),
+			Friends: friends,
+		}
+		return nil
+	})
+	if err != nil {
+		logging.FromContext(ctx).Warn("account referral card", "error", err, "customer_id", customer.ID)
+		return nil
+	}
+	return card
+}
+
+// referralOfferLabel is what a friend gets, in the words the card uses:
+// "50% off" or "$5.00 off".
+func referralOfferLabel(d *domain.Discount) string {
+	if d.Type == domain.DiscountTypeFixedAmount {
+		return fmt.Sprintf("$%d.%02d off", d.Value/100, d.Value%100)
+	}
+	return fmt.Sprintf("%d%% off", d.Value)
 }

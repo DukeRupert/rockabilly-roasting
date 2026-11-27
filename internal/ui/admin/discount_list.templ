@@ -91,6 +91,28 @@ func discountLastValidDay(t time.Time, loc *time.Location) string {
 // x-data both name the fields discountType and discountValue.
 const fullDiscountWarningShow = "discountType === 'percentage' && parseFloat(discountValue) >= 100"
 
+// listedCodes is the codes the list prints for a discount: all of them, except
+// on the referral offer, whose member codes are counted rather than printed.
+func listedCodes(d domain.Discount, codes []domain.CouponCode) []domain.CouponCode {
+	if d.IsReferral {
+		return nil
+	}
+	return codes
+}
+
+func referralMemberCodesLabel(codes []domain.CouponCode) string {
+	n := 0
+	for _, c := range codes {
+		if c.CustomerID != nil {
+			n++
+		}
+	}
+	if n == 1 {
+		return "1 member code"
+	}
+	return fmt.Sprintf("%d member codes", n)
+}
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -119,6 +141,9 @@ templ DiscountListContent(props DiscountListProps) {
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Discounts</h1>
 			<p class="mt-1 text-sm text-rr-muted">Manage discounts and promotions</p>
+		</div>
+		<div class="mt-4 sm:mt-0">
+			<a href="/admin/referrals" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">Referrals &rarr;</a>
 		</div>
 	</div>
 	<!-- Create form -->
@@ -325,7 +350,11 @@ templ DiscountListContent(props DiscountListProps) {
 									<a href={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", d.ID.String())) } class="text-rr-red hover:text-rr-red-lt">{ d.Name }</a>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									for i, code := range props.Codes[d.ID] {
+									if d.IsReferral {
+										<span class="font-semibold text-rr-heading">Referral offer</span>
+										<span class="block text-xs text-rr-muted">{ referralMemberCodesLabel(props.Codes[d.ID]) }</span>
+									}
+									for i, code := range listedCodes(d, props.Codes[d.ID]) {
 										if i > 0 {
 											<span class="text-rr-border"> · </span>
 										}
@@ -335,7 +364,7 @@ templ DiscountListContent(props DiscountListProps) {
 											<span class="font-mono text-rr-heading">{ code.Code }</span>
 										}
 									}
-									if len(props.Codes[d.ID]) == 0 {
+									if len(props.Codes[d.ID]) == 0 && !d.IsReferral {
 										<span class="text-rr-border">&mdash;</span>
 									}
 									if d.UsageLimit == domain.CouponUsageOncePerCustomer {

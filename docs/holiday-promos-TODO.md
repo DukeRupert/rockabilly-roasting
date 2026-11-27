@@ -75,13 +75,24 @@ In build order. Items 1 to 3 shipped in #81 (v1.129.0), item 4 in #82
       subscribers only, first subscription order, last valid day 12/31
 
 ### 5. Referral program
-- [ ] One code per active member under a single referral discount
-      (`coupon_codes.customer_id` = the owner)
-- [ ] Generate codes on demand, show them on the account page
-- [ ] Stop members redeeming their own code
-- [ ] Record the referrer on redemption; a "free bags owed" list in admin
-- [ ] Decide how the free bag is delivered: staff fulfil it by hand, or it's
-      added to the member's next renewal
+- [x] One code per active member under a single referral discount
+      (`discounts.is_referral`, at most one; `coupon_codes.customer_id` = the
+      owner, unique per discount)
+- [x] Generate codes on demand (NAME-XXXX), show them on the subscriptions
+      page with a copy button and a friends-joined count
+- [x] Stop members redeeming their own code; refuse the ownerless code typed
+      when the offer was created; refuse members' codes once the offer ends
+- [x] Record the referrer on redemption: `referral_rewards`, written at
+      capture when the claim holds, voided if the order is cancelled before
+      the bag is sent
+- [x] "Bags owed" list in admin (`/admin/referrals`) with Mark sent
+- [ ] Client to decide how the free bag is delivered. Built as staff
+      fulfilling by hand from the list; adding it to the member's next
+      renewal would be a later change
+- [ ] Client to say which bag counts as the free one
+- [ ] Once deployed: create the referral discount (50%, once per customer,
+      new subscribers only, first subscription order) and choose "Use as the
+      referral offer"
 
 ### 6. Reporting
 - [ ] CSV export per discount: order number, date, customer, code, referrer,

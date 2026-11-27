@@ -15,6 +15,10 @@ import (
 // address.*, subscription self-actions, and login/logout.
 func customerEventLabel(action string) string {
 	switch action {
+	case audit.AuditReferralRewardEarned:
+		return "Earned a referral bag"
+	case audit.AuditReferralRewardSent:
+		return "Referral bag sent"
 	case audit.AuditCustomerLogin:
 		return "Logged in"
 	case audit.AuditCustomerLogout:
@@ -89,7 +93,8 @@ func customerEventMarker(action string) string {
 		audit.AuditCustomerTaxExemptionGranted,
 		audit.AuditSubscriptionCreated,
 		audit.AuditSubscriptionResumed,
-		audit.AuditSubscriptionSkipUndone:
+		audit.AuditSubscriptionSkipUndone,
+		audit.AuditReferralRewardEarned:
 		return "bg-rr-amber"
 	case audit.AuditSubscriptionPaused, audit.AuditSubscriptionSkipped:
 		return "bg-rr-raised"

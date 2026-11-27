@@ -138,6 +138,13 @@ var (
 	// ErrCouponNewSubscribersOnly: a new-subscribers discount, and the
 	// customer has held a subscription before.
 	ErrCouponNewSubscribersOnly = errors.New("discount is for new subscribers only")
+	// ErrCouponOwnCode: a member trying their own referral code.
+	ErrCouponOwnCode = errors.New("customer cannot use their own referral code")
+	// ErrReferralOfferInvalid: a discount that cannot be the referral offer
+	// as it stands. See DiscountService.SetReferralOffer.
+	ErrReferralOfferInvalid = errors.New("discount cannot be the referral offer")
+	// ErrReferralRewardNotOwed: marking a reward sent that is not owed.
+	ErrReferralRewardNotOwed = errors.New("referral reward is not owed")
 
 	// Auth errors
 	ErrSessionExpired   = errors.New("session expired")

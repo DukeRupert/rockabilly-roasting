@@ -132,3 +132,45 @@ func TestDiscountForms_WarnAboutFullDiscount(t *testing.T) {
 		t.Error("edit form does not start from the saved type and value")
 	}
 }
+
+// The referral panel says what a discount lacks, the same rules
+// SetReferralOffer applies, and its confirmation names the code that stops
+// working. The edit form fixes the offer's order type.
+func TestDiscountReferralPanel(t *testing.T) {
+	render := func(d domain.Discount, codes []domain.CouponCode) string {
+		var b bytes.Buffer
+		if err := DiscountShowContent(DiscountShowProps{Discount: d, Codes: codes, MerchantTZ: time.UTC}).Render(context.Background(), &b); err != nil {
+			t.Fatal(err)
+		}
+		return b.String()
+	}
+
+	cart := welcomeDiscount()
+	cart.UsageLimit = domain.CouponUsageSingleUse
+	cart.AppliesTo = domain.DiscountAppliesToOneTime
+	page := render(cart, nil)
+	for _, want := range []string{"Once per customer (set when created)", "For the first subscription order (Order type)"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("panel does not list %q", want)
+		}
+	}
+	if strings.Contains(page, "Use as the referral offer</button>") {
+		t.Error("a discount that fails the rules is offered the button")
+	}
+
+	ok := welcomeDiscount()
+	page = render(ok, []domain.CouponCode{{Code: "WELCOME50"}})
+	if !strings.Contains(page, "Use as the referral offer") || !strings.Contains(page, "WELCOME50") {
+		t.Error("an eligible discount's confirmation does not name its own code")
+	}
+
+	offer := welcomeDiscount()
+	offer.IsReferral = true
+	page = render(offer, nil)
+	if strings.Contains(page, `name="applies_to"`) && !strings.Contains(page, `type="hidden" name="applies_to" value="subscription_signup"`) {
+		t.Error("the offer's order type is editable")
+	}
+	if !strings.Contains(page, "Fixed while this is the referral offer.") {
+		t.Error("the edit form does not say why the order type is fixed")
+	}
+}

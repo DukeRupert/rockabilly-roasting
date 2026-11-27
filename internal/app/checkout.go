@@ -669,6 +669,28 @@ func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *do
 		return nil, ErrDiscountNotActive
 	}
 
+	// The referral offer works only through a member's own code: the code is
+	// what names the referrer. An ownerless code on it (the one typed when the
+	// discount was created) would be a referral with no one to reward, so it
+	// answers as though it did not exist. And a member cannot refer themselves.
+	if discount.IsReferral {
+		if coupon.CustomerID == nil {
+			return nil, ErrCouponNotFound
+		}
+		// Either identity counts: the checkout's customer (from the typed
+		// email) or the signed-in member, so checking out under a second
+		// email does not turn a member's own code into a referral.
+		if (use.CustomerID != nil && *use.CustomerID == *coupon.CustomerID) ||
+			(use.SignedInCustomerID != nil && *use.SignedInCustomerID == *coupon.CustomerID) {
+			return nil, ErrCouponOwnCode
+		}
+	} else if coupon.CustomerID != nil {
+		// Only referral codes have an owner. One on a discount that is no
+		// longer the referral offer is a member's code for an offer that has
+		// ended, not a code for anyone.
+		return nil, ErrCouponNotFound
+	}
+
 	// The wrong kind of order is refused before anything about timing or
 	// money: the shopper is in the wrong place, and should hear that first.
 	signupCode := discount.AppliesTo == domain.DiscountAppliesToSubscriptionSignup
@@ -891,12 +913,16 @@ func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, orde
 		return fmt.Errorf("get discount to redeem: %w", err)
 	}
 	if discount.UsageLimit == domain.CouponUsageOncePerCustomer {
-		return s.claimPerCustomerRedemption(ctx, tx, order, coupon, actor)
+		held, err := s.claimPerCustomerRedemption(ctx, tx, order, coupon, actor)
+		if err != nil || !held {
+			return err
+		}
+		return s.recordReferralReward(ctx, tx, order, coupon, discount, actor)
 	}
 
 	_, err = s.discounts.RedeemCouponCode(ctx, tx, couponID, order.CustomerID, order.ID)
 	if err == nil {
-		return nil
+		return s.recordReferralReward(ctx, tx, order, coupon, discount, actor)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("redeem coupon code: %w", err)
@@ -914,7 +940,7 @@ func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, orde
 		return fmt.Errorf("get coupon code after failed redeem: %w", getErr)
 	}
 	if held.RedeemedByOrderID != nil && *held.RedeemedByOrderID == order.ID {
-		return nil
+		return s.recordReferralReward(ctx, tx, order, coupon, discount, actor)
 	}
 
 	return s.recordLostRedemption(ctx, tx, order, couponID, actor)
@@ -953,33 +979,80 @@ func (s *CheckoutService) checkSubscriber(ctx context.Context, tx pgx.Tx, use Co
 // from an earlier pass through capture, or the same customer paid for another
 // order on this discount first (two tabs, two orders, one offer). Only the
 // second is a loss.
-func (s *CheckoutService) claimPerCustomerRedemption(ctx context.Context, tx pgx.Tx, order *domain.Order, coupon *domain.CouponCode, actor Actor) error {
+//
+// held reports whether this order holds the claim — newly, or from an earlier
+// pass through capture. A lost claim is false, and earns no referral reward.
+func (s *CheckoutService) claimPerCustomerRedemption(ctx context.Context, tx pgx.Tx, order *domain.Order, coupon *domain.CouponCode, actor Actor) (held bool, err error) {
 	if order.CustomerID == nil {
 		// Every checkout order has a customer; with none, there is no one to
 		// hold the limit against.
-		return nil
+		return false, nil
 	}
 
-	_, err := s.discounts.CreateRedemption(ctx, tx, store.CreateRedemptionParams{
+	_, err = s.discounts.CreateRedemption(ctx, tx, store.CreateRedemptionParams{
 		DiscountID:   coupon.DiscountID,
 		CouponCodeID: coupon.ID,
 		CustomerID:   *order.CustomerID,
 		OrderID:      order.ID,
 	})
 	if err == nil {
-		return nil
+		return true, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("redeem coupon for customer: %w", err)
+		return false, fmt.Errorf("redeem coupon for customer: %w", err)
 	}
 
 	if _, getErr := s.discounts.GetRedemptionByOrderID(ctx, tx, order.ID); getErr == nil {
-		return nil
+		return true, nil
 	} else if !errors.Is(getErr, pgx.ErrNoRows) {
-		return fmt.Errorf("get coupon redemption after failed claim: %w", getErr)
+		return false, fmt.Errorf("get coupon redemption after failed claim: %w", getErr)
 	}
 
-	return s.recordLostRedemption(ctx, tx, order, coupon.ID, actor)
+	return false, s.recordLostRedemption(ctx, tx, order, coupon.ID, actor)
+}
+
+// recordReferralReward records the free bag a member earns when an order
+// placed with their referral code is paid and holds its claim. Nothing for any
+// other code. The order has one reward at most: capture re-entering finds the
+// row it wrote before.
+func (s *CheckoutService) recordReferralReward(ctx context.Context, tx pgx.Tx, order *domain.Order, coupon *domain.CouponCode, discount *domain.Discount, actor Actor) error {
+	if !discount.IsReferral || coupon.CustomerID == nil || order.CustomerID == nil {
+		return nil
+	}
+	if *coupon.CustomerID == *order.CustomerID {
+		// checkCoupon refuses this at placement; a reward for referring
+		// yourself is not one.
+		return nil
+	}
+	reward, err := s.discounts.CreateReferralReward(ctx, tx, store.CreateReferralRewardParams{
+		ReferrerCustomerID: *coupon.CustomerID,
+		ReferredCustomerID: *order.CustomerID,
+		CouponCodeID:       coupon.ID,
+		OrderID:            order.ID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditReferralRewardEarned,
+		ResourceType: "customer",
+		ResourceID:   reward.ReferrerCustomerID,
+		After:        reward,
+		Metadata: map[string]any{
+			"order_id":       order.ID.String(),
+			"order_number":   order.Number,
+			"coupon_code_id": coupon.ID.String(),
+		},
+	}); err != nil {
+		return fmt.Errorf("audit referral reward: %w", err)
+	}
+	return nil
 }
 
 // recordLostRedemption files the audit entry for a paid order whose coupon

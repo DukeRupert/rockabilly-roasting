@@ -256,6 +256,14 @@ const (
 	// already charged, so the capture stands and this is the only trace that
 	// the code went out more often than its limit allows.
 	AuditCouponRedemptionLost = "coupon.redemption_lost"
+	// AuditDiscountReferralOffer records a discount being made, or stopping
+	// being, the referral offer members share.
+	AuditDiscountReferralOffer = "discount.referral_offer"
+	// AuditReferralRewardEarned records a free bag a member earned when a
+	// friend's order placed with their code was paid.
+	AuditReferralRewardEarned = "referral.reward_earned"
+	// AuditReferralRewardSent records staff marking that free bag sent.
+	AuditReferralRewardSent = "referral.reward_sent"
 
 	// Wholesale customer actions
 	AuditWholesaleApplicationApproved = "wholesale.application_approved"

@@ -28,6 +28,7 @@ type Querier interface {
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
+	ClearReferralDiscount(ctx context.Context) error
 	// Cleared by intent rather than by subscription: a batch's charge covers
 	// every member, and settling it — by an order or a refund — settles all of
 	// them, including a member that has since left the box.
@@ -40,6 +41,7 @@ type Querier interface {
 	// cancelled or expired. Paused ones count, because they resume to it.
 	CountLiveSubscriptionsAtAddress(ctx context.Context, arg CountLiveSubscriptionsAtAddressParams) (int64, error)
 	CountOrdersByCustomer(ctx context.Context, customerID *uuid.UUID) (int64, error)
+	CountReferralRewardsByReferrer(ctx context.Context, referrerCustomerID uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
 	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
@@ -75,6 +77,8 @@ type Querier interface {
 	CreateProductMedia(ctx context.Context, arg CreateProductMediaParams) (ProductMedium, error)
 	CreateProductOption(ctx context.Context, arg CreateProductOptionParams) (ProductOption, error)
 	CreateProductOptionValue(ctx context.Context, arg CreateProductOptionValueParams) (ProductOptionValue, error)
+	// One per paid order; a capture that runs twice finds its own row.
+	CreateReferralReward(ctx context.Context, arg CreateReferralRewardParams) (ReferralReward, error)
 	CreateResetToken(ctx context.Context, arg CreateResetTokenParams) (ResetToken, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error)
@@ -165,6 +169,7 @@ type Querier interface {
 	GetInventoryItemByVariantID(ctx context.Context, variantID uuid.UUID) (InventoryItem, error)
 	GetInvoiceByID(ctx context.Context, id uuid.UUID) (Invoice, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error)
+	GetMemberCouponCode(ctx context.Context, arg GetMemberCouponCodeParams) (CouponCode, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	// Same as GetOrderByID but takes a row-level lock, so a manual payment-status
 	// override (admin "mark as paid") serializes against a concurrent QB reconcile
@@ -192,6 +197,7 @@ type Querier interface {
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
 	GetProductMediaByID(ctx context.Context, id uuid.UUID) (ProductMedium, error)
+	GetReferralDiscount(ctx context.Context) (Discount, error)
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error)
 	GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error)
@@ -254,6 +260,7 @@ type Querier interface {
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
 	ListProductOptionValuesByOption(ctx context.Context, productOptionID uuid.UUID) ([]ProductOptionValue, error)
 	ListProductOptionsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductOption, error)
+	ListReferralRewardsByStatus(ctx context.Context, arg ListReferralRewardsByStatusParams) ([]ListReferralRewardsByStatusRow, error)
 	ListRootTaxons(ctx context.Context) ([]Taxon, error)
 	ListShipmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Shipment, error)
 	ListStaff(ctx context.Context, arg ListStaffParams) ([]Staff, error)
@@ -289,6 +296,7 @@ type Querier interface {
 	LockSubscriptionForCustomer(ctx context.Context, arg LockSubscriptionForCustomerParams) (Subscription, error)
 	MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+	MarkReferralRewardSent(ctx context.Context, arg MarkReferralRewardSentParams) (ReferralReward, error)
 	MarkResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	// The key generation moves once per refund, however many times a failed
 	// refund is retried.
@@ -322,6 +330,9 @@ type Querier interface {
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
+	// Makes one discount the referral offer and unmarks any other, in one
+	// statement so the one-offer index never sees two.
+	SetReferralDiscount(ctx context.Context, id uuid.UUID) error
 	SetSubscriptionRenewalPaymentIntent(ctx context.Context, arg SetSubscriptionRenewalPaymentIntentParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
@@ -422,6 +433,8 @@ type Querier interface {
 	UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListPriceParams) (Price, error)
 	UpsertProductAttributeValue(ctx context.Context, arg UpsertProductAttributeValueParams) error
 	UpsertTierPrice(ctx context.Context, arg UpsertTierPriceParams) (Price, error)
+	// A cancelled order takes back the bag it earned, unless it already went out.
+	VoidReferralRewardByOrderID(ctx context.Context, orderID uuid.UUID) error
 }
 
 var _ Querier = (*Queries)(nil)

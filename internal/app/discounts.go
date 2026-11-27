@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -376,6 +378,187 @@ func (s *DiscountService) SetActive(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		Metadata:     map[string]any{"was_active": discount.Active},
 	}); err != nil {
 		return fmt.Errorf("audit discount active: %w", err)
+	}
+	return nil
+}
+
+// --- Referral program ---
+
+// ReferralOffer returns the discount marked as the referral offer, or nil when
+// none is.
+func (s *DiscountService) ReferralOffer(ctx context.Context, tx pgx.Tx) (*domain.Discount, error) {
+	d, err := s.discounts.GetReferralDiscount(ctx, tx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return d, nil
+}
+
+// SetReferralOffer makes a discount the one members share, unmarking any
+// other. It has to be once-per-customer: a member's code is handed to many
+// friends, and a single-use one would stop working after the first.
+func (s *DiscountService) SetReferralOffer(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+	d, err := s.GetDiscount(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if d.UsageLimit != domain.CouponUsageOncePerCustomer {
+		return fmt.Errorf("a referral offer must be once per customer: %w", ErrReferralOfferInvalid)
+	}
+	if err := s.discounts.SetReferralDiscount(ctx, tx, id); err != nil {
+		return err
+	}
+	return s.auditReferralOffer(ctx, tx, id, true, actor)
+}
+
+// ClearReferralOffer stops a discount being the referral offer. Members' codes
+// stay on it, and stop working: an offer that is not the referral offer is an
+// ordinary discount, and those codes would otherwise reward nobody.
+func (s *DiscountService) ClearReferralOffer(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+	d, err := s.GetDiscount(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if !d.IsReferral {
+		return nil
+	}
+	if err := s.discounts.ClearReferralDiscount(ctx, tx); err != nil {
+		return err
+	}
+	return s.auditReferralOffer(ctx, tx, id, false, actor)
+}
+
+func (s *DiscountService) auditReferralOffer(ctx context.Context, tx pgx.Tx, id uuid.UUID, on bool, actor Actor) error {
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditDiscountReferralOffer,
+		ResourceType: "discount",
+		ResourceID:   id,
+		Metadata:     map[string]any{"is_referral": on},
+	}); err != nil {
+		return fmt.Errorf("audit referral offer: %w", err)
+	}
+	return nil
+}
+
+// MemberReferralCode returns the code a member shares, and the offer it is
+// on, minting the code the first time it is asked for. Nil, with no error,
+// when there is nothing to share: no referral offer, an inactive one, or a
+// customer who is not an active member.
+func (s *DiscountService) MemberReferralCode(ctx context.Context, tx pgx.Tx, customer *domain.Customer) (*domain.CouponCode, *domain.Discount, error) {
+	offer, err := s.ReferralOffer(ctx, tx)
+	if err != nil || offer == nil || !offer.Active {
+		return nil, nil, err
+	}
+	member, err := s.discounts.CustomerIsSubscriber(ctx, tx, customer.ID)
+	if err != nil || !member {
+		return nil, nil, err
+	}
+
+	code, err := s.discounts.GetMemberCouponCode(ctx, tx, offer.ID, customer.ID)
+	if err == nil {
+		return code, offer, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, err
+	}
+
+	// Mint one. A savepoint around each insert, so a clash — another page
+	// load minting this member's code, or a code string already taken — does
+	// not abort the request's transaction.
+	for attempt := 0; attempt < 5; attempt++ {
+		candidate := referralCodeFor(customer.FirstName)
+		sp, err := tx.Begin(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("begin referral code savepoint: %w", err)
+		}
+		created, err := s.discounts.CreateCouponCode(ctx, sp, store.CreateCouponCodeParams{
+			DiscountID: offer.ID,
+			Code:       candidate,
+			CustomerID: &customer.ID,
+		})
+		if err == nil {
+			if err := sp.Commit(ctx); err != nil {
+				return nil, nil, fmt.Errorf("commit referral code: %w", err)
+			}
+			return created, offer, nil
+		}
+		_ = sp.Rollback(ctx)
+		if existing, getErr := s.discounts.GetMemberCouponCode(ctx, tx, offer.ID, customer.ID); getErr == nil {
+			return existing, offer, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("mint referral code for customer %s: no free code after 5 tries", customer.ID)
+}
+
+// referralCodeAlphabet leaves out characters that read alike (0/O, 1/I/L), so
+// a code said aloud or copied by hand survives.
+const referralCodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+// referralCodeFor builds a code a member can say out loud: their first name,
+// letters only and capped at eight, then four random characters — LOGAN-7KQ2.
+// FRIEND stands in for a name with no usable letters.
+func referralCodeFor(firstName string) string {
+	var name strings.Builder
+	for _, r := range strings.ToUpper(firstName) {
+		if r >= 'A' && r <= 'Z' {
+			name.WriteRune(r)
+		}
+		if name.Len() == 8 {
+			break
+		}
+	}
+	prefix := name.String()
+	if prefix == "" {
+		prefix = "FRIEND"
+	}
+	suffix := make([]byte, 4)
+	for i := range suffix {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(referralCodeAlphabet))))
+		if err != nil {
+			panic(fmt.Sprintf("crypto/rand failed: %v", err))
+		}
+		suffix[i] = referralCodeAlphabet[n.Int64()]
+	}
+	return prefix + "-" + string(suffix)
+}
+
+// ReferralFriendsCount is how many friends a member has brought in: paid
+// orders on their code that were not cancelled.
+func (s *DiscountService) ReferralFriendsCount(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (int, error) {
+	return s.discounts.CountReferralRewards(ctx, tx, customerID)
+}
+
+// ListReferralRewards returns rewards in one status, oldest first.
+func (s *DiscountService) ListReferralRewards(ctx context.Context, tx pgx.Tx, status domain.ReferralRewardStatus, limit int) ([]domain.ReferralRewardRow, error) {
+	return s.discounts.ListReferralRewards(ctx, tx, status, limit)
+}
+
+// MarkReferralRewardSent records that staff sent a member's free bag.
+func (s *DiscountService) MarkReferralRewardSent(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+	reward, err := s.discounts.MarkReferralRewardSent(ctx, tx, id, actor.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrReferralRewardNotOwed
+		}
+		return err
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditReferralRewardSent,
+		ResourceType: "customer",
+		ResourceID:   reward.ReferrerCustomerID,
+		After:        reward,
+		Metadata:     map[string]any{"order_id": reward.OrderID.String()},
+	}); err != nil {
+		return fmt.Errorf("audit referral reward sent: %w", err)
 	}
 	return nil
 }

@@ -295,6 +295,7 @@ type Discount struct {
 	UsageLimit        string             `json:"usage_limit"`
 	Eligibility       string             `json:"eligibility"`
 	AppliesTo         string             `json:"applies_to"`
+	IsReferral        bool               `json:"is_referral"`
 }
 
 type EmailVerification struct {
@@ -625,6 +626,18 @@ type QbInvoicePreview struct {
 	AutoBilled          bool            `json:"auto_billed"`
 	BillingMethod       string          `json:"billing_method"`
 	TaxCents            int32           `json:"tax_cents"`
+}
+
+type ReferralReward struct {
+	ID                 uuid.UUID          `json:"id"`
+	ReferrerCustomerID uuid.UUID          `json:"referrer_customer_id"`
+	ReferredCustomerID uuid.UUID          `json:"referred_customer_id"`
+	CouponCodeID       uuid.UUID          `json:"coupon_code_id"`
+	OrderID            uuid.UUID          `json:"order_id"`
+	Status             string             `json:"status"`
+	SentAt             pgtype.Timestamptz `json:"sent_at"`
+	SentBy             *uuid.UUID         `json:"sent_by"`
+	CreatedAt          time.Time          `json:"created_at"`
 }
 
 type ResetToken struct {

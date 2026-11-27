@@ -88,8 +88,11 @@ type Discount struct {
 	UsageLimit        CouponUsageLimit
 	Eligibility       DiscountEligibility
 	AppliesTo         DiscountAppliesTo
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// IsReferral marks the one discount members share: each member's own
+	// code on it says who referred the friend. See ReferralReward.
+	IsReferral bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // CouponCode represents a redeemable coupon tied to a discount.
@@ -121,4 +124,40 @@ type AppliedDiscount struct {
 	CouponCode   *CouponCode
 	AmountCents  int
 	FreeShipping bool
+}
+
+// ReferralRewardStatus is where a member's earned free bag stands.
+type ReferralRewardStatus string
+
+const (
+	ReferralRewardOwed ReferralRewardStatus = "owed"
+	ReferralRewardSent ReferralRewardStatus = "sent"
+	// ReferralRewardVoid: the friend's order was cancelled before the bag
+	// went out.
+	ReferralRewardVoid ReferralRewardStatus = "void"
+)
+
+// ReferralReward is a free bag a member earned: one per paid order placed with
+// the member's referral code.
+type ReferralReward struct {
+	ID                 uuid.UUID
+	ReferrerCustomerID uuid.UUID
+	ReferredCustomerID uuid.UUID
+	CouponCodeID       uuid.UUID
+	OrderID            uuid.UUID
+	Status             ReferralRewardStatus
+	SentAt             *time.Time
+	SentBy             *uuid.UUID
+	CreatedAt          time.Time
+}
+
+// ReferralRewardRow is a ReferralReward with what the admin list shows beside
+// it: who earned it, the friend's order and the code used.
+type ReferralRewardRow struct {
+	ReferralReward
+	ReferrerEmail     string
+	ReferrerFirstName string
+	ReferrerLastName  string
+	OrderNumber       string
+	Code              string
 }

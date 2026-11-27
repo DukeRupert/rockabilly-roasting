@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -125,6 +126,10 @@ type checkoutApplyCouponResponse struct {
 	DiscountType  string `json:"discount_type,omitempty"`
 	DiscountValue int    `json:"discount_value,omitempty"`
 	ErrorMessage  string `json:"error_message,omitempty"`
+	// SignInURL is set when the code is for members and the shopper is not
+	// signed in. Signing in keeps the cart (its cookie is not the session's),
+	// and the login page returns them here.
+	SignInURL string `json:"sign_in_url,omitempty"`
 }
 
 type checkoutRemoveCouponRequest struct {
@@ -334,6 +339,7 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 			var use app.CouponUse
 			if customer, ok := auth.CustomerFromContext(ctx); ok {
 				use.CustomerID = &customer.ID
+				use.SignedInCustomerID = &customer.ID
 			}
 			discount, cc, ccErr := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *cart.AppliedCouponCodeID, resp.Subtotal, use)
 			if ccErr == nil {
@@ -584,6 +590,9 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var use app.CouponUse
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		use.SignedInCustomerID = &customer.ID
+	}
 	if req.CustomerID != "" {
 		customerID, parseErr := uuid.Parse(req.CustomerID)
 		if parseErr != nil {
@@ -613,6 +622,9 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 			}
 			d.Metrics.CouponRejected.WithLabelValues(label).Inc()
 			resp = checkoutApplyCouponResponse{ErrorMessage: msg}
+			if errors.Is(txErr, app.ErrCouponSignInRequired) {
+				resp.SignInURL = "/account/login?next=" + url.QueryEscape("/checkout")
+			}
 			return nil
 		}
 
@@ -708,6 +720,14 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// The session's customer, if any. customerID above is whoever the
+	// information step resolved from the email typed in; only the session
+	// can vouch for a members-only coupon.
+	var signedIn *uuid.UUID
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		signedIn = &customer.ID
+	}
+
 	// Phase 1: load cart + compute totals (tx, no external calls).
 	var (
 		subtotal      int
@@ -783,7 +803,10 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get cart: %w", txErr)
 		}
 		if cart.AppliedCouponCodeID != nil {
-			discount, cc, ccErr := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *cart.AppliedCouponCodeID, subtotal, app.CouponUse{CustomerID: &customerID})
+			discount, cc, ccErr := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *cart.AppliedCouponCodeID, subtotal, app.CouponUse{
+				CustomerID:         &customerID,
+				SignedInCustomerID: signedIn,
+			})
 			switch msg, label, refused := couponRefusal(ccErr); {
 			case ccErr == nil:
 				discountTotal = calculateDiscountAmount(discount, subtotal)
@@ -951,16 +974,17 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:        customerID,
-			Items:             orderItems,
-			ShippingAddressID: addressID,
-			BillingAddressID:  addressID,
-			CurrencyCode:      "USD",
-			CouponCode:        couponCodePtr,
-			BasePrice:         true, // as phase 1 priced them; see there
-			ShippingCents:     shippingTotal,
-			TaxCents:          taxTotal,
-			ShippingMethod:    chosenMethod,
+			CustomerID:         customerID,
+			Items:              orderItems,
+			ShippingAddressID:  addressID,
+			BillingAddressID:   addressID,
+			CurrencyCode:       "USD",
+			CouponCode:         couponCodePtr,
+			SignedInCustomerID: signedIn,
+			BasePrice:          true, // as phase 1 priced them; see there
+			ShippingCents:      shippingTotal,
+			TaxCents:           taxTotal,
+			ShippingMethod:     chosenMethod,
 			Metadata: map[string]any{
 				"cart_id":           cartID.String(),
 				"payment_intent_id": pi.ID,
@@ -1031,6 +1055,10 @@ func couponRefusal(err error) (msg, label string, ok bool) {
 		return "That code doesn't look right.", "not_found", true
 	case errors.Is(err, app.ErrCouponAlreadyUsed):
 		return "That code has already been used.", "already_used", true
+	case errors.Is(err, app.ErrCouponSignInRequired):
+		return "That code is for Daily Grind members. Sign in to use it.", "sign_in_required", true
+	case errors.Is(err, app.ErrCouponSubscribersOnly):
+		return "That code is for Daily Grind members, on orders placed from their own account.", "subscribers_only", true
 	case errors.Is(err, app.ErrCouponUsedByCustomer):
 		return "You've already used that code. It's good for one order per customer.", "used_by_customer", true
 	case errors.Is(err, app.ErrDiscountNotActive), errors.Is(err, app.ErrDiscountNotFound):

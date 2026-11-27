@@ -58,6 +58,15 @@ func discountUsageLabel(l domain.CouponUsageLimit) string {
 	return "Single-use"
 }
 
+// discountEligibilityLabel names who may use a discount, blank for anyone so
+// the common case adds nothing to the list.
+func discountEligibilityLabel(e domain.DiscountEligibility) string {
+	if e == domain.DiscountEligibilitySubscribers {
+		return "Daily Grind members only"
+	}
+	return ""
+}
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -155,7 +164,7 @@ templ DiscountListContent(props DiscountListProps) {
 				/>
 			</div>
 			<div class="sm:col-span-2">
-				<label for="discount-usage" class="block text-sm font-medium text-rr-body">Who can use it</label>
+				<label for="discount-usage" class="block text-sm font-medium text-rr-body">How often</label>
 				<div class="mt-1 grid grid-cols-1">
 					<select
 						id="discount-usage"
@@ -172,6 +181,25 @@ templ DiscountListContent(props DiscountListProps) {
 					</svg>
 				</div>
 				<p id="discount-usage-hint" class="mt-1 text-xs text-rr-muted">Can't be changed later</p>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="discount-eligibility" class="block text-sm font-medium text-rr-body">Who can use it</label>
+				<div class="mt-1 grid grid-cols-1">
+					<select
+						id="discount-eligibility"
+						name="eligibility"
+						required
+						aria-describedby="discount-eligibility-hint"
+						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						<option value="anyone" selected>Anyone</option>
+						<option value="subscribers">Daily Grind members only</option>
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<p id="discount-eligibility-hint" class="mt-1 text-xs text-rr-muted">Members must be signed in, with an active subscription</p>
 			</div>
 			<div class="sm:col-span-1">
 				<label for="discount-expires" class="block text-sm font-medium text-rr-body">Expires</label>
@@ -260,6 +288,9 @@ templ DiscountListContent(props DiscountListProps) {
 									}
 									if d.UsageLimit == domain.CouponUsageOncePerCustomer {
 										<span class="block text-xs text-rr-muted">{ discountUsesLabel(props.Redemptions[d.ID]) }</span>
+									}
+									if discountEligibilityLabel(d.Eligibility) != "" {
+										<span class="block text-xs text-rr-muted">{ discountEligibilityLabel(d.Eligibility) }</span>
 									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">

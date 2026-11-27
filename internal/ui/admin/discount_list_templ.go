@@ -66,6 +66,15 @@ func discountUsageLabel(l domain.CouponUsageLimit) string {
 	return "Single-use"
 }
 
+// discountEligibilityLabel names who may use a discount, blank for anyone so
+// the common case adds nothing to the list.
+func discountEligibilityLabel(e domain.DiscountEligibility) string {
+	if e == domain.DiscountEligibilitySubscribers {
+		return "Daily Grind members only"
+	}
+	return ""
+}
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -109,7 +118,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Discounts</h1><p class=\"mt-1 text-sm text-rr-muted\">Manage discounts and promotions</p></div></div><!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">New Discount</h2><p class=\"mt-1 text-sm text-rr-muted\">Each discount carries one coupon code, stored uppercase. A single-use code is spent by the first order that pays with it. A once-per-customer code can go out to everyone, and each customer can use it on one order.</p><form method=\"post\" action=\"/admin/discounts\" class=\"mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"discount-name\" class=\"block text-sm font-medium text-rr-body\">Name</label> <input id=\"discount-name\" name=\"name\" type=\"text\" required placeholder=\"e.g. Spring promo\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-1\"><label for=\"discount-code\" class=\"block text-sm font-medium text-rr-body\">Coupon code</label> <input id=\"discount-code\" name=\"code\" type=\"text\" required placeholder=\"SPRING10\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading uppercase placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-1\"><label for=\"discount-type\" class=\"block text-sm font-medium text-rr-body\">Type</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"discount-type\" name=\"type\" required class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"percentage\" selected>Percentage</option> <option value=\"fixed_amount\">Fixed amount</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div class=\"sm:col-span-1\"><label for=\"discount-value\" class=\"block text-sm font-medium text-rr-body\">Value</label> <input id=\"discount-value\" name=\"value\" type=\"text\" required placeholder=\"10 or 5.00\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><p class=\"mt-1 text-xs text-rr-muted\">Percent (10) or dollars (5.00)</p></div><div class=\"sm:col-span-1\"><label for=\"discount-minimum\" class=\"block text-sm font-medium text-rr-body\">Min order $</label> <input id=\"discount-minimum\" name=\"minimum_order\" type=\"text\" placeholder=\"Optional\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-2\"><label for=\"discount-usage\" class=\"block text-sm font-medium text-rr-body\">Who can use it</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"discount-usage\" name=\"usage_limit\" required aria-describedby=\"discount-usage-hint\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"single_use\" selected>Single-use: one order, anyone</option> <option value=\"once_per_customer\">Once per customer: shareable</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div><p id=\"discount-usage-hint\" class=\"mt-1 text-xs text-rr-muted\">Can't be changed later</p></div><div class=\"sm:col-span-1\"><label for=\"discount-expires\" class=\"block text-sm font-medium text-rr-body\">Expires</label> <input id=\"discount-expires\" name=\"expires_at\" type=\"date\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><p class=\"mt-1 text-xs text-rr-muted\">Valid through end of day</p></div><div class=\"flex items-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Create Discount</button></div></form></div><!-- Filters --><form method=\"get\" action=\"/admin/discounts\" class=\"mt-6 flex items-center gap-3\"><div class=\"grid grid-cols-1\"><select name=\"active\" onchange=\"this.form.submit()\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"><option value=\"\">All discounts</option> <option value=\"true\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Discounts</h1><p class=\"mt-1 text-sm text-rr-muted\">Manage discounts and promotions</p></div></div><!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">New Discount</h2><p class=\"mt-1 text-sm text-rr-muted\">Each discount carries one coupon code, stored uppercase. A single-use code is spent by the first order that pays with it. A once-per-customer code can go out to everyone, and each customer can use it on one order.</p><form method=\"post\" action=\"/admin/discounts\" class=\"mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"discount-name\" class=\"block text-sm font-medium text-rr-body\">Name</label> <input id=\"discount-name\" name=\"name\" type=\"text\" required placeholder=\"e.g. Spring promo\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-1\"><label for=\"discount-code\" class=\"block text-sm font-medium text-rr-body\">Coupon code</label> <input id=\"discount-code\" name=\"code\" type=\"text\" required placeholder=\"SPRING10\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading uppercase placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-1\"><label for=\"discount-type\" class=\"block text-sm font-medium text-rr-body\">Type</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"discount-type\" name=\"type\" required class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"percentage\" selected>Percentage</option> <option value=\"fixed_amount\">Fixed amount</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div class=\"sm:col-span-1\"><label for=\"discount-value\" class=\"block text-sm font-medium text-rr-body\">Value</label> <input id=\"discount-value\" name=\"value\" type=\"text\" required placeholder=\"10 or 5.00\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><p class=\"mt-1 text-xs text-rr-muted\">Percent (10) or dollars (5.00)</p></div><div class=\"sm:col-span-1\"><label for=\"discount-minimum\" class=\"block text-sm font-medium text-rr-body\">Min order $</label> <input id=\"discount-minimum\" name=\"minimum_order\" type=\"text\" placeholder=\"Optional\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-2\"><label for=\"discount-usage\" class=\"block text-sm font-medium text-rr-body\">How often</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"discount-usage\" name=\"usage_limit\" required aria-describedby=\"discount-usage-hint\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"single_use\" selected>Single-use: one order, anyone</option> <option value=\"once_per_customer\">Once per customer: shareable</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div><p id=\"discount-usage-hint\" class=\"mt-1 text-xs text-rr-muted\">Can't be changed later</p></div><div class=\"sm:col-span-2\"><label for=\"discount-eligibility\" class=\"block text-sm font-medium text-rr-body\">Who can use it</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"discount-eligibility\" name=\"eligibility\" required aria-describedby=\"discount-eligibility-hint\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"anyone\" selected>Anyone</option> <option value=\"subscribers\">Daily Grind members only</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div><p id=\"discount-eligibility-hint\" class=\"mt-1 text-xs text-rr-muted\">Members must be signed in, with an active subscription</p></div><div class=\"sm:col-span-1\"><label for=\"discount-expires\" class=\"block text-sm font-medium text-rr-body\">Expires</label> <input id=\"discount-expires\" name=\"expires_at\" type=\"date\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><p class=\"mt-1 text-xs text-rr-muted\">Valid through end of day</p></div><div class=\"flex items-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Create Discount</button></div></form></div><!-- Filters --><form method=\"get\" action=\"/admin/discounts\" class=\"mt-6 flex items-center gap-3\"><div class=\"grid grid-cols-1\"><select name=\"active\" onchange=\"this.form.submit()\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"><option value=\"\">All discounts</option> <option value=\"true\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -151,7 +160,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var2 templ.SafeURL
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", d.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 245, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 273, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -164,7 +173,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 245, Col: 135}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 273, Col: 135}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -193,7 +202,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var4 string
 						templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue("Redeemed " + code.RedeemedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 253, Col: 142}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 281, Col: 142}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 						if templ_7745c5c3_Err != nil {
@@ -206,7 +215,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var5 string
 						templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(code.Code)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 253, Col: 156}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 281, Col: 156}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 						if templ_7745c5c3_Err != nil {
@@ -224,7 +233,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var6 string
 						templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(code.Code)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 255, Col: 62}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 283, Col: 62}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 						if templ_7745c5c3_Err != nil {
@@ -250,67 +259,86 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(discountUsesLabel(props.Redemptions[d.ID]))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 262, Col: 96}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 290, Col: 96}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
+				if discountEligibilityLabel(d.Eligibility) != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<span class=\"block text-xs text-rr-muted\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var8 string
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(discountEligibilityLabel(d.Eligibility))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 293, Col: 93}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
 				}
-				var templ_7745c5c3_Var8 string
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(discountTypeLabel(d.Type))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 266, Col: 36}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-heading tabular-nums\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(discountValueDisplay(d))
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(discountTypeLabel(d.Type))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 269, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 297, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, " ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-heading tabular-nums\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(discountValueDisplay(d))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 300, Col: 34}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if discountMinimumLabel(d) != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span class=\"block text-xs font-normal text-rr-muted\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<span class=\"block text-xs font-normal text-rr-muted\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var10 string
-					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(discountMinimumLabel(d))
+					var templ_7745c5c3_Var11 string
+					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(discountMinimumLabel(d))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 271, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 302, Col: 89}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -318,36 +346,16 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if d.StartsAt != nil || d.ExpiresAt != nil {
 					if d.StartsAt != nil {
-						var templ_7745c5c3_Var11 string
-						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(d.StartsAt.In(props.MerchantTZ).Format("Jan 2"))
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 280, Col: 60}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					} else {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<span class=\"text-rr-border\">&mdash;</span>")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, " <span class=\"text-rr-border\">&rarr; </span> ")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					if d.ExpiresAt != nil {
 						var templ_7745c5c3_Var12 string
-						templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(d.ExpiresAt.In(props.MerchantTZ).Format("Jan 2"))
+						templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(d.StartsAt.In(props.MerchantTZ).Format("Jan 2"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 286, Col: 61}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 311, Col: 60}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 						if templ_7745c5c3_Err != nil {
@@ -359,123 +367,143 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 							return templ_7745c5c3_Err
 						}
 					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, " <span class=\"text-rr-border\">&rarr; </span> ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if d.ExpiresAt != nil {
+						var templ_7745c5c3_Var13 string
+						templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(d.ExpiresAt.In(props.MerchantTZ).Format("Jan 2"))
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 317, Col: 61}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<span class=\"text-rr-border\">&mdash;</span>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<span class=\"text-rr-border\">No dates</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"text-rr-border\">No dates</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var13 string
-				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(d.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
+				var templ_7745c5c3_Var14 string
+				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(d.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 295, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 326, Col: 65}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if d.Active {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<form method=\"post\" action=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var14 templ.SafeURL
-					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/deactivate", d.ID.String())))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 299, Col: 114}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" class=\"inline\"><button type=\"submit\" class=\"text-rr-muted hover:text-rr-heading\">Deactivate</button></form>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<form method=\"post\" action=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var15 templ.SafeURL
-					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/activate", d.ID.String())))
+					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/deactivate", d.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 303, Col: 112}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 330, Col: 114}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" class=\"inline\"><button type=\"submit\" class=\"text-rr-red hover:text-rr-red-lt\">Activate</button></form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" class=\"inline\"><button type=\"submit\" class=\"text-rr-muted hover:text-rr-heading\">Deactivate</button></form>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<form method=\"post\" action=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var16 templ.SafeURL
+					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/activate", d.ID.String())))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 334, Col: 112}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" class=\"inline\"><button type=\"submit\" class=\"text-rr-red hover:text-rr-red-lt\">Activate</button></form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</tbody></table></div><!-- Pagination --> <nav class=\"flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0\" aria-label=\"Pagination\"><div class=\"-mt-px flex w-0 flex-1\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</tbody></table></div><!-- Pagination --> <nav class=\"flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0\" aria-label=\"Pagination\"><div class=\"-mt-px flex w-0 flex-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if props.Page > 1 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<a href=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var16 templ.SafeURL
-				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page-1, props.ActiveFilter)))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 318, Col: 112}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Previous</a>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div><div class=\"-mt-px flex w-0 flex-1 justify-end\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if props.HasMore {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var17 templ.SafeURL
-				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page+1, props.ActiveFilter)))
+				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page-1, props.ActiveFilter)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 328, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 349, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Next</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Previous</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></nav>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</div><div class=\"-mt-px flex w-0 flex-1 justify-end\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if props.HasMore {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var18 templ.SafeURL
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page+1, props.ActiveFilter)))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 359, Col: 112}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Next</a>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div></nav>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -499,12 +527,12 @@ func DiscountList(props DiscountListProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var18 == nil {
-			templ_7745c5c3_Var18 = templ.NopComponent
+		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var19 == nil {
+			templ_7745c5c3_Var19 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var19 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var20 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -527,7 +555,7 @@ func DiscountList(props DiscountListProps) templ.Component {
 			ActivePath: "/admin/discounts",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var20), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

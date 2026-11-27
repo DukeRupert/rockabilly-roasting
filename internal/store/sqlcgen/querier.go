@@ -91,6 +91,10 @@ type Querier interface {
 	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	CreateWholesaleCustomer(ctx context.Context, arg CreateWholesaleCustomerParams) (Customer, error)
 	CustomerHasRedeemedDiscount(ctx context.Context, arg CustomerHasRedeemedDiscountParams) (bool, error)
+	// Whether a customer counts as a member for a subscribers-only discount: they
+	// hold an active subscription. Paused and past-due subscriptions do not count;
+	// the client's offer is for active members only.
+	CustomerIsSubscriber(ctx context.Context, customerID uuid.UUID) (bool, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
 	DeleteAttributeKey(ctx context.Context, id uuid.UUID) error

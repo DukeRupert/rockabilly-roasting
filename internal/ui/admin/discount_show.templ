@@ -125,6 +125,10 @@ templ DiscountShowContent(props DiscountShowProps) {
 				}
 				<span class="mx-1.5 text-rr-border">&middot;</span>
 				{ discountUsageLabel(props.Discount.UsageLimit) }
+				if discountEligibilityLabel(props.Discount.Eligibility) != "" {
+					<span class="mx-1.5 text-rr-border">&middot;</span>
+					{ discountEligibilityLabel(props.Discount.Eligibility) }
+				}
 				<span class="mx-1.5 text-rr-border">&middot;</span>
 				Created { props.Discount.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 			</p>
@@ -296,6 +300,17 @@ templ discountEditCard(props DiscountShowProps) {
 					required
 					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 				/>
+			</div>
+			<div>
+				<label for="d-eligibility" class="block text-xs text-rr-muted">Who can use it</label>
+				<select
+					id="d-eligibility"
+					name="eligibility"
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				>
+					<option value="anyone" selected?={ props.Discount.Eligibility != domain.DiscountEligibilitySubscribers }>Anyone</option>
+					<option value="subscribers" selected?={ props.Discount.Eligibility == domain.DiscountEligibilitySubscribers }>Daily Grind members only</option>
+				</select>
 			</div>
 			<div>
 				<label for="d-min" class="block text-xs text-rr-muted">Minimum order &mdash; blank for none</label>

@@ -33,6 +33,23 @@ func (l CouponUsageLimit) Valid() bool {
 	return l == CouponUsageSingleUse || l == CouponUsageOncePerCustomer
 }
 
+// DiscountEligibility says who may use a discount at all.
+type DiscountEligibility string
+
+const (
+	DiscountEligibilityAnyone DiscountEligibility = "anyone"
+	// DiscountEligibilitySubscribers limits a discount to signed-in customers
+	// holding an active subscription (not paused, past due, cancelled or
+	// expired), on an order
+	// for themselves.
+	DiscountEligibilitySubscribers DiscountEligibility = "subscribers"
+)
+
+// Valid reports whether e is one of the defined eligibilities.
+func (e DiscountEligibility) Valid() bool {
+	return e == DiscountEligibilityAnyone || e == DiscountEligibilitySubscribers
+}
+
 // Discount represents a discount rule.
 type Discount struct {
 	ID                uuid.UUID
@@ -45,6 +62,7 @@ type Discount struct {
 	ExpiresAt         *time.Time
 	Active            bool
 	UsageLimit        CouponUsageLimit
+	Eligibility       DiscountEligibility
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

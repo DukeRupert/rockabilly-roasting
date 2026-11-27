@@ -183,6 +183,8 @@ export interface ApplyCouponResponse {
   discount_type?: string;
   discount_value?: number;
   error_message?: string;
+  // Set when the code is for members and the shopper isn't signed in.
+  sign_in_url?: string;
 }
 
 // customerId is sent once the information step has identified the shopper,

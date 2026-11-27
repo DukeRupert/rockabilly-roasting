@@ -23,7 +23,7 @@ Deadlines: GIFT20 ends **2026-12-21**, WELCOME50 ends **2026-12-31**.
 
 ## Checklist
 
-In build order. Items 1 and 2 are done on `feat/promo-codes`.
+In build order. Items 1 to 3 are done on `feat/promo-codes`.
 
 ### 1. Codes many customers can use, each once per customer
 - [x] Discount-level usage setting: `single_use` (today's behaviour) or
@@ -47,12 +47,15 @@ In build order. Items 1 and 2 are done on `feat/promo-codes`.
 - [ ] Subscription signup purchase gets it too, once item 4 lands
 
 ### 3. GIFT20: active members only, one-time checkout
-- [ ] Discount-level eligibility setting: `anyone` or `active_subscribers`
-- [ ] `active_subscribers` needs a signed-in customer with an active
-      subscription; a guest is told to sign in
-- [ ] Re-checked at placement, so a code applied before a cancel or sign-out
+- [x] Discount-level eligibility setting: `anyone` or `subscribers`. Editable,
+      unlike the usage limit
+- [x] `subscribers` needs a signed-in customer with an **active**
+      subscription (paused and past-due don't count, per the client), on an
+      order for themselves. A guest is told to sign in, with a link back to checkout;
+      the cart survives signing in
+- [x] Re-checked at placement, so a code applied before a cancel or sign-out
       doesn't carry through
-- [ ] Admin forms expose it
+- [x] Admin create and edit forms expose it; list and show pages display it
 
 ### 4. WELCOME50: subscription signup coupons
 - [ ] Coupon field on the subscribe flow (`SubscribeApp.svelte`)

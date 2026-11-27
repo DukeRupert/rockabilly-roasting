@@ -405,6 +405,10 @@ type PlaceOrderParams struct {
 	CurrencyCode      string
 	CouponCode        *string
 	SubscriptionID    *uuid.UUID
+	// SignedInCustomerID is the customer of the authenticated session placing
+	// the order, nil for a guest. It is what a subscribers-only coupon is held
+	// against; CustomerID comes from the checkout form and proves nothing.
+	SignedInCustomerID *uuid.UUID
 	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
 	// whose lines are priced from the base price as every renewal is, and for
 	// retail checkout, whose cart was.
@@ -468,7 +472,10 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	if p.CouponCode != nil {
 		// The order's customer is always known here, so the per-customer rule
 		// is checked even if the code was applied before the shopper was.
-		appliedDiscount, coupon, err = s.ApplyCoupon(ctx, tx, *p.CouponCode, subtotal, CouponUse{CustomerID: &p.CustomerID})
+		appliedDiscount, coupon, err = s.ApplyCoupon(ctx, tx, *p.CouponCode, subtotal, CouponUse{
+			CustomerID:         &p.CustomerID,
+			SignedInCustomerID: p.SignedInCustomerID,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -604,8 +611,14 @@ func (s *CheckoutService) GetCouponCodeByCode(ctx context.Context, tx pgx.Tx, co
 // beside both checkout steps, so a code can be tried before the information
 // step has named a customer; the once-per-customer rule is checked whenever
 // the customer is known, and PlaceOrder always knows.
+//
+// SignedInCustomerID is the customer of the authenticated session, nil for a
+// guest. It is kept apart from CustomerID because the checkout takes the
+// order's customer from a form — anyone can type a member's email — so only
+// the session can prove membership.
 type CouponUse struct {
-	CustomerID *uuid.UUID
+	CustomerID         *uuid.UUID
+	SignedInCustomerID *uuid.UUID
 }
 
 // ApplyCoupon looks a coupon code up and checks it against every rule —
@@ -682,6 +695,12 @@ func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *do
 
 	if discount.MinimumOrderCents != nil && subtotalCents < *discount.MinimumOrderCents {
 		return nil, ErrMinimumOrderNotMet
+	}
+
+	if discount.Eligibility == domain.DiscountEligibilitySubscribers {
+		if err := s.checkSubscriber(ctx, tx, use); err != nil {
+			return nil, err
+		}
 	}
 
 	if discount.UsageLimit == domain.CouponUsageOncePerCustomer && use.CustomerID != nil {
@@ -890,6 +909,31 @@ func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, orde
 	}
 
 	return s.recordLostRedemption(ctx, tx, order, couponID, actor)
+}
+
+// checkSubscriber holds a subscribers-only discount to a signed-in member
+// buying for themselves.
+//
+// A guest is asked to sign in rather than refused outright: they may well be
+// a member, and the checkout cannot tell from an email address typed into a
+// form. A signed-in member placing an order under some other customer — the
+// information step resolves the customer by the email entered — is refused,
+// or the member's sign-in would discount anybody's order.
+func (s *CheckoutService) checkSubscriber(ctx context.Context, tx pgx.Tx, use CouponUse) error {
+	if use.SignedInCustomerID == nil {
+		return ErrCouponSignInRequired
+	}
+	if use.CustomerID != nil && *use.CustomerID != *use.SignedInCustomerID {
+		return ErrCouponSubscribersOnly
+	}
+	member, err := s.discounts.CustomerIsSubscriber(ctx, tx, *use.SignedInCustomerID)
+	if err != nil {
+		return err
+	}
+	if !member {
+		return ErrCouponSubscribersOnly
+	}
+	return nil
 }
 
 // claimPerCustomerRedemption writes the ledger row for a once-per-customer

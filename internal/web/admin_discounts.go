@@ -165,6 +165,14 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 		usageLimit = domain.CouponUsageSingleUse
 	}
 	if !usageLimit.Valid() {
+		renderDiscountError(w, r, "Pick how often the code can be used.")
+		return
+	}
+	eligibility := domain.DiscountEligibility(r.FormValue("eligibility"))
+	if eligibility == "" {
+		eligibility = domain.DiscountEligibilityAnyone
+	}
+	if !eligibility.Valid() {
 		renderDiscountError(w, r, "Pick who can use the code.")
 		return
 	}
@@ -190,6 +198,7 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 			ExpiresAt:         expiresAt,
 			Code:              code,
 			UsageLimit:        usageLimit,
+			Eligibility:       eligibility,
 		}, staffActor(r))
 		return txErr
 	})
@@ -381,6 +390,13 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// Blank leaves eligibility as it is; anything else must be a real value.
+	eligibility := domain.DiscountEligibility(r.FormValue("eligibility"))
+	if eligibility != "" && !eligibility.Valid() {
+		fail("Pick who can use the code.")
+		return
+	}
+
 	startsAt, ok := parseMerchantDay(r.FormValue("starts_at"), d.MerchantTZ, false)
 	if !ok {
 		fail("Start date must be a valid date.")
@@ -403,6 +419,7 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 			MinimumOrderCents: minimumOrderCents,
 			StartsAt:          startsAt,
 			ExpiresAt:         expiresAt,
+			Eligibility:       eligibility,
 		}, staffActor(r))
 		return txErr
 	})

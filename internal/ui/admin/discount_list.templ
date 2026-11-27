@@ -86,6 +86,11 @@ func discountLastValidDay(t time.Time, loc *time.Location) string {
 	return t.In(loc).AddDate(0, 0, -1).Format("Jan 2")
 }
 
+// fullDiscountWarningShow is the Alpine expression for when the warning shows:
+// a percentage of 100 or more. Shared by the create and edit forms, whose
+// x-data both name the fields discountType and discountValue.
+const fullDiscountWarningShow = "discountType === 'percentage' && parseFloat(discountValue) >= 100"
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -120,7 +125,12 @@ templ DiscountListContent(props DiscountListProps) {
 	<div class="mt-6 border border-rr-border bg-rr-surface p-6">
 		<h2 class="text-sm font-semibold text-rr-heading">New Discount</h2>
 		<p class="mt-1 text-sm text-rr-muted">Each discount carries one coupon code, stored uppercase. A single-use code is spent by the first order that pays with it. A once-per-customer code can go out to everyone, and each customer can use it on one order.</p>
-		<form method="post" action="/admin/discounts" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
+		<form
+			method="post"
+			action="/admin/discounts"
+			class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6"
+			x-data="{ discountType: 'percentage', discountValue: '' }"
+		>
 			<div class="sm:col-span-2">
 				<label for="discount-name" class="block text-sm font-medium text-rr-body">Name</label>
 				<input
@@ -150,6 +160,7 @@ templ DiscountListContent(props DiscountListProps) {
 						id="discount-type"
 						name="type"
 						required
+						x-model="discountType"
 						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
 					>
 						<option value="percentage" selected>Percentage</option>
@@ -167,11 +178,13 @@ templ DiscountListContent(props DiscountListProps) {
 					name="value"
 					type="text"
 					required
+					x-model="discountValue"
 					placeholder="10 or 5.00"
 					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
 				/>
 				<p class="mt-1 text-xs text-rr-muted">Percent (10) or dollars (5.00)</p>
 			</div>
+			@FullDiscountWarning("sm:col-span-6")
 			<div class="sm:col-span-1">
 				<label for="discount-minimum" class="block text-sm font-medium text-rr-body">Min order $</label>
 				<input
@@ -419,4 +432,19 @@ templ DiscountList(props DiscountListProps) {
 	}) {
 		@DiscountListContent(props)
 	}
+}
+
+// FullDiscountWarning tells staff, as they type, what a 100%-off code does at
+// checkout. It warns rather than refuses: a free order can be exactly what is
+// wanted. Card payments need at least $0.50, so an order with nothing left to
+// charge — no shipping, no tax — cannot be paid and the shopper sees an error.
+templ FullDiscountWarning(class string) {
+	<div
+		x-show={ fullDiscountWarningShow }
+		x-cloak
+		role="status"
+		class={ "border border-rr-red bg-rr-surface px-3 py-2 text-sm text-rr-heading", class }
+	>
+		<p><span class="font-semibold text-rr-red">100% off makes these orders free.</span> If shipping and tax are also $0 (pickup, local delivery or free shipping), checkout can&rsquo;t take the payment, because card payments need at least $0.50. The customer will see an error and can&rsquo;t complete the order. Double-check this is what you want.</p>
+	</div>
 }

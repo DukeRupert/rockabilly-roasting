@@ -3,7 +3,9 @@ package admin
 import (
 	"bytes"
 	"context"
+	"html"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,5 +66,69 @@ func TestDiscountList_LabelsTheSettings(t *testing.T) {
 		if !bytes.Contains([]byte(row), []byte(want)) {
 			t.Errorf("list row is missing %q", want)
 		}
+	}
+}
+
+// The same guard for a GIFT20-shaped discount: members only, one-time orders.
+// It is live, and a save that dropped "subscribers" would open it to anyone.
+func TestDiscountEditForm_PreselectsMembersOnly(t *testing.T) {
+	var b bytes.Buffer
+	d := welcomeDiscount()
+	d.Eligibility = domain.DiscountEligibilitySubscribers
+	d.AppliesTo = domain.DiscountAppliesToOneTime
+	if err := DiscountShowContent(DiscountShowProps{Discount: d, MerchantTZ: time.UTC}).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	sel := regexp.MustCompile(`(?s)<select[^>]*name="eligibility".*?</select>`).FindString(b.String())
+	got := regexp.MustCompile(`<option value="([^"]+)" selected`).FindAllStringSubmatch(sel, -1)
+	if len(got) != 1 || got[0][1] != "subscribers" {
+		t.Errorf("eligibility preselected %v, want subscribers", got)
+	}
+}
+
+func TestDiscountList_LabelsMembersOnly(t *testing.T) {
+	var b bytes.Buffer
+	d := welcomeDiscount()
+	d.Eligibility = domain.DiscountEligibilitySubscribers
+	props := DiscountListProps{Discounts: []domain.Discount{d}, Codes: map[uuid.UUID][]domain.CouponCode{}, Redemptions: map[uuid.UUID]int{}, MerchantTZ: time.UTC, Page: 1}
+	if err := DiscountListContent(props).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	row := regexp.MustCompile(`(?s)<tbody.*</tbody>`).FindString(b.String())
+	if !strings.Contains(row, "Daily Grind members only") {
+		t.Error(`list row is missing "Daily Grind members only"`)
+	}
+}
+
+// Staff are warned, as they type, that a 100%-off code can make an order
+// nobody can pay for. The showing and hiding is Alpine in the browser; what
+// can be held here is that both forms carry the warning, bound to the shared
+// condition, and that the edit form starts from the saved type and value so
+// an existing 100% code shows it on load.
+func TestDiscountForms_WarnAboutFullDiscount(t *testing.T) {
+	var create, editPage bytes.Buffer
+	if err := DiscountListContent(DiscountListProps{MerchantTZ: time.UTC, Page: 1}).Render(context.Background(), &create); err != nil {
+		t.Fatal(err)
+	}
+	full := welcomeDiscount()
+	full.Value = 100
+	if err := DiscountShowContent(DiscountShowProps{Discount: full, MerchantTZ: time.UTC}).Render(context.Background(), &editPage); err != nil {
+		t.Fatal(err)
+	}
+	for name, page := range map[string]string{"create": create.String(), "edit": editPage.String()} {
+		if !strings.Contains(page, "100% off makes these orders free.") {
+			t.Errorf("%s form has no full-discount warning", name)
+		}
+		if !strings.Contains(page, `x-show="`+html.EscapeString(fullDiscountWarningShow)+`"`) {
+			t.Errorf("%s form's warning is not bound to the shared condition", name)
+		}
+		for _, model := range []string{`x-model="discountType"`, `x-model="discountValue"`} {
+			if !strings.Contains(page, model) {
+				t.Errorf("%s form is missing %s", name, model)
+			}
+		}
+	}
+	if !strings.Contains(editPage.String(), "discountType: &#39;percentage&#39;, discountValue: &#39;100&#39;") {
+		t.Error("edit form does not start from the saved type and value")
 	}
 }

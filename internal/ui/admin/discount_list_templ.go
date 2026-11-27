@@ -87,6 +87,13 @@ func discountAppliesToLabel(a domain.DiscountAppliesTo) string {
 	return ""
 }
 
+// discountLastValidDay is the last day a discount works. ExpiresAt is stored
+// as the start of the day after (the forms take "valid through this day"), so
+// showing it as-is reads one day late.
+func discountLastValidDay(t time.Time, loc *time.Location) string {
+	return t.In(loc).AddDate(0, 0, -1).Format("Jan 2")
+}
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -172,7 +179,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var2 templ.SafeURL
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", d.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 305, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 312, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -185,7 +192,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 305, Col: 135}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 312, Col: 135}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -214,7 +221,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var4 string
 						templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue("Redeemed " + code.RedeemedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 313, Col: 142}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 320, Col: 142}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 						if templ_7745c5c3_Err != nil {
@@ -227,7 +234,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var5 string
 						templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(code.Code)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 313, Col: 156}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 320, Col: 156}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 						if templ_7745c5c3_Err != nil {
@@ -245,7 +252,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var6 string
 						templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(code.Code)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 315, Col: 62}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 322, Col: 62}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 						if templ_7745c5c3_Err != nil {
@@ -271,7 +278,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(discountUsesLabel(props.Redemptions[d.ID]))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 322, Col: 96}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 329, Col: 96}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -290,7 +297,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(discountEligibilityLabel(d.Eligibility))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 325, Col: 93}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 332, Col: 93}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -309,7 +316,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(discountAppliesToLabel(d.AppliesTo))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 328, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 335, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -327,7 +334,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(discountTypeLabel(d.Type))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 332, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 339, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -340,7 +347,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(discountValueDisplay(d))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 335, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 342, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -358,7 +365,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(discountMinimumLabel(d))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 337, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 344, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -386,7 +393,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 						var templ_7745c5c3_Var13 string
 						templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(d.StartsAt.In(props.MerchantTZ).Format("Jan 2"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 346, Col: 60}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 353, Col: 60}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 						if templ_7745c5c3_Err != nil {
@@ -404,9 +411,9 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					}
 					if d.ExpiresAt != nil {
 						var templ_7745c5c3_Var14 string
-						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(d.ExpiresAt.In(props.MerchantTZ).Format("Jan 2"))
+						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(discountLastValidDay(*d.ExpiresAt, props.MerchantTZ))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 352, Col: 61}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 359, Col: 65}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 						if templ_7745c5c3_Err != nil {
@@ -431,7 +438,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(d.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 361, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 368, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -449,7 +456,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var16 templ.SafeURL
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/deactivate", d.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 365, Col: 114}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 372, Col: 114}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -467,7 +474,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 					var templ_7745c5c3_Var17 templ.SafeURL
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/activate", d.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 369, Col: 112}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 376, Col: 112}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -495,7 +502,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var18 templ.SafeURL
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page-1, props.ActiveFilter)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 384, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 391, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -518,7 +525,7 @@ func DiscountListContent(props DiscountListProps) templ.Component {
 				var templ_7745c5c3_Var19 templ.SafeURL
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/discounts?page=%d&active=%s", props.Page+1, props.ActiveFilter)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 394, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/discount_list.templ`, Line: 401, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {

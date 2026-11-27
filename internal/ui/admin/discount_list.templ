@@ -79,6 +79,13 @@ func discountAppliesToLabel(a domain.DiscountAppliesTo) string {
 	return ""
 }
 
+// discountLastValidDay is the last day a discount works. ExpiresAt is stored
+// as the start of the day after (the forms take "valid through this day"), so
+// showing it as-is reads one day late.
+func discountLastValidDay(t time.Time, loc *time.Location) string {
+	return t.In(loc).AddDate(0, 0, -1).Format("Jan 2")
+}
+
 // discountUsesLabel is the list's one-line redemption count for a
 // once-per-customer discount.
 func discountUsesLabel(n int) string {
@@ -349,7 +356,7 @@ templ DiscountListContent(props DiscountListProps) {
 										}
 										<span class="text-rr-border"> &rarr; </span>
 										if d.ExpiresAt != nil {
-											{ d.ExpiresAt.In(props.MerchantTZ).Format("Jan 2") }
+											{ discountLastValidDay(*d.ExpiresAt, props.MerchantTZ) }
 										} else {
 											<span class="text-rr-border">&mdash;</span>
 										}

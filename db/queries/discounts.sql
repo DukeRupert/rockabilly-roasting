@@ -177,8 +177,15 @@ UPDATE discounts SET banner_text = $2, updated_at = now() WHERE id = $1;
 
 -- name: ListBannerDiscounts :many
 -- The live discounts with banner copy, soonest to end first: the offer about
--- to run out is the one worth a shopper's attention.
-SELECT * FROM discounts
+-- to run out is the one worth a shopper's attention. promo_code is the code
+-- the banner link carries: the discount's one shared, unspent code, or empty
+-- when there is none or more than one and the link could not pick.
+SELECT sqlc.embed(discounts),
+       COALESCE((SELECT min(c.code) FROM coupon_codes c
+                 WHERE c.discount_id = discounts.id
+                   AND c.customer_id IS NULL AND c.redeemed_at IS NULL
+                 HAVING count(*) = 1), '')::text AS promo_code
+FROM discounts
 WHERE active AND banner_text <> ''
   AND (starts_at IS NULL OR starts_at <= now())
   AND (expires_at IS NULL OR expires_at > now())

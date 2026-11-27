@@ -206,3 +206,63 @@ func TestDiscountService_SetBannerText(t *testing.T) {
 		assert.ErrorIs(t, svc.SetBannerText(ctx, tx, uuid.New(), "x", testutil.TestActor()), app.ErrDiscountNotFound)
 	})
 }
+
+// A banner link carries the discount's code when there is exactly one it
+// could mean, so checkout applies it; see web/promo_code.go.
+func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
+	svc := newDiscountService()
+
+	t.Run("one shared code", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("GIFT-"+strings.ToUpper(uuid.NewString()[:6]))).Code
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a signup code goes to the Daily Grind page with it", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc, testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup))
+		code := testutil.CreateCouponCode(t, tx, d.ID).Code
+		assert.Equal(t, "/subscriptions?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("more than one code: the link cannot pick", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		testutil.CreateCouponCode(t, tx, d.ID)
+		testutil.CreateCouponCode(t, tx, d.ID)
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a member's own code on it does not count against the shared one", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := testutil.CreateCouponCode(t, tx, d.ID).Code
+		owned := testutil.CreateCouponCode(t, tx, d.ID)
+		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET customer_id = $2 WHERE id = $1`,
+			owned.ID, newShopper(t, tx).customer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a spent single-use code is not carried", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		cc := testutil.CreateCouponCode(t, tx, d.ID)
+		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET redeemed_at = now() WHERE id = $1`, cc.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("the referral offer never carries one: each member shares their own", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc,
+			testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup),
+			testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer))
+		testutil.CreateCouponCode(t, tx, d.ID)
+		require.NoError(t, svc.SetReferralOffer(context.Background(), tx, d.ID, testutil.TestActor()))
+		member := newShopper(t, tx)
+		member.subscribe(t, tx, domain.SubscriptionStatusActive)
+		assert.Equal(t, "/account/subscriptions", bannerHref(t, tx, svc, member.customer, text))
+	})
+}

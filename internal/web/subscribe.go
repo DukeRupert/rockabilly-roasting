@@ -419,13 +419,14 @@ func (d *Deps) subscribePageProps(w http.ResponseWriter, r *http.Request) (store
 	}
 
 	props := storefront.SubscribePageProps{
-		Lines:      pageLines,
-		LinesJSON:  string(linesJSON),
-		Subtotal:   subtotal,
-		MultiPlan:  len(distinctPlans) > 1,
-		MerchantTZ: d.MerchantTZ,
-		StripeKey:  os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-		CartCount:  d.cartItemCountFromCookie(r),
+		Lines:         pageLines,
+		LinesJSON:     string(linesJSON),
+		Subtotal:      subtotal,
+		MultiPlan:     len(distinctPlans) > 1,
+		MerchantTZ:    d.MerchantTZ,
+		StripeKey:     os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		CartCount:     d.cartItemCountFromCookie(r),
+		PendingCoupon: pendingPromo(r),
 	}
 	return props, true
 }
@@ -652,11 +653,12 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		// is one. Its shipping charge covers the box.
 		shipsWith *domain.Order
 
-		discountTotal   int
-		discountName    string
-		couponCode      string
-		couponNotice    string
-		couponSignInURL string
+		discountTotal    int
+		discountName     string
+		couponCode       string
+		couponNotice     string
+		dropPendingPromo bool
+		couponSignInURL  string
 	)
 	// The session's customer, if any: the form's email proves nothing, and a
 	// members-only code is held to the session (see app.CouponUse).
@@ -767,6 +769,10 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				couponNotice = msg
 				if errors.Is(cErr, app.ErrCouponSignInRequired) {
 					couponSignInURL = subscribeSignInURL(lines)
+				} else if code == pendingPromo(r) {
+					// A promo link's code refused for good: stop filling it in.
+					// An accepted one stays, as a signup has no cart to hold it.
+					dropPendingPromo = true
 				}
 			default:
 				return fmt.Errorf("check signup coupon: %w", cErr)
@@ -1029,6 +1035,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			Quantity:  item.Quantity,
 			Subtotal:  item.UnitPrice * item.Quantity,
 		}
+	}
+	if dropPendingPromo {
+		clearPendingPromo(w)
 	}
 	JSON(w, http.StatusOK, subscribePaymentIntentResponse{
 		checkoutPaymentIntentResponse: checkoutPaymentIntentResponse{

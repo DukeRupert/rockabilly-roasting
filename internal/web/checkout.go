@@ -51,6 +51,10 @@ type checkoutCartResponse struct {
 	// Coupon reports a coupon already applied to this cart (and still
 	// valid) so the checkout UI can show the applied state after a reload.
 	Coupon *checkoutCartCoupon `json:"coupon,omitempty"`
+	// PendingCoupon is a code a promo link left for this shopper, offered
+	// only while the cart has no coupon. The UI applies it through the code
+	// box, so a refusal reads the same as one typed by hand.
+	PendingCoupon string `json:"pending_coupon,omitempty"`
 	// FreeShippingRemaining is how many more cents (after the applied coupon)
 	// clear the free-shipping threshold; 0 once met. Omitted when no threshold
 	// is configured.
@@ -348,6 +352,9 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 		// is not shown as applied.
 		discountCents, coupon := d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, resp.Subtotal)
 		resp.Coupon = coupon
+		if coupon == nil {
+			resp.PendingCoupon = pendingPromo(r)
+		}
 
 		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if txErr != nil {
@@ -660,6 +667,12 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// A promo link's code is done with once the cart holds a code, or once
+	// checkout has refused it for a reason signing in will not fix.
+	if pending := pendingPromo(r); pending != "" &&
+		(resp.Valid || (pending == code && resp.SignInURL == "")) {
+		clearPendingPromo(w)
+	}
 	JSON(w, http.StatusOK, resp)
 }
 

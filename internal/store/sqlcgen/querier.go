@@ -230,8 +230,10 @@ type Querier interface {
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
 	// The live discounts with banner copy, soonest to end first: the offer about
-	// to run out is the one worth a shopper's attention.
-	ListBannerDiscounts(ctx context.Context) ([]Discount, error)
+	// to run out is the one worth a shopper's attention. promo_code is the code
+	// the banner link carries: the discount's one shared, unspent code, or empty
+	// when there is none or more than one and the link could not pick.
+	ListBannerDiscounts(ctx context.Context) ([]ListBannerDiscountsRow, error)
 	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
 	ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error)
 	ListBoxPresets(ctx context.Context) ([]BoxPreset, error)

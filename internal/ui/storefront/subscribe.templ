@@ -58,6 +58,9 @@ type SubscribePageProps struct {
 	// which is when they ship together only the first time and separately —
 	// each with its own shipping charge — after that. Drives the notice.
 	MultiPlan  bool
+	// PendingCoupon is a code a promo link left; the form starts with it
+	// filled in.
+	PendingCoupon string
 	MerchantTZ *time.Location
 	StripeKey  string
 	CartCount  int
@@ -93,6 +96,7 @@ templ SubscribeContent(props SubscribePageProps) {
 				id="subscribe-app"
 				data-lines={ props.LinesJSON }
 				data-stripe-key={ props.StripeKey }
+				data-coupon={ props.PendingCoupon }
 			></div>
 			<script type="module" src={ utils.ScriptURL("/static/checkout/subscribe.js") }></script>
 		</div>

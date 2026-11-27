@@ -41,9 +41,12 @@
   interface Props {
     lines: BoxLine[];
     stripeKey: string;
+    // A code a promo link left: the form starts with it applied, and the
+    // first payment intent prices it or says why not.
+    coupon?: string;
   }
 
-  let { lines: initialLines, stripeKey }: Props = $props();
+  let { lines: initialLines, stripeKey, coupon = '' }: Props = $props();
 
   let lines = $state<BoxLine[]>(initialLines);
 
@@ -96,7 +99,8 @@
   // goes with every payment intent created; applying or removing one is a
   // change to what is charged, and re-creates the intent like any other.
   let couponInput = $state('');
-  let couponCode = $state('');
+  // svelte-ignore state_referenced_locally
+  let couponCode = $state(coupon);
   let couponName = $state('');
   let couponError = $state('');
   let couponSignInUrl = $state('');

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -101,7 +102,8 @@ func (s *DiscountService) StorefrontBanners(ctx context.Context, tx pgx.Tx, cust
 	}
 
 	var out []domain.PromoBanner
-	for _, d := range discounts {
+	for _, bd := range discounts {
+		d := bd.Discount
 		var show bool
 		switch {
 		case d.IsReferral, d.Eligibility == domain.DiscountEligibilitySubscribers:
@@ -117,7 +119,7 @@ func (s *DiscountService) StorefrontBanners(ctx context.Context, tx pgx.Tx, cust
 			return nil, err
 		}
 		if show {
-			out = append(out, domain.PromoBanner{Text: d.BannerText, Href: bannerHref(d)})
+			out = append(out, domain.PromoBanner{Text: d.BannerText, Href: bannerHref(d, bd.PromoCode)})
 		}
 	}
 	return out, nil
@@ -125,14 +127,21 @@ func (s *DiscountService) StorefrontBanners(ctx context.Context, tx pgx.Tx, cust
 
 // bannerHref is where a banner line leads: a member's referral code is on
 // their subscriptions page, a signup code is used from the Daily Grind page,
-// and anything else is spent in the shop.
-func bannerHref(d domain.Discount) string {
+// and anything else is spent in the shop. A link with a code carries it as a
+// promo link (web/promo_code.go), so checkout applies it; the referral offer
+// never does, as each member shares their own.
+func bannerHref(d domain.Discount, code string) string {
+	var path string
 	switch {
 	case d.IsReferral:
 		return "/account/subscriptions"
 	case d.AppliesTo == domain.DiscountAppliesToSubscriptionSignup:
-		return "/subscriptions"
+		path = "/subscriptions"
 	default:
-		return "/catalog"
+		path = "/catalog"
 	}
+	if code == "" {
+		return path
+	}
+	return path + "?promo=" + url.QueryEscape(code)
 }

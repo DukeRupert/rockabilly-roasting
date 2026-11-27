@@ -9,4 +9,8 @@ ALTER TABLE discounts
         CHECK (eligibility IN ('anyone', 'subscribers'));
 
 -- +goose Down
+-- Dropping the column would make every members-only code (GIFT20) work for
+-- anyone. A rollback cannot keep the restriction, so it switches those codes
+-- off instead of widening them; staff can turn them back on deliberately.
+UPDATE discounts SET active = false, updated_at = now() WHERE eligibility <> 'anyone';
 ALTER TABLE discounts DROP COLUMN IF EXISTS eligibility;

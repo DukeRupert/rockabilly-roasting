@@ -21,7 +21,10 @@ type OrderConfirmedAnalytics struct {
 	ValueCents    int                  `json:"value_cents"`
 	TaxCents      int                  `json:"tax_cents"`
 	ShippingCents int                  `json:"shipping_cents"`
-	Items         []OrderConfirmedItem `json:"items"`
+	// Coupon is the code the order was placed with, for GA4's purchase-level
+	// coupon parameter. Empty when the order carried none.
+	Coupon string               `json:"coupon,omitempty"`
+	Items  []OrderConfirmedItem `json:"items"`
 }
 
 type OrderConfirmedProps struct {

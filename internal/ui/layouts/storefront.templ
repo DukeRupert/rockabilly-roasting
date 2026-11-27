@@ -126,6 +126,7 @@ templ Storefront(props StorefrontProps) {
 						value: value,
 						tax: (data.tax_cents || 0) / 100,
 						shipping: (data.shipping_cents || 0) / 100,
+						coupon: data.coupon || undefined,
 						items: items
 					});
 					try {

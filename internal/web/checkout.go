@@ -1410,6 +1410,16 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 		analytics.TaxCents = order.TaxTotal
 		analytics.ShippingCents = order.ShippingTotal
 		analytics.Items = items
+
+		// The code the order was placed with, which is also what it was
+		// discounted by — including when a capture race lost the redemption,
+		// since the discount stood. A failed lookup costs only this field:
+		// the purchase event matters more than its coupon.
+		if coupon, cErr := d.DiscountService.GetCouponCodeForOrder(ctx, tx, order); cErr != nil {
+			logging.FromContext(ctx).Warn("order analytics: coupon lookup", "error", cErr, "order_number", orderNumber)
+		} else if coupon != nil {
+			analytics.Coupon = coupon.Code
+		}
 		return nil
 	})
 	if err != nil {

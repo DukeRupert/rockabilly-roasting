@@ -24,12 +24,15 @@ type OrderConfirmedItem struct {
 }
 
 type OrderConfirmedAnalytics struct {
-	TransactionID string               `json:"transaction_id"`
-	Currency      string               `json:"currency"`
-	ValueCents    int                  `json:"value_cents"`
-	TaxCents      int                  `json:"tax_cents"`
-	ShippingCents int                  `json:"shipping_cents"`
-	Items         []OrderConfirmedItem `json:"items"`
+	TransactionID string `json:"transaction_id"`
+	Currency      string `json:"currency"`
+	ValueCents    int    `json:"value_cents"`
+	TaxCents      int    `json:"tax_cents"`
+	ShippingCents int    `json:"shipping_cents"`
+	// Coupon is the code the order was placed with, for GA4's purchase-level
+	// coupon parameter. Empty when the order carried none.
+	Coupon string               `json:"coupon,omitempty"`
+	Items  []OrderConfirmedItem `json:"items"`
 }
 
 type OrderConfirmedProps struct {
@@ -83,7 +86,7 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.OrderNumber)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/order_confirmed.templ`, Line: 88, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/order_confirmed.templ`, Line: 91, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {

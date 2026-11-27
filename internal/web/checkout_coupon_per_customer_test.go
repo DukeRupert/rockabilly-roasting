@@ -67,3 +67,33 @@ func TestCheckoutPaymentIntent_RefusedCouponIsDroppedWithANotice(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, cart.AppliedCouponCodeID, "the refused code is taken off the cart")
 }
+
+// The GA4 purchase event carries the code the order was placed with, so the
+// client can see sales by promotion in Analytics. An order with no code sends
+// no coupon parameter at all rather than an empty one.
+func TestLoadOrderAnalytics_Coupon(t *testing.T) {
+	ctx := context.Background()
+	f := newCheckoutCouponFixture(t)
+	d, _ := newCheckoutPaymentDeps(t)
+
+	w := f.postIntent(t, d, "")
+	require.Equal(t, 200, w.Code, w.Body.String())
+
+	var withCode, without string
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tx.QueryRow(ctx,
+		`SELECT number FROM orders WHERE metadata->>'cart_id' = $1 ORDER BY created_at DESC LIMIT 1`,
+		f.cartID.String()).Scan(&withCode))
+	plain := testutil.CreateOrder(t, tx, f.customer.ID, f.addressID, f.addressID)
+	without = plain.Number
+	require.NoError(t, tx.Commit(ctx))
+
+	got, err := d.loadOrderAnalytics(ctx, withCode)
+	require.NoError(t, err)
+	assert.Equal(t, f.code, got.Coupon)
+
+	got, err = d.loadOrderAnalytics(ctx, without)
+	require.NoError(t, err)
+	assert.Empty(t, got.Coupon)
+}

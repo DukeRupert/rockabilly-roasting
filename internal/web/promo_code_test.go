@@ -78,9 +78,9 @@ func TestCapturePromoParam(t *testing.T) {
 	t.Run("the redirect can only name this site", func(t *testing.T) {
 		// The path as the client sent it: this runs before ServeMux cleans it.
 		for target, want := range map[string]string{
-			"//evil.example/?promo=X":   "/evil.example/",
+			"//evil.example/?promo=X":  "/evil.example/",
 			"/\\evil.example/?promo=X": "/evil.example/",
-			"///evil.example?promo=X":   "/evil.example",
+			"///evil.example?promo=X":  "/evil.example",
 		} {
 			w := serve(http.MethodGet, target)
 			require.Equal(t, http.StatusFound, w.Code, target)

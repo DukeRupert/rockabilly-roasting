@@ -17,6 +17,13 @@ ALTER TABLE discounts ADD CONSTRAINT discounts_eligibility_check
     CHECK (eligibility IN ('anyone', 'subscribers', 'new_subscribers'));
 
 -- +goose Down
+-- Collapsing these would turn WELCOME50 into a 50%-off code anyone could use
+-- at cart checkout. A rollback cannot keep the restriction, so it switches
+-- those codes off first instead of widening them. Re-migrating brings the
+-- columns back as 'one_time' / 'anyone': set each code's order type and
+-- eligibility again before turning it back on.
+UPDATE discounts SET active = false, updated_at = now()
+WHERE applies_to <> 'one_time' OR eligibility = 'new_subscribers';
 ALTER TABLE discounts DROP CONSTRAINT discounts_eligibility_check;
 UPDATE discounts SET eligibility = 'anyone' WHERE eligibility = 'new_subscribers';
 ALTER TABLE discounts ADD CONSTRAINT discounts_eligibility_check

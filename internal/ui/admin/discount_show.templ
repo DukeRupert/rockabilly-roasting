@@ -39,6 +39,13 @@ func discountValueInput(d domain.Discount) string {
 	return fmt.Sprintf("%d", d.Value)
 }
 
+// discountFormState seeds the edit form's Alpine state from the saved
+// discount, so an existing 100%-off code shows its warning on load. Both
+// values are generated here (an enum and a formatted number), never free text.
+func discountFormState(d domain.Discount) string {
+	return fmt.Sprintf("{ discountType: '%s', discountValue: '%s' }", d.Type, discountValueInput(d))
+}
+
 // discountDescriptionValue is the edit form's description contents, blank for
 // nil. Kept as a Go expression on one line: templ would indent an if-block
 // inside the element, and a textarea renders its leading whitespace verbatim.
@@ -260,6 +267,7 @@ templ discountEditCard(props DiscountShowProps) {
 			method="post"
 			action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", props.Discount.ID.String())) }
 			class="flex flex-col gap-3"
+			x-data={ discountFormState(props.Discount) }
 		>
 			<div>
 				<label for="d-name" class="block text-xs text-rr-muted">Name</label>
@@ -287,6 +295,7 @@ templ discountEditCard(props DiscountShowProps) {
 				<select
 					id="d-type"
 					name="type"
+					x-model="discountType"
 					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 				>
 					<option value="percentage" selected?={ props.Discount.Type == domain.DiscountTypePercentage }>Percentage</option>
@@ -301,10 +310,12 @@ templ discountEditCard(props DiscountShowProps) {
 					type="text"
 					inputmode="decimal"
 					value={ discountValueInput(props.Discount) }
+					x-model="discountValue"
 					required
 					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 				/>
 			</div>
+			@FullDiscountWarning("")
 			<div>
 				<label for="d-eligibility" class="block text-xs text-rr-muted">Who can use it</label>
 				<select

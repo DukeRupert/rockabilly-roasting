@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -148,4 +149,75 @@ func TestCheckoutApplyCoupon_RefusesASignupCode(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.False(t, resp.Valid)
 	assert.Contains(t, resp.ErrorMessage, "new Daily Grind subscriptions")
+}
+
+// withShippingThreshold charges cents for shipping under threshold and nothing
+// at or over it, restoring the config afterwards.
+func withShippingThreshold(t *testing.T, d *Deps, cents, threshold int) {
+	t.Helper()
+	ctx := context.Background()
+	set := func(cfg domain.ShippingConfig) {
+		tx, err := testPool.Begin(ctx)
+		require.NoError(t, err)
+		require.NoError(t, d.CheckoutService.UpdateShippingConfig(ctx, tx, cfg, testutil.TestActor()))
+		require.NoError(t, tx.Commit(ctx))
+	}
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	before, err := d.CheckoutService.GetShippingConfig(ctx, tx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Rollback(ctx))
+	restore := *before
+	t.Cleanup(func() { set(restore) })
+	cfg := *before
+	cfg.FlatRateCents = cents
+	cfg.FreeShippingThreshold = &threshold
+	set(cfg)
+}
+
+// Tax and shipping on a signup are priced on what is charged after the code,
+// as at cart checkout: tax on the discounted subtotal, and the free-shipping
+// threshold measured against it.
+func TestSubscribePaymentIntent_CouponPricesTaxAndShippingOnTheDiscountedSubtotal(t *testing.T) {
+	f := newSubscribeFixture(t)
+	d, _ := newSubscribePaymentDeps(t)
+	withFlatRateTax(t, 0.10)
+	// 1620 (1800 less the plan's 10%) clears a 1000 threshold; half of it
+	// does not.
+	withShippingThreshold(t, d, 500, 1000)
+
+	plain := decodeSubscribeIntent(t, postSubscribePaymentIntent(t, d,
+		subscribePaymentIntentBody(f.planID, f.variantID, 1, shipToWashington)))
+	require.Equal(t, 1620, plain.Subtotal)
+	require.Zero(t, plain.ShippingTotal, "over the threshold without a code")
+	require.Equal(t, 162, plain.TaxTotal, "10% of 1620")
+
+	coded := decodeSubscribeIntent(t, postSubscribePaymentIntent(t, d,
+		subscribePaymentIntentBody(f.planID, f.variantID, 1, shipToWashington, withCoupon(welcomeCode(t)))))
+	assert.Equal(t, 810, coded.DiscountTotal)
+	assert.Equal(t, 81, coded.TaxTotal, "10% of the 810 charged, not of 1620")
+	assert.Equal(t, 500, coded.ShippingTotal, "810 is under the threshold")
+	assert.Equal(t, 810+500+81, coded.Amount)
+}
+
+// A members-only signup code tried by a guest links to sign in and back to
+// the same box, not to cart checkout.
+func TestSubscribePaymentIntent_SignInLinkReturnsToTheBox(t *testing.T) {
+	f := newSubscribeFixture(t)
+	d, _ := newSubscribePaymentDeps(t)
+	code := newSignupCode(t,
+		testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup),
+		testutil.WithEligibility(domain.DiscountEligibilitySubscribers))
+
+	resp := decodeSubscribeIntent(t, postSubscribePaymentIntent(t, d,
+		subscribePaymentIntentBody(f.planID, f.variantID, 2, withCoupon(code))))
+	require.Contains(t, resp.CouponNotice, "Sign in")
+
+	u, err := url.Parse(resp.CouponSignInURL)
+	require.NoError(t, err)
+	assert.Equal(t, "/account/login", u.Path)
+	next, err := url.Parse(u.Query().Get("next"))
+	require.NoError(t, err)
+	assert.Equal(t, "/subscribe", next.Path)
+	assert.Equal(t, []string{f.planID.String() + ":" + f.variantID.String() + ":2"}, next.Query()["line"])
 }

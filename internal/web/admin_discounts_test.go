@@ -108,6 +108,17 @@ func TestAdminDiscountCreate_UsageAndEligibility(t *testing.T) {
 		}, "")
 		assert.NotEqual(t, http.StatusSeeOther, w.Code)
 	})
+
+	t.Run("an order type that is not one of the options is refused", func(t *testing.T) {
+		code := "BADKIND" + strings.ToUpper(uuid.NewString()[:8])
+		w := postDiscountForm(t, d.handleAdminDiscountCreate, "/admin/discounts", url.Values{
+			"name": {"Bad"}, "code": {code}, "type": {"percentage"}, "value": {"10"},
+			"applies_to": {"renewals-too"},
+		}, "")
+		assert.NotEqual(t, http.StatusSeeOther, w.Code)
+		assert.Contains(t, w.Body.String(), "Pick which orders the code works on.",
+			"staff are told which field to fix, not that something is invalid")
+	})
 }
 
 func TestAdminDiscountUpdate_Eligibility(t *testing.T) {

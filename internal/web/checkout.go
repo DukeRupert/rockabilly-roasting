@@ -843,10 +843,13 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		// Tax is on discounted subtotal.
+		// Tax is on the discounted subtotal, spread across the lines in
+		// proportion. At 100% off that is nothing: the guard used to require a
+		// positive discounted subtotal, which skipped the spread exactly then
+		// and taxed a free order on its full price.
 		discountedSubtotal := subtotal - discountTotal
 		for i := range taxLineItems {
-			if discountTotal > 0 && discountedSubtotal > 0 {
+			if discountTotal > 0 && subtotal > 0 {
 				ratio := float64(discountedSubtotal) / float64(subtotal)
 				taxLineItems[i].Subtotal = int(float64(taxLineItems[i].Subtotal) * ratio)
 			}
@@ -1553,9 +1556,10 @@ func addressShippable(a *domain.Address) bool {
 //
 // Confirm-path errors only: its one caller is handleCheckoutConfirm, which
 // reaches GetPaymentIntent, ConfirmCheckoutPayment and an order read. A coupon
-// error cannot arrive here — the two that exist come from PlaceOrder and
-// ApplyCoupon, neither on this path — so there is no coupon label. The
-// placement path labels its own refusal inline.
+// refusal cannot arrive here — every one comes from ApplyCoupon or
+// CheckAppliedCoupon (the code lookup, then the rules in checkCoupon), directly
+// or through PlaceOrder, none on this path — so there is no coupon label. The
+// placement paths label their own refusals.
 func classifyCheckoutError(err error) string {
 	switch {
 	case errors.Is(err, app.ErrPaymentFailed):

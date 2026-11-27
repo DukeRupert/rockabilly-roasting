@@ -294,6 +294,7 @@ type Discount struct {
 	UpdatedAt         time.Time          `json:"updated_at"`
 	UsageLimit        string             `json:"usage_limit"`
 	Eligibility       string             `json:"eligibility"`
+	AppliesTo         string             `json:"applies_to"`
 }
 
 type EmailVerification struct {

@@ -176,6 +176,14 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 		renderDiscountError(w, r, "Pick who can use the code.")
 		return
 	}
+	appliesTo := domain.DiscountAppliesTo(r.FormValue("applies_to"))
+	if appliesTo == "" {
+		appliesTo = domain.DiscountAppliesToOneTime
+	}
+	if !appliesTo.Valid() {
+		renderDiscountError(w, r, "Pick which orders the code works on.")
+		return
+	}
 
 	var expiresAt *time.Time
 	if raw := r.FormValue("expires_at"); raw != "" {
@@ -199,6 +207,7 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 			Code:              code,
 			UsageLimit:        usageLimit,
 			Eligibility:       eligibility,
+			AppliesTo:         appliesTo,
 		}, staffActor(r))
 		return txErr
 	})
@@ -396,6 +405,11 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 		fail("Pick who can use the code.")
 		return
 	}
+	appliesTo := domain.DiscountAppliesTo(r.FormValue("applies_to"))
+	if appliesTo != "" && !appliesTo.Valid() {
+		fail("Pick which orders the code works on.")
+		return
+	}
 
 	startsAt, ok := parseMerchantDay(r.FormValue("starts_at"), d.MerchantTZ, false)
 	if !ok {
@@ -420,6 +434,7 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 			StartsAt:          startsAt,
 			ExpiresAt:         expiresAt,
 			Eligibility:       eligibility,
+			AppliesTo:         appliesTo,
 		}, staffActor(r))
 		return txErr
 	})

@@ -92,6 +92,15 @@
   let pickerPlanId = $state('');
   let pickerQuantity = $state(1);
 
+  // Coupon. The server holds no cart for a signup, so the code lives here and
+  // goes with every payment intent created; applying or removing one is a
+  // change to what is charged, and re-creates the intent like any other.
+  let couponInput = $state('');
+  let couponCode = $state('');
+  let couponName = $state('');
+  let couponError = $state('');
+  let couponSignInUrl = $state('');
+
   // UI state
   let processing = $state(false);
   let error = $state('');
@@ -306,6 +315,7 @@
         postal_code: postalCode,
         country,
         previous_payment_intent_id: previousId,
+        coupon_code: couponCode || undefined,
       });
     },
     idOf: (r) => intentIdOf(r.client_secret),
@@ -347,6 +357,16 @@
     const piResponse = outcome.result;
     error = '';
     totals = piResponse;
+    // The server says whether the code took. A refused one was priced out of
+    // this intent already, so it is dropped here without creating another.
+    if (piResponse.coupon_notice) {
+      couponCode = '';
+      couponName = '';
+      couponError = piResponse.coupon_notice;
+      couponSignInUrl = piResponse.coupon_sign_in_url || '';
+    } else if (piResponse.coupon_code) {
+      couponName = piResponse.discount_name || '';
+    }
     // Nothing computed in the browser: every line's price shown from here
     // on is the server's. Matched on plan and variant together — the key the
     // server merges lines on — because one variant can be in the box on two
@@ -437,6 +457,34 @@
       initStripe();
     } else {
       stripeInitialized = false;
+    }
+  }
+
+  function applyCoupon() {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    couponCode = code;
+    couponName = '';
+    couponInput = '';
+    couponError = '';
+    couponSignInUrl = '';
+    resetPaymentIntent();
+  }
+
+  function removeCoupon() {
+    couponCode = '';
+    couponName = '';
+    couponError = '';
+    couponSignInUrl = '';
+    resetPaymentIntent();
+  }
+
+  // The code box sits inside the signup form, whose submit pays: Enter in it
+  // applies the code instead.
+  function handleCouponKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyCoupon();
     }
   }
 
@@ -799,6 +847,63 @@
           Payment
         </h2>
 
+        <!-- Coupon code: applies to this first order only. -->
+        <div class="mb-4">
+          {#if couponCode}
+            <div class="flex items-center justify-between gap-3 border-2 border-ink bg-cream-hi px-3 py-2">
+              <p class="font-oswald text-ink text-sm min-w-0" style="letter-spacing:0.04em;">
+                <span class="font-special text-rust">{couponCode}</span>
+                {#if couponName}
+                  <span class="text-ink-soft"> · {couponName}</span>
+                {:else if !formValid}
+                  <span class="text-ink-soft"> · applied once your details are in</span>
+                {/if}
+              </p>
+              <button
+                type="button"
+                onclick={removeCoupon}
+                class="font-oswald font-bold text-[10px] text-chrome-deep hover:text-rust transition-colors"
+                style="letter-spacing:0.18em; text-transform:uppercase;"
+              >
+                Remove
+              </button>
+            </div>
+          {:else}
+            <div class="flex gap-2">
+              <label for="subscribe-coupon-code" class="sr-only">Coupon code</label>
+              <input
+                id="subscribe-coupon-code"
+                type="text"
+                bind:value={couponInput}
+                onkeydown={handleCouponKeydown}
+                placeholder="Coupon code"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                class="paper-input min-w-0 flex-1 border-2 border-ink bg-paper px-3 py-2 font-special text-sm text-ink uppercase placeholder:normal-case placeholder:font-oswald placeholder:text-chrome-deep focus:outline-none"
+                style="letter-spacing:0.08em;"
+              />
+              <button
+                type="button"
+                onclick={applyCoupon}
+                disabled={!couponInput.trim()}
+                class="font-oswald font-bold text-[11px] text-ink border-2 border-ink bg-paper-warm px-4 py-2 hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style="letter-spacing:0.16em; text-transform:uppercase;"
+              >
+                Apply
+              </button>
+            </div>
+          {/if}
+          {#if couponError}
+            <p class="mt-2 font-oswald font-bold text-rust text-xs" role="alert">
+              {couponError}
+              {#if couponSignInUrl}
+                <a href={couponSignInUrl} class="underline text-ink hover:text-rust">Go to sign in</a>
+              {/if}
+            </p>
+          {/if}
+        </div>
+
         {#if !stripeReady}
           <div class="border-2 border-ink bg-cream-hi p-6 text-center">
             <p
@@ -830,6 +935,12 @@
                 <span>Your box</span>
                 <span class="font-special">{formatCents(totals.subtotal)}</span>
               </div>
+              {#if totals.discount_total > 0}
+                <div class="flex items-center justify-between font-oswald text-sm text-rust" style="letter-spacing:0.04em;">
+                  <span>{totals.discount_name || 'Discount'} · first order</span>
+                  <span class="font-special">−{formatCents(totals.discount_total)}</span>
+                </div>
+              {/if}
               <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
                 <span>Shipping</span>
                 <span class="font-special">

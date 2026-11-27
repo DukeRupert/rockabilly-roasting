@@ -1,6 +1,6 @@
 -- name: CreateDiscount :one
-INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility, applies_to)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetDiscountByID :one
@@ -9,7 +9,7 @@ SELECT * FROM discounts WHERE id = $1;
 -- name: UpdateDiscount :one
 UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
-    starts_at = $7, expires_at = $8, active = $9, eligibility = $10, updated_at = now()
+    starts_at = $7, expires_at = $8, active = $9, eligibility = $10, applies_to = $11, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
@@ -107,4 +107,11 @@ SELECT EXISTS (
     SELECT 1 FROM subscriptions
     WHERE customer_id = $1
       AND status = 'active'
+);
+
+-- name: CustomerHasEverSubscribed :one
+-- Whether a customer has held a subscription in any status, for a
+-- new-subscribers-only discount.
+SELECT EXISTS (
+    SELECT 1 FROM subscriptions WHERE customer_id = $1
 );

@@ -51,6 +51,11 @@ type subscribePaymentIntentRequest struct {
 	// can cancel it — which in turn cancels its pre-created order via the
 	// payment_intent.canceled webhook.
 	PreviousPaymentIntentID string `json:"previous_payment_intent_id,omitempty"`
+	// CouponCode is a code the shopper entered on the subscribe form. There
+	// is no cart to hold it, so the client sends it with every intent it
+	// creates; a code the rules refuse is priced out and named in the
+	// response's coupon_notice.
+	CouponCode string `json:"coupon_code,omitempty"`
 }
 
 // subscribeLineRequest is one item in a signup: a variant, the plan it renews
@@ -646,7 +651,19 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		// shipsWith is the open order this one will be packed with, when there
 		// is one. Its shipping charge covers the box.
 		shipsWith *domain.Order
+
+		discountTotal   int
+		discountName    string
+		couponCode      string
+		couponNotice    string
+		couponSignInURL string
 	)
+	// The session's customer, if any: the form's email proves nothing, and a
+	// members-only code is held to the session (see app.CouponUse).
+	var signedIn *uuid.UUID
+	if sc, ok := auth.CustomerFromContext(ctx); ok {
+		signedIn = &sc.ID
+	}
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		plans := make(map[uuid.UUID]*domain.SubscriptionPlan)
 		signup = make([]signupLine, len(lines))
@@ -728,6 +745,33 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			return txErr
 		}
 
+		// The coupon, if one was entered, by the same rules as cart checkout
+		// but for a signup: only subscription-signup codes work here. It comes
+		// off this first order alone — renewals are priced from the plan.
+		if code := strings.ToUpper(strings.TrimSpace(req.CouponCode)); code != "" {
+			discount, cc, cErr := d.CheckoutService.ApplyCoupon(ctx, tx, code, priced.Subtotal, app.CouponUse{
+				CustomerID:         &customer.ID,
+				SignedInCustomerID: signedIn,
+				SubscriptionSignup: true,
+			})
+			switch msg, label, refused := couponRefusal(cErr); {
+			case cErr == nil:
+				discountTotal = calculateDiscountAmount(discount, priced.Subtotal)
+				discountName = discount.Name
+				couponCode = cc.Code
+				d.Metrics.CouponApplied.Inc()
+			case refused:
+				d.Metrics.CouponRejected.WithLabelValues(label).Inc()
+				couponNotice = msg
+				if errors.Is(cErr, app.ErrCouponSignInRequired) {
+					couponSignInURL = checkoutSignInURL
+				}
+			default:
+				return fmt.Errorf("check signup coupon: %w", cErr)
+			}
+		}
+		discountedSubtotal := priced.Subtotal - discountTotal
+
 		// Tax per line, each on its own discounted subtotal and its own
 		// product's exemption, matching retail checkout. One line built from
 		// the order's subtotal would tax an exempt item as if it were taxable,
@@ -742,9 +786,15 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			if txErr != nil {
 				return fmt.Errorf("get product for tax: %w", txErr)
 			}
+			lineSubtotal := item.UnitPrice * item.Quantity
+			// A coupon is spread across the lines in proportion, as retail
+			// checkout spreads it, so tax is on what is actually charged.
+			if discountTotal > 0 && priced.Subtotal > 0 {
+				lineSubtotal = int(float64(lineSubtotal) * float64(discountedSubtotal) / float64(priced.Subtotal))
+			}
 			taxLines[i] = domain.TaxLineItem{
 				LineIndex: i,
-				Subtotal:  item.UnitPrice * item.Quantity,
+				Subtotal:  lineSubtotal,
 				TaxExempt: product.TaxExempt,
 			}
 		}
@@ -756,7 +806,8 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 
 		// Shipping once, on the whole order. That is the point of putting
 		// several items in one signup.
-		shipCents, shipCfg, txErr := d.CheckoutService.CalculateShipping(ctx, tx, priced.Subtotal, addr.PostalCode)
+		// On the discounted subtotal, as retail checkout prices it.
+		shipCents, shipCfg, txErr := d.CheckoutService.CalculateShipping(ctx, tx, discountedSubtotal, addr.PostalCode)
 		if txErr != nil {
 			return fmt.Errorf("calculate shipping: %w", txErr)
 		}
@@ -802,7 +853,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	totalCents := priced.Subtotal + shippingCents + taxCents
+	totalCents := priced.Subtotal - discountTotal + shippingCents + taxCents
 
 	// Phase 2: ensure Stripe customer + create PaymentIntent (external — no tx).
 	// The Stripe customer is required so the payment method is saved for
@@ -885,15 +936,22 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		for i, l := range signup {
 			items[i] = l.cartItem(priced.Items[i].UnitPrice)
 		}
+		var couponPtr *string
+		if couponCode != "" {
+			couponPtr = &couponCode
+		}
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:        customer.ID,
-			Items:             items,
-			ShippingAddressID: addr.ID,
-			BillingAddressID:  addr.ID,
-			CurrencyCode:      "USD",
-			ShippingCents:     shippingCents,
-			TaxCents:          taxCents,
-			ShippingMethod:    shipMethod,
+			CustomerID:         customer.ID,
+			Items:              items,
+			ShippingAddressID:  addr.ID,
+			BillingAddressID:   addr.ID,
+			CurrencyCode:       "USD",
+			ShippingCents:      shippingCents,
+			TaxCents:           taxCents,
+			ShippingMethod:     shipMethod,
+			CouponCode:         couponPtr,
+			SignedInCustomerID: signedIn,
+			SubscriptionSignup: true,
 			// Without BasePrice the service would resolve this customer's list
 			// price, which is not what phase 1 quoted.
 			BasePrice: true,
@@ -924,8 +982,15 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
 			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
 		}
-		// Same one rule as the retail endpoint. This path has no coupon, so it
-		// has no exception either.
+		// A coupon refused here passed phase 1 moments ago — another order
+		// claimed a single-use code, say — so the shopper hears why in the
+		// words the code box would use, and can retry without it. Everything
+		// else goes through the one rule.
+		if msg, label, refused := couponRefusal(err); refused {
+			d.Metrics.CheckoutFailed.WithLabelValues("subscribe", "coupon_"+label).Inc()
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": msg})
+			return
+		}
 		d.failCheckout(w, r, "subscribe", err)
 		return
 	}
@@ -964,13 +1029,18 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	}
 	JSON(w, http.StatusOK, subscribePaymentIntentResponse{
 		checkoutPaymentIntentResponse: checkoutPaymentIntentResponse{
-			ClientSecret:  pi.ClientSecret,
-			Amount:        totalCents,
-			Currency:      "usd",
-			Subtotal:      priced.Subtotal,
-			TaxTotal:      taxCents,
-			ShippingTotal: shippingCents,
-			ShippingLabel: shippingLabel,
+			ClientSecret:    pi.ClientSecret,
+			Amount:          totalCents,
+			Currency:        "usd",
+			Subtotal:        priced.Subtotal,
+			DiscountTotal:   discountTotal,
+			DiscountName:    discountName,
+			CouponCode:      couponCode,
+			CouponNotice:    couponNotice,
+			CouponSignInURL: couponSignInURL,
+			TaxTotal:        taxCents,
+			ShippingTotal:   shippingCents,
+			ShippingLabel:   shippingLabel,
 		},
 		Lines: lineResp,
 	})

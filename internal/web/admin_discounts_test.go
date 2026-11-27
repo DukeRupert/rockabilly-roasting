@@ -73,6 +73,20 @@ func TestAdminDiscountCreate_UsageAndEligibility(t *testing.T) {
 		assert.Equal(t, domain.DiscountEligibilitySubscribers, got.Eligibility)
 	})
 
+	t.Run("a signup code for new subscribers reaches the discount", func(t *testing.T) {
+		code := "WELCOME" + strings.ToUpper(uuid.NewString()[:8])
+		w := postDiscountForm(t, d.handleAdminDiscountCreate, "/admin/discounts", url.Values{
+			"name": {"Welcome 50"}, "code": {code}, "type": {"percentage"}, "value": {"50"},
+			"usage_limit": {"once_per_customer"}, "eligibility": {"new_subscribers"},
+			"applies_to": {"subscription_signup"},
+		}, "")
+		require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+
+		got := discountByCode(t, d, code)
+		assert.Equal(t, domain.DiscountEligibilityNewSubscribers, got.Eligibility)
+		assert.Equal(t, domain.DiscountAppliesToSubscriptionSignup, got.AppliesTo)
+	})
+
 	t.Run("left out, they default to single-use for anyone", func(t *testing.T) {
 		code := "PLAIN" + strings.ToUpper(uuid.NewString()[:8])
 		w := postDiscountForm(t, d.handleAdminDiscountCreate, "/admin/discounts", url.Values{
@@ -83,6 +97,7 @@ func TestAdminDiscountCreate_UsageAndEligibility(t *testing.T) {
 		got := discountByCode(t, d, code)
 		assert.Equal(t, domain.CouponUsageSingleUse, got.UsageLimit)
 		assert.Equal(t, domain.DiscountEligibilityAnyone, got.Eligibility)
+		assert.Equal(t, domain.DiscountAppliesToOneTime, got.AppliesTo)
 	})
 
 	t.Run("a value that is not one of the options is refused", func(t *testing.T) {
@@ -115,4 +130,20 @@ func TestAdminDiscountUpdate_Eligibility(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
 	assert.Equal(t, domain.DiscountEligibilitySubscribers, discountByCode(t, d, code).Eligibility,
 		"an edit that leaves the field out leaves it alone")
+}
+
+func TestAdminDiscountUpdate_AppliesTo(t *testing.T) {
+	d := newDiscountAdminDeps(t)
+	code := "KIND" + strings.ToUpper(uuid.NewString()[:8])
+	w := postDiscountForm(t, d.handleAdminDiscountCreate, "/admin/discounts", url.Values{
+		"name": {"Kind"}, "code": {code}, "type": {"percentage"}, "value": {"20"},
+	}, "")
+	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	id := discountByCode(t, d, code).ID.String()
+
+	edit := url.Values{"name": {"Kind"}, "type": {"percentage"}, "value": {"20"}, "applies_to": {"subscription_signup"}}
+	w = postDiscountForm(t, d.handleAdminDiscountUpdate, "/admin/discounts/"+id, edit, id)
+	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	assert.NotContains(t, w.Header().Get("Location"), "error=")
+	assert.Equal(t, domain.DiscountAppliesToSubscriptionSignup, discountByCode(t, d, code).AppliesTo)
 }

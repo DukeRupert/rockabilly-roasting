@@ -6,7 +6,7 @@ Discounts let you offer a percentage or a fixed-dollar saving to customers. Each
 
 A **discount** is a rule that defines the type and amount of the reduction, and who can use it. A **coupon code** is what the customer actually types in.
 
-Every discount has two settings that decide who can use its code and how often:
+Every discount has three settings that decide where its code works, who can use it and how often:
 
 - **How often** -- chosen when the discount is created, and fixed after that:
   - **Single-use** -- the code works for one order. The first customer to pay with it uses it up for everyone. Good for a one-off code given to one person.
@@ -14,6 +14,10 @@ Every discount has two settings that decide who can use its code and how often:
 - **Who can use it** -- can be changed at any time:
   - **Anyone** -- any shopper, signed in or not.
   - **Daily Grind members only** -- the shopper must be signed in, with an **active** subscription. Paused, past-due, cancelled and expired subscriptions don't count. The order must be for the signed-in member's own account. A shopper who isn't signed in is asked to sign in, and their cart is kept when they do.
+  - **New subscribers only** -- the customer has never had a subscription, in any status. Someone who subscribed before and cancelled doesn't count as new.
+- **Order type** -- can be changed at any time:
+  - **One-time orders** -- the code works at cart checkout. Every code made before this setting existed is one of these.
+  - **First subscription order** -- the code works only on the subscribe page, and takes money off the first order of the new subscription. Later deliveries are charged the plan's normal price. Use this for a welcome offer like WELCOME50.
 
 "Once per customer" goes by the customer's account, which checkout finds from the email address entered. A shopper who checks out as a guest with a different email address counts as a new customer.
 
@@ -36,12 +40,13 @@ Go to **Admin > Discounts**. The **New Discount** form at the top of the page ha
 - **Value** -- A whole percent (e.g., `20`) or a dollar amount (e.g., `5.00`).
 - **Min order $** -- Optional. The code only works when the subtotal is at least this much.
 - **How often** -- Single-use or Once per customer. See above. This can't be changed later.
-- **Who can use it** -- Anyone or Daily Grind members only.
+- **Who can use it** -- Anyone, Daily Grind members only, or New subscribers only.
+- **Order type** -- One-time orders or First subscription order.
 - **Expires** -- Optional. The code works through the end of this day.
 
 ## Editing a Discount
 
-Click a discount's name to open its page. The **Edit** panel on the right lets you change the name, a staff-only description, the type and value, the minimum order, **Who can use it**, the **Starts** date and the **Last valid day**.
+Click a discount's name to open its page. The **Edit** panel on the right lets you change the name, a staff-only description, the type and value, the minimum order, **Who can use it**, **Order type**, the **Starts** date and the **Last valid day**.
 
 - **Starts** -- The code doesn't work before this day.
 - **Last valid day** -- The code works through the end of this day.
@@ -55,7 +60,7 @@ The **Status** panel turns the discount on or off. An inactive discount can't be
 The list page shows each discount with:
 
 - **Name** -- Click it to open the discount's page.
-- **Code** -- The coupon code. A used-up single-use code is struck through. Once-per-customer codes show how many orders have used them, and members-only discounts say "Daily Grind members only".
+- **Code** -- The coupon code. A used-up single-use code is struck through. Once-per-customer codes show how many orders have used them, members-only and new-subscriber discounts say so, and subscription codes say "First subscription order".
 - **Type** and **Value** -- Including the minimum order, if any.
 - **Status** -- Active or inactive.
 - **Dates** -- The start and expiry dates, if set.

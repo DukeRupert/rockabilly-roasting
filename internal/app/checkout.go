@@ -409,6 +409,9 @@ type PlaceOrderParams struct {
 	// the order, nil for a guest. It is what a subscribers-only coupon is held
 	// against; CustomerID comes from the checkout form and proves nothing.
 	SignedInCustomerID *uuid.UUID
+	// SubscriptionSignup marks the first order of a new subscription, which
+	// takes subscription-signup coupons and refuses cart-checkout ones.
+	SubscriptionSignup bool
 	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
 	// whose lines are priced from the base price as every renewal is, and for
 	// retail checkout, whose cart was.
@@ -475,6 +478,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		appliedDiscount, coupon, err = s.ApplyCoupon(ctx, tx, *p.CouponCode, subtotal, CouponUse{
 			CustomerID:         &p.CustomerID,
 			SignedInCustomerID: p.SignedInCustomerID,
+			SubscriptionSignup: p.SubscriptionSignup,
 		})
 		if err != nil {
 			return nil, err
@@ -592,9 +596,13 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 // guest. It is kept apart from CustomerID because the checkout takes the
 // order's customer from a form — anyone can type a member's email — so only
 // the session can prove membership.
+//
+// SubscriptionSignup says the order is the first of a new subscription rather
+// than a cart checkout; each discount works on one kind or the other.
 type CouponUse struct {
 	CustomerID         *uuid.UUID
 	SignedInCustomerID *uuid.UUID
+	SubscriptionSignup bool
 }
 
 // ApplyCoupon looks a coupon code up and checks it against every rule —
@@ -661,6 +669,16 @@ func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *do
 		return nil, ErrDiscountNotActive
 	}
 
+	// The wrong kind of order is refused before anything about timing or
+	// money: the shopper is in the wrong place, and should hear that first.
+	signupCode := discount.AppliesTo == domain.DiscountAppliesToSubscriptionSignup
+	if signupCode && !use.SubscriptionSignup {
+		return nil, ErrCouponSignupOnly
+	}
+	if !signupCode && use.SubscriptionSignup {
+		return nil, ErrCouponOneTimeOnly
+	}
+
 	now := time.Now()
 	if discount.StartsAt != nil && now.Before(*discount.StartsAt) {
 		return nil, ErrDiscountNotStarted
@@ -673,9 +691,24 @@ func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *do
 		return nil, ErrMinimumOrderNotMet
 	}
 
-	if discount.Eligibility == domain.DiscountEligibilitySubscribers {
+	switch discount.Eligibility {
+	case domain.DiscountEligibilitySubscribers:
 		if err := s.checkSubscriber(ctx, tx, use); err != nil {
 			return nil, err
+		}
+	case domain.DiscountEligibilityNewSubscribers:
+		// Checked whenever the customer is known; a signup always knows by
+		// the time it places the order. The customer is whoever the form
+		// names — joining needs no sign-in, so there is nothing stronger to
+		// hold this to.
+		if use.CustomerID != nil {
+			subscribed, err := s.discounts.CustomerHasEverSubscribed(ctx, tx, *use.CustomerID)
+			if err != nil {
+				return nil, err
+			}
+			if subscribed {
+				return nil, ErrCouponNewSubscribersOnly
+			}
 		}
 	}
 

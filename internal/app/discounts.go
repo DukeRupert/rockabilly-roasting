@@ -137,6 +137,8 @@ type CreateDiscountParams struct {
 	UsageLimit domain.CouponUsageLimit
 	// Eligibility is who may use it; empty means anyone.
 	Eligibility domain.DiscountEligibility
+	// AppliesTo is the kind of order it works on; empty means one-time orders.
+	AppliesTo domain.DiscountAppliesTo
 }
 
 // CreateWithCode creates a discount and its first coupon code in one step.
@@ -163,6 +165,12 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 	if !p.Eligibility.Valid() {
 		return nil, ErrDiscountInvalid
 	}
+	if p.AppliesTo == "" {
+		p.AppliesTo = domain.DiscountAppliesToOneTime
+	}
+	if !p.AppliesTo.Valid() {
+		return nil, ErrDiscountInvalid
+	}
 
 	if _, err := s.discounts.GetCouponCodeByCode(ctx, tx, p.Code); err == nil {
 		return nil, ErrCouponCodeExists
@@ -180,6 +188,7 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 		Active:            true,
 		UsageLimit:        p.UsageLimit,
 		Eligibility:       p.Eligibility,
+		AppliesTo:         p.AppliesTo,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create discount: %w", err)
@@ -247,6 +256,8 @@ type EditDiscountParams struct {
 	// against it, so changing it only changes who can use the code next.
 	// Empty leaves it as it is.
 	Eligibility domain.DiscountEligibility
+	// AppliesTo is editable for the same reason. Empty leaves it as it is.
+	AppliesTo domain.DiscountAppliesTo
 }
 
 // Update edits an existing discount.
@@ -267,6 +278,9 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 	if p.Eligibility != "" && !p.Eligibility.Valid() {
 		return nil, ErrDiscountInvalid
 	}
+	if p.AppliesTo != "" && !p.AppliesTo.Valid() {
+		return nil, ErrDiscountInvalid
+	}
 	if p.StartsAt != nil && p.ExpiresAt != nil && !p.ExpiresAt.After(*p.StartsAt) {
 		return nil, fmt.Errorf("expiry must fall after the start date: %w", ErrDiscountInvalid)
 	}
@@ -281,6 +295,9 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 	if p.Eligibility == "" {
 		p.Eligibility = existing.Eligibility
 	}
+	if p.AppliesTo == "" {
+		p.AppliesTo = existing.AppliesTo
+	}
 
 	discount, err := s.discounts.Update(ctx, tx, store.UpdateDiscountParams{
 		ID:                id,
@@ -293,6 +310,7 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 		ExpiresAt:         p.ExpiresAt,
 		Active:            existing.Active,
 		Eligibility:       p.Eligibility,
+		AppliesTo:         p.AppliesTo,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update discount: %w", err)
@@ -337,6 +355,7 @@ func (s *DiscountService) SetActive(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		ExpiresAt:         discount.ExpiresAt,
 		Active:            active,
 		Eligibility:       discount.Eligibility,
+		AppliesTo:         discount.AppliesTo,
 	})
 	if err != nil {
 		return fmt.Errorf("update discount active: %w", err)

@@ -95,9 +95,9 @@ func (q *Queries) CreateCouponRedemption(ctx context.Context, arg CreateCouponRe
 }
 
 const createDiscount = `-- name: CreateDiscount :one
-INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility
+INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility, applies_to)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to
 `
 
 type CreateDiscountParams struct {
@@ -112,6 +112,7 @@ type CreateDiscountParams struct {
 	Active            bool               `json:"active"`
 	UsageLimit        string             `json:"usage_limit"`
 	Eligibility       string             `json:"eligibility"`
+	AppliesTo         string             `json:"applies_to"`
 }
 
 func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error) {
@@ -127,6 +128,7 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		arg.Active,
 		arg.UsageLimit,
 		arg.Eligibility,
+		arg.AppliesTo,
 	)
 	var i Discount
 	err := row.Scan(
@@ -143,8 +145,24 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		&i.UpdatedAt,
 		&i.UsageLimit,
 		&i.Eligibility,
+		&i.AppliesTo,
 	)
 	return i, err
+}
+
+const customerHasEverSubscribed = `-- name: CustomerHasEverSubscribed :one
+SELECT EXISTS (
+    SELECT 1 FROM subscriptions WHERE customer_id = $1
+)
+`
+
+// Whether a customer has held a subscription in any status, for a
+// new-subscribers-only discount.
+func (q *Queries) CustomerHasEverSubscribed(ctx context.Context, customerID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, customerHasEverSubscribed, customerID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const customerHasRedeemedDiscount = `-- name: CustomerHasRedeemedDiscount :one
@@ -294,7 +312,7 @@ func (q *Queries) GetCouponRedemptionByOrderID(ctx context.Context, orderID uuid
 }
 
 const getDiscountByID = `-- name: GetDiscountByID :one
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility FROM discounts WHERE id = $1
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to FROM discounts WHERE id = $1
 `
 
 func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error) {
@@ -314,6 +332,7 @@ func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, 
 		&i.UpdatedAt,
 		&i.UsageLimit,
 		&i.Eligibility,
+		&i.AppliesTo,
 	)
 	return i, err
 }
@@ -461,9 +480,9 @@ func (q *Queries) ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrde
 const updateDiscount = `-- name: UpdateDiscount :one
 UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
-    starts_at = $7, expires_at = $8, active = $9, eligibility = $10, updated_at = now()
+    starts_at = $7, expires_at = $8, active = $9, eligibility = $10, applies_to = $11, updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to
 `
 
 type UpdateDiscountParams struct {
@@ -477,6 +496,7 @@ type UpdateDiscountParams struct {
 	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
 	Active            bool               `json:"active"`
 	Eligibility       string             `json:"eligibility"`
+	AppliesTo         string             `json:"applies_to"`
 }
 
 func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error) {
@@ -491,6 +511,7 @@ func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) 
 		arg.ExpiresAt,
 		arg.Active,
 		arg.Eligibility,
+		arg.AppliesTo,
 	)
 	var i Discount
 	err := row.Scan(
@@ -507,6 +528,7 @@ func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) 
 		&i.UpdatedAt,
 		&i.UsageLimit,
 		&i.Eligibility,
+		&i.AppliesTo,
 	)
 	return i, err
 }

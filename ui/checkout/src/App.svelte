@@ -208,6 +208,7 @@
     if (pi.coupon_notice) {
       appliedCoupon = null;
       couponError = pi.coupon_notice;
+      couponSignInUrl = pi.coupon_sign_in_url || '';
     }
   }
 </script>

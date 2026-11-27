@@ -102,6 +102,8 @@ export interface PaymentIntentResponse {
   // example a one-per-customer code this shopper has already used). The
   // server has already taken it off the cart and priced without it.
   coupon_notice?: string;
+  // Set with coupon_notice when the dropped code is for members.
+  coupon_sign_in_url?: string;
 }
 
 export interface ConfirmRequest {

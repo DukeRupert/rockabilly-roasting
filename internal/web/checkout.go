@@ -160,6 +160,9 @@ type checkoutPaymentIntentResponse struct {
 	// shopper was known, who turns out to have used it. The coupon has been
 	// taken off the cart; the client shows this beside the code box.
 	CouponNotice string `json:"coupon_notice,omitempty"`
+	// CouponSignInURL accompanies a notice that the dropped code is for
+	// members, as checkoutApplyCouponResponse.SignInURL does at the code box.
+	CouponSignInURL string `json:"coupon_sign_in_url,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -623,7 +626,7 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 			d.Metrics.CouponRejected.WithLabelValues(label).Inc()
 			resp = checkoutApplyCouponResponse{ErrorMessage: msg}
 			if errors.Is(txErr, app.ErrCouponSignInRequired) {
-				resp.SignInURL = "/account/login?next=" + url.QueryEscape("/checkout")
+				resp.SignInURL = checkoutSignInURL
 			}
 			return nil
 		}
@@ -730,18 +733,19 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 	// Phase 1: load cart + compute totals (tx, no external calls).
 	var (
-		subtotal      int
-		discountTotal int
-		discountName  string
-		couponCode    string
-		couponNotice  string
-		taxTotal      int
-		taxLabel      string
-		shippingTotal int
-		shippingLabel string
-		shippingAddr  *domain.Address
-		orderItems    []app.CartItem
-		chosenMethod  *domain.ShippingMethod
+		subtotal        int
+		discountTotal   int
+		discountName    string
+		couponCode      string
+		couponNotice    string
+		couponSignInURL string
+		taxTotal        int
+		taxLabel        string
+		shippingTotal   int
+		shippingLabel   string
+		shippingAddr    *domain.Address
+		orderItems      []app.CartItem
+		chosenMethod    *domain.ShippingMethod
 	)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -822,6 +826,9 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 					return fmt.Errorf("clear refused coupon: %w", clearErr)
 				}
 				couponNotice = msg
+				if errors.Is(ccErr, app.ErrCouponSignInRequired) {
+					couponSignInURL = checkoutSignInURL
+				}
 			default:
 				return fmt.Errorf("check applied coupon: %w", ccErr)
 			}
@@ -1029,20 +1036,25 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
-		ClientSecret:  pi.ClientSecret,
-		Amount:        totalCents,
-		Currency:      "usd",
-		Subtotal:      subtotal,
-		DiscountTotal: discountTotal,
-		DiscountName:  discountName,
-		CouponCode:    couponCode,
-		TaxTotal:      taxTotal,
-		TaxLabel:      taxLabel,
-		ShippingTotal: shippingTotal,
-		ShippingLabel: shippingLabel,
-		CouponNotice:  couponNotice,
+		ClientSecret:    pi.ClientSecret,
+		Amount:          totalCents,
+		Currency:        "usd",
+		Subtotal:        subtotal,
+		DiscountTotal:   discountTotal,
+		DiscountName:    discountName,
+		CouponCode:      couponCode,
+		TaxTotal:        taxTotal,
+		TaxLabel:        taxLabel,
+		ShippingTotal:   shippingTotal,
+		ShippingLabel:   shippingLabel,
+		CouponNotice:    couponNotice,
+		CouponSignInURL: couponSignInURL,
 	})
 }
+
+// checkoutSignInURL sends a shopper to sign in and back to checkout. Their cart
+// survives: its cookie is not the session's.
+var checkoutSignInURL = "/account/login?next=" + url.QueryEscape("/checkout")
 
 // couponRefusal is the shopper-facing sentence and metric label for a coupon
 // the rules refused. ok is false for anything else, which callers treat as a

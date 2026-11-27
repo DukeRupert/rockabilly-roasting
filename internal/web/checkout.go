@@ -50,6 +50,10 @@ type checkoutCartResponse struct {
 	// Coupon reports a coupon already applied to this cart (and still
 	// valid) so the checkout UI can show the applied state after a reload.
 	Coupon *checkoutCartCoupon `json:"coupon,omitempty"`
+	// FreeShippingRemaining is how many more cents (after the applied coupon)
+	// clear the free-shipping threshold; 0 once met. Omitted when no threshold
+	// is configured.
+	FreeShippingRemaining *int `json:"free_shipping_remaining,omitempty"`
 }
 
 type checkoutCartCoupon struct {
@@ -146,6 +150,10 @@ type checkoutPaymentIntentResponse struct {
 	TaxLabel      string `json:"tax_label,omitempty"`
 	ShippingTotal int    `json:"shipping_total"`
 	ShippingLabel string `json:"shipping_label,omitempty"`
+	// FreeShippingRemaining is set only when the order ships by carrier and a
+	// threshold is configured — pickup and local delivery are already free, so
+	// there is nothing to nudge toward.
+	FreeShippingRemaining *int `json:"free_shipping_remaining,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -320,15 +328,15 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 		// Surface the applied coupon (if still valid) so the UI can restore
 		// the applied state on reload. Mirrors the payment-intent validity
 		// rules: unredeemed, active, minimum met.
-		if cart.AppliedCouponCodeID != nil {
-			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
-			if ccErr == nil && cc.RedeemedAt == nil {
-				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
-				if dErr == nil && discount.Active &&
-					(discount.MinimumOrderCents == nil || resp.Subtotal >= *discount.MinimumOrderCents) {
-					resp.Coupon = &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}
-				}
-			}
+		discountCents, coupon := d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, resp.Subtotal)
+		resp.Coupon = coupon
+
+		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return fmt.Errorf("get shipping config: %w", txErr)
+		}
+		if remaining, ok := shipCfg.FreeShippingRemaining(resp.Subtotal - discountCents); ok {
+			resp.FreeShippingRemaining = &remaining
 		}
 
 		if customer, ok := auth.CustomerFromContext(ctx); ok {
@@ -721,6 +729,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		shippingAddr  *domain.Address
 		orderItems    []app.CartItem
 		chosenMethod  *domain.ShippingMethod
+
+		freeShippingRemaining *int
 	)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -867,6 +877,11 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		chosenMethod = resolveLocalMethod(eligible, req.ShippingMethod, customer.PreferredLocalFulfillment)
 		shippingTotal = shipCfg.CalculateForMethod(discountedSubtotal, shippingAddr.PostalCode, chosenMethod)
 		shippingLabel = shippingDisplayLabel(shipCfg, shippingTotal, shippingAddr.PostalCode, chosenMethod)
+		if chosenMethod == nil || *chosenMethod == domain.ShippingMethodShipped {
+			if remaining, ok := shipCfg.FreeShippingRemaining(discountedSubtotal); ok {
+				freeShippingRemaining = &remaining
+			}
+		}
 
 		return nil
 	})
@@ -1006,6 +1021,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		TaxLabel:      taxLabel,
 		ShippingTotal: shippingTotal,
 		ShippingLabel: shippingLabel,
+
+		FreeShippingRemaining: freeShippingRemaining,
 	})
 }
 
@@ -1379,6 +1396,27 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 		return nil, err
 	}
 	return &analytics, nil
+}
+
+// appliedCouponDiscount returns the discount a cart's applied coupon is worth
+// against subtotal, and the coupon for display, using the same validity rules
+// as payment-intent pricing: unredeemed, active, minimum met. A missing or
+// no-longer-valid coupon is worth 0 and returns nil — this feeds display only,
+// so lookup failures are swallowed rather than failing the page.
+func (d *Deps) appliedCouponDiscount(ctx context.Context, tx pgx.Tx, couponCodeID *uuid.UUID, subtotal int) (int, *checkoutCartCoupon) {
+	if couponCodeID == nil {
+		return 0, nil
+	}
+	cc, err := d.CheckoutService.GetCouponCodeByID(ctx, tx, *couponCodeID)
+	if err != nil || cc.RedeemedAt != nil {
+		return 0, nil
+	}
+	discount, err := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
+	if err != nil || !discount.Active ||
+		(discount.MinimumOrderCents != nil && subtotal < *discount.MinimumOrderCents) {
+		return 0, nil
+	}
+	return calculateDiscountAmount(discount, subtotal), &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}
 }
 
 // calculateDiscountAmount computes the discount amount in cents.

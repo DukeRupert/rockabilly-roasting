@@ -154,6 +154,18 @@ func (c ShippingConfig) CalculateForMethod(subtotalCents int, shipToZip string, 
 	return c.FlatRateCents
 }
 
+// FreeShippingRemaining reports how many more cents the shopper must spend to
+// clear the free-shipping threshold. qualifyingSubtotalCents must be the same
+// figure CalculateForMethod is priced on (the subtotal after any coupon) or the
+// nudge and the charged shipping disagree. ok is false when no threshold is
+// configured; remaining is 0 once the threshold is met.
+func (c ShippingConfig) FreeShippingRemaining(qualifyingSubtotalCents int) (remaining int, ok bool) {
+	if c.FreeShippingThreshold == nil {
+		return 0, false
+	}
+	return max(*c.FreeShippingThreshold-qualifyingSubtotalCents, 0), true
+}
+
 // EligibleLocalMethods returns the local fulfillment methods available for a
 // given ship-to zip, in stable display order (delivery first, then pickup).
 // Returns an empty slice when the zip is not local or when no local toggles

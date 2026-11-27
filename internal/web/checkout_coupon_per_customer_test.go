@@ -2,6 +2,10 @@ package web
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -96,4 +100,46 @@ func TestLoadOrderAnalytics_Coupon(t *testing.T) {
 	got, err = d.loadOrderAnalytics(ctx, without)
 	require.NoError(t, err)
 	assert.Empty(t, got.Coupon)
+}
+
+// Once the information step has named the shopper, the code box refuses a
+// once-per-customer code they have already used, rather than letting them
+// find out at the payment step. Before that it cannot know, and lets it on.
+func TestCheckoutApplyCoupon_OncePerCustomerUsesTheCustomerWhenKnown(t *testing.T) {
+	ctx := context.Background()
+	f := newCheckoutCouponFixture(t)
+	d, _ := newCheckoutPaymentDeps(t)
+
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+	discount := testutil.CreateDiscount(t, tx,
+		testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer))
+	coupon := testutil.CreateCouponCode(t, tx, discount.ID,
+		testutil.WithCouponCode("SHARED-"+uuid.New().String()[:8]))
+	earlier := testutil.CreateOrder(t, tx, f.customer.ID, f.addressID, f.addressID)
+	_, err = store.NewDiscountStore().CreateRedemption(ctx, tx, store.CreateRedemptionParams{
+		DiscountID: discount.ID, CouponCodeID: coupon.ID,
+		CustomerID: f.customer.ID, OrderID: earlier.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit(ctx))
+
+	apply := func(customerID string) checkoutApplyCouponResponse {
+		t.Helper()
+		body, err := json.Marshal(checkoutApplyCouponRequest{CartID: f.cartID.String(), Code: coupon.Code, CustomerID: customerID})
+		require.NoError(t, err)
+		w := httptest.NewRecorder()
+		d.handleCheckoutApplyCoupon(w, httptest.NewRequest(http.MethodPost, "/api/checkout/coupon", strings.NewReader(string(body))))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var resp checkoutApplyCouponResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		return resp
+	}
+
+	known := apply(f.customer.ID.String())
+	assert.False(t, known.Valid)
+	assert.Contains(t, known.ErrorMessage, "already used")
+
+	assert.True(t, apply("").Valid, "an anonymous shopper cannot be checked yet")
 }

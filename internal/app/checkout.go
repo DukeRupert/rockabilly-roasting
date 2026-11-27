@@ -581,30 +581,6 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	return order, nil
 }
 
-// GetCouponCodeByID returns a coupon code by ID.
-func (s *CheckoutService) GetCouponCodeByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.CouponCode, error) {
-	coupon, err := s.discounts.GetCouponCodeByID(ctx, tx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCouponNotFound
-		}
-		return nil, fmt.Errorf("get coupon code: %w", err)
-	}
-	return coupon, nil
-}
-
-// GetCouponCodeByCode returns a coupon code by its code string.
-func (s *CheckoutService) GetCouponCodeByCode(ctx context.Context, tx pgx.Tx, code string) (*domain.CouponCode, error) {
-	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, code)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCouponNotFound
-		}
-		return nil, fmt.Errorf("get coupon code: %w", err)
-	}
-	return coupon, nil
-}
-
 // CouponUse is who a coupon is being used by.
 //
 // CustomerID is nil while the shopper is still unknown. The code box sits

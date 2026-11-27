@@ -492,8 +492,6 @@ func Storefront(props StorefrontProps) templ.Component {
 	})
 }
 
-// CartBadge renders the header cart count chip. Count 0 collapses to a
-// screen-reader-only "empty" so the badge never shows "· 0".
 // promoStrip is the offer strip above the header: one line per live discount
 // staff are promoting to this shopper. Outside the sticky header, so it
 // scrolls away and the header keeps its height. Outside #main-content too, so
@@ -533,7 +531,7 @@ func promoStrip(banners []domain.PromoBanner) templ.Component {
 				var templ_7745c5c3_Var20 templ.SafeURL
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(b.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 765, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 763, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -546,7 +544,7 @@ func promoStrip(banners []domain.PromoBanner) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(b.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 765, Col: 198}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 763, Col: 198}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -566,6 +564,8 @@ func promoStrip(banners []domain.PromoBanner) templ.Component {
 	})
 }
 
+// CartBadge renders the header cart count chip. Count 0 collapses to a
+// screen-reader-only "empty" so the badge never shows "· 0".
 func CartBadge(count int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

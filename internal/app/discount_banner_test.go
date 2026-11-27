@@ -138,9 +138,13 @@ func TestStorefrontBanners_OnlyLiveDiscounts(t *testing.T) {
 
 	t.Run("a discount without a banner line is not promoted", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
-		d, text := bannerDiscount(t, tx, svc)
+		d, _ := bannerDiscount(t, tx, svc)
 		require.NoError(t, svc.SetBannerText(context.Background(), tx, d.ID, "  ", testutil.TestActor()))
-		assert.NotContains(t, bannerTexts(t, tx, svc, nil), text)
+		banners, err := svc.StorefrontBanners(context.Background(), tx, nil)
+		require.NoError(t, err)
+		for _, b := range banners {
+			assert.NotEmpty(t, b.Text, "an unpromoted discount would be an empty, linked line")
+		}
 	})
 
 	t.Run("soonest to end comes first", func(t *testing.T) {

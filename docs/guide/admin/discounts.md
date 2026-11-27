@@ -97,14 +97,14 @@ Coupon entry is rate-limited by IP address to prevent abuse.
 
 A discount can be promoted in a strip of offers above the header on every storefront page. Open the discount and use the **Site banner** card on the right:
 
-1. Write one short line, at most 120 characters, and **include the code**. For example: *Holiday gift: 20% off any bag with code GIFT20*.
+1. Write one short line, at most 120 characters, and **include the code**. For example: *Holiday gift: 20% off any bag with code GIFT20*. The referral offer is the exception: leave the code out, because each member has their own. For example: *Share your Daily Grind code: friends get 50% off, you get a free bag*.
 2. Click **Save banner**.
 
-The line links to where the code is used: the shop for one-time orders, the Daily Grind page for a first subscription order, and a member's subscriptions page for the referral offer.
+The line links to where the code is used: the shop for one-time orders, the Daily Grind page for a first subscription order, and a member's subscriptions page for the referral offer. The card says who will see the line and where it links before you save.
 
 The banner only shows while the discount is **active and within its dates**, so it goes away when the discount ends. Nobody has to remember to take it down. To stop showing it sooner, empty the line and save, or deactivate the discount.
 
-The site shows each line only to customers who can use it, so it never advertises a code that checkout would refuse:
+The site shows each line only to the customers the discount is for:
 
 | Discount | Who sees the banner |
 |---|---|

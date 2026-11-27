@@ -210,3 +210,31 @@ func TestDiscountBannerCard(t *testing.T) {
 		t.Error("a members-only offer does not say it is members only")
 	}
 }
+
+// The card's "linking to" must match app.bannerHref for every setup staff can
+// make: who sees it follows eligibility, where it links follows order type,
+// and the two are chosen independently on the form.
+func TestDiscountBannerAudience_EverySetup(t *testing.T) {
+	for _, tc := range []struct {
+		elig    domain.DiscountEligibility
+		applies domain.DiscountAppliesTo
+		want    string
+	}{
+		{domain.DiscountEligibilityAnyone, domain.DiscountAppliesToOneTime, "Seen by everyone, linking to the shop."},
+		{domain.DiscountEligibilityAnyone, domain.DiscountAppliesToSubscriptionSignup, "Seen by everyone, linking to the Daily Grind page."},
+		{domain.DiscountEligibilitySubscribers, domain.DiscountAppliesToOneTime, "Seen by signed-in Daily Grind members only, linking to the shop."},
+		{domain.DiscountEligibilitySubscribers, domain.DiscountAppliesToSubscriptionSignup, "Seen by signed-in Daily Grind members only, linking to the Daily Grind page."},
+		{domain.DiscountEligibilityNewSubscribers, domain.DiscountAppliesToOneTime, "Seen by everyone except signed-in customers who have subscribed before, linking to the shop."},
+		{domain.DiscountEligibilityNewSubscribers, domain.DiscountAppliesToSubscriptionSignup, "Seen by everyone except signed-in customers who have subscribed before, linking to the Daily Grind page."},
+	} {
+		got := discountBannerAudience(domain.Discount{Eligibility: tc.elig, AppliesTo: tc.applies})
+		if !strings.HasPrefix(got, tc.want) || !strings.Contains(got, "Include the code") {
+			t.Errorf("%s + %s: got %q, want it to start %q and ask for the code", tc.elig, tc.applies, got, tc.want)
+		}
+	}
+
+	ref := discountBannerAudience(domain.Discount{IsReferral: true, Eligibility: domain.DiscountEligibilityNewSubscribers, AppliesTo: domain.DiscountAppliesToSubscriptionSignup})
+	if !strings.Contains(ref, "subscriptions page") || !strings.Contains(ref, "Don't put a code") || strings.Contains(ref, "Include the code") {
+		t.Errorf("referral offer: %q", ref)
+	}
+}

@@ -49,8 +49,11 @@ func (s *DiscountService) SetBannerText(ctx context.Context, tx pgx.Tx, id uuid.
 // discount with banner copy that this shopper could use. customer is the
 // signed-in customer, nil for a guest.
 //
-// The audience follows the discount's own rules, so the strip never advertises
-// a code that checkout would refuse:
+// The audience follows the discount's own eligibility rules, so the strip does
+// not advertise a code to someone it is not meant for. (It cannot know about
+// per-order limits — a single-use code already spent, a once-per-customer
+// offer this shopper has used, a minimum order — and checkout still refuses
+// those.)
 //   - the referral offer goes to active members, who share it, not to the
 //     friends it discounts — they arrive with a member's code;
 //   - subscribers-only goes to signed-in active members;

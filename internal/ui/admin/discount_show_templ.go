@@ -1442,7 +1442,7 @@ func discountBannerCard(props DiscountShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, " Include the code in the line. It shows only while the discount is active and within its dates. Leave it empty to stop showing it.</p><button type=\"submit\" class=\"btn-confirm w-full justify-center\">Save banner</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, " It shows only while the discount is active and within its dates. Leave it empty to stop showing it.</p><button type=\"submit\" class=\"btn-confirm w-full justify-center\">Save banner</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1457,20 +1457,25 @@ func discountBannerCard(props DiscountShowProps) templ.Component {
 }
 
 // discountBannerAudience says who sees the banner, by the same rules as
-// DiscountService.StorefrontBanners, and where the line links.
+// DiscountService.StorefrontBanners, and where the line links, by the same
+// rule as app.bannerHref: the referral offer first, then the order type.
 func discountBannerAudience(d domain.Discount) string {
+	var who string
 	switch {
 	case d.IsReferral:
-		return "Seen by signed-in Daily Grind members, linking to their subscriptions page where their own code is."
+		return "Seen by signed-in Daily Grind members, linking to their subscriptions page, where their own code is. Don't put a code in this line: each member has their own, and this discount's own code doesn't work."
 	case d.Eligibility == domain.DiscountEligibilitySubscribers:
-		return "Seen by signed-in Daily Grind members only, linking to the shop."
+		who = "Seen by signed-in Daily Grind members only"
 	case d.Eligibility == domain.DiscountEligibilityNewSubscribers:
-		return "Seen by everyone except signed-in customers who have subscribed before, linking to the Daily Grind page."
-	case d.AppliesTo == domain.DiscountAppliesToSubscriptionSignup:
-		return "Seen by everyone, linking to the Daily Grind page."
+		who = "Seen by everyone except signed-in customers who have subscribed before"
 	default:
-		return "Seen by everyone, linking to the shop."
+		who = "Seen by everyone"
 	}
+	where := "the shop"
+	if d.AppliesTo == domain.DiscountAppliesToSubscriptionSignup {
+		where = "the Daily Grind page"
+	}
+	return who + ", linking to " + where + ". Include the code in the line."
 }
 
 var _ = templruntime.GeneratedTemplate

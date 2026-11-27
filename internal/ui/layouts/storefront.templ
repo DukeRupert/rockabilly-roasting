@@ -749,8 +749,6 @@ templ Storefront(props StorefrontProps) {
 	</html>
 }
 
-// CartBadge renders the header cart count chip. Count 0 collapses to a
-// screen-reader-only "empty" so the badge never shows "· 0".
 // promoStrip is the offer strip above the header: one line per live discount
 // staff are promoting to this shopper. Outside the sticky header, so it
 // scrolls away and the header keeps its height. Outside #main-content too, so
@@ -770,6 +768,8 @@ templ promoStrip(banners []domain.PromoBanner) {
 	}
 }
 
+// CartBadge renders the header cart count chip. Count 0 collapses to a
+// screen-reader-only "empty" so the badge never shows "· 0".
 templ CartBadge(count int) {
 	if count > 0 {
 		<span id="cart-badge">· { fmt.Sprintf("%d", count) }</span>

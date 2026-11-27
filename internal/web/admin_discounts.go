@@ -442,6 +442,8 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 		switch {
 		case errors.Is(err, app.ErrDiscountNotFound):
 			http.NotFound(w, r)
+		case errors.Is(err, app.ErrReferralOfferInvalid):
+			fail("This is the referral offer, so it has to stay for the first subscription order. Stop using it as the referral offer first.")
 		case errors.Is(err, app.ErrDiscountInvalid):
 			fail("Those settings are not valid. Check the value and the dates.")
 		default:

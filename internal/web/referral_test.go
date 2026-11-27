@@ -133,7 +133,7 @@ func TestReferral_NoCardWithoutAnActiveSubscription(t *testing.T) {
 	assert.NotContains(t, subscriptionsPageAs(t, d, stranger), "Share the Daily Grind")
 }
 
-// Only a once-per-customer discount can be the offer; the handler says why.
+// A discount that fails the offer's rules is refused, and the handler says why.
 func TestAdminDiscountReferralSet_RefusesASingleUseDiscount(t *testing.T) {
 	d := newDiscountAdminDeps(t)
 	code := "SINGLE" + strings.ToUpper(uuid.NewString()[:8])
@@ -147,4 +147,26 @@ func TestAdminDiscountReferralSet_RefusesASingleUseDiscount(t *testing.T) {
 	require.Equal(t, http.StatusSeeOther, w.Code)
 	assert.Contains(t, w.Header().Get("Location"), "error=")
 	assert.False(t, discountByCode(t, d, code).IsReferral)
+}
+
+// The edit form cannot move the offer off the first subscription order, and
+// a hand-made request that tries is refused with a reason.
+func TestAdminDiscountUpdate_KeepsTheOfferOnSignups(t *testing.T) {
+	d := newAccountBoxDeps(t)
+	id := makeReferralOffer(t, d).String()
+
+	w := postDiscountForm(t, d.handleAdminDiscountUpdate, "/admin/discounts/"+id, url.Values{
+		"name": {"Friends"}, "type": {"percentage"}, "value": {"50"}, "applies_to": {"one_time"},
+	}, id)
+	require.Equal(t, http.StatusSeeOther, w.Code)
+	assert.Contains(t, w.Header().Get("Location"), "error=")
+
+	ctx := context.Background()
+	tx, err := testPool.Begin(ctx)
+	require.NoError(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+	got, err := d.DiscountService.GetDiscount(ctx, tx, uuid.MustParse(id))
+	require.NoError(t, err)
+	assert.Equal(t, domain.DiscountAppliesToSubscriptionSignup, got.AppliesTo)
+	assert.True(t, got.IsReferral)
 }

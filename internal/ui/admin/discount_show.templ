@@ -334,17 +334,28 @@ templ discountEditCard(props DiscountShowProps) {
 					<option value="new_subscribers" selected?={ props.Discount.Eligibility == domain.DiscountEligibilityNewSubscribers }>New subscribers only</option>
 				</select>
 			</div>
-			<div>
-				<label for="d-applies-to" class="block text-xs text-rr-muted">Order type</label>
-				<select
-					id="d-applies-to"
-					name="applies_to"
-					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
-				>
-					<option value="one_time" selected?={ props.Discount.AppliesTo != domain.DiscountAppliesToSubscriptionSignup }>One-time orders</option>
-					<option value="subscription_signup" selected?={ props.Discount.AppliesTo == domain.DiscountAppliesToSubscriptionSignup }>First subscription order</option>
-				</select>
-			</div>
+			if props.Discount.IsReferral {
+				<!-- The referral offer's order type is fixed: members' cards promise
+				     their friends a first subscription order. -->
+				<div>
+					<p class="block text-xs text-rr-muted">Order type</p>
+					<p class="mt-1 text-sm text-rr-heading">First subscription order</p>
+					<p class="text-xs text-rr-muted">Fixed while this is the referral offer.</p>
+					<input type="hidden" name="applies_to" value="subscription_signup"/>
+				</div>
+			} else {
+				<div>
+					<label for="d-applies-to" class="block text-xs text-rr-muted">Order type</label>
+					<select
+						id="d-applies-to"
+						name="applies_to"
+						class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+					>
+						<option value="one_time" selected?={ props.Discount.AppliesTo != domain.DiscountAppliesToSubscriptionSignup }>One-time orders</option>
+						<option value="subscription_signup" selected?={ props.Discount.AppliesTo == domain.DiscountAppliesToSubscriptionSignup }>First subscription order</option>
+					</select>
+				</div>
+			}
 			<div>
 				<label for="d-min" class="block text-xs text-rr-muted">Minimum order &mdash; blank for none</label>
 				<input

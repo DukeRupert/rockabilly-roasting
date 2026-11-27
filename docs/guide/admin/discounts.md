@@ -101,7 +101,7 @@ Each active Daily Grind member can share their own code. A friend who uses it ge
 
 The code you typed when creating the discount stops working once it is the referral offer: the offer only works through a member's code, because the code is what says who referred the friend. So use a separate discount for referrals, not one whose code you've already shared, like WELCOME50. The confirmation names the code that will stop working.
 
-Members only see their code while the offer can be used: switched on, past its start date and before its last valid day. An expired offer's card disappears.
+Members only see their code while the offer can be used: switched on, past its start date and through its last valid day. An expired offer's card disappears.
 
 **Members' codes.** Every member with an active subscription sees a "Share the Daily Grind" card on their subscriptions page with their own code (their first name and four characters, like LOGAN-7KQ2), a copy button, and how many friends have joined with it. A member can't use their own code. The discount's page shows how many member codes exist rather than listing them.
 

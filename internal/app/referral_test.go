@@ -100,7 +100,7 @@ func TestReferral_MemberCodes(t *testing.T) {
 		assert.Nil(t, code, "an inactive offer has nothing to share")
 	})
 
-	t.Run("only a once-per-customer discount can be the offer, and there is one at a time", func(t *testing.T) {
+	t.Run("a single-use discount cannot be the offer, and there is one at a time", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		single := testutil.CreateDiscount(t, tx)
 		assert.ErrorIs(t, svc.SetReferralOffer(ctx, tx, single.ID, testutil.TestActor()), app.ErrReferralOfferInvalid)
@@ -327,5 +327,49 @@ func TestReferral_ReviewFixes(t *testing.T) {
 		n, err := svc.ReferralFriendsCount(ctx, tx, m.customer.ID)
 		require.NoError(t, err)
 		assert.Zero(t, n)
+	})
+}
+
+// The offer's rules, one at a time: each fixture fails exactly one, so each
+// check is held on its own. And they hold on edit, not only when chosen.
+func TestReferral_OfferRules(t *testing.T) {
+	ctx := context.Background()
+	svc := newDiscountService()
+	actor := testutil.TestActor()
+	signup := testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup)
+	once := testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer)
+
+	for name, opts := range map[string][]testutil.DiscountOption{
+		"single-use":         {signup},
+		"one-time orders":    {once},
+		"free shipping type": {signup, once, testutil.WithDiscountType(domain.DiscountTypeFreeShipping)},
+	} {
+		t.Run(name+" is refused", func(t *testing.T) {
+			tx := testutil.NewTestTx(t, testPool)
+			d := testutil.CreateDiscount(t, tx, opts...)
+			assert.ErrorIs(t, svc.SetReferralOffer(ctx, tx, d.ID, actor), app.ErrReferralOfferInvalid)
+		})
+	}
+
+	t.Run("the offer cannot be edited into a one-time-order code", func(t *testing.T) {
+		// Members' cards would go on promising a first subscription order
+		// their friends would be refused, while a one-time order on the code
+		// earned a bag.
+		tx := testutil.NewTestTx(t, testPool)
+		offer := newReferralOffer(t, tx)
+
+		_, err := svc.Update(ctx, tx, offer.ID, app.EditDiscountParams{
+			Name: offer.Name, Type: offer.Type, Value: offer.Value, AppliesTo: domain.DiscountAppliesToOneTime,
+		}, actor)
+		assert.ErrorIs(t, err, app.ErrReferralOfferInvalid)
+
+		// Everything else about it can still be edited.
+		got, err := svc.Update(ctx, tx, offer.ID, app.EditDiscountParams{
+			Name: "Friends 40", Type: offer.Type, Value: 40,
+		}, actor)
+		require.NoError(t, err)
+		assert.Equal(t, 40, got.Value)
+		assert.True(t, got.IsReferral)
+		assert.Equal(t, domain.DiscountAppliesToSubscriptionSignup, got.AppliesTo)
 	})
 }

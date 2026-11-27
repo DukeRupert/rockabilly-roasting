@@ -300,6 +300,11 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 	if p.AppliesTo == "" {
 		p.AppliesTo = existing.AppliesTo
 	}
+	if existing.IsReferral {
+		if err := referralOfferRules(existing.UsageLimit, p.AppliesTo, p.Type); err != nil {
+			return nil, err
+		}
+	}
 
 	discount, err := s.discounts.Update(ctx, tx, store.UpdateDiscountParams{
 		ID:                id,
@@ -411,13 +416,8 @@ func (s *DiscountService) SetReferralOffer(ctx context.Context, tx pgx.Tx, id uu
 	if err != nil {
 		return err
 	}
-	switch {
-	case d.UsageLimit != domain.CouponUsageOncePerCustomer:
-		return fmt.Errorf("a referral offer must be once per customer: %w", ErrReferralOfferInvalid)
-	case d.AppliesTo != domain.DiscountAppliesToSubscriptionSignup:
-		return fmt.Errorf("a referral offer must be for the first subscription order: %w", ErrReferralOfferInvalid)
-	case d.Type != domain.DiscountTypePercentage && d.Type != domain.DiscountTypeFixedAmount:
-		return fmt.Errorf("a referral offer must take money off: %w", ErrReferralOfferInvalid)
+	if err := referralOfferRules(d.UsageLimit, d.AppliesTo, d.Type); err != nil {
+		return err
 	}
 	if d.IsReferral {
 		return nil
@@ -521,6 +521,22 @@ func (s *DiscountService) MemberReferralCode(ctx context.Context, tx pgx.Tx, cus
 		}
 	}
 	return nil, nil, fmt.Errorf("mint referral code for customer %s after 5 tries: %w", customer.ID, lastErr)
+}
+
+// referralOfferRules is what a discount must be to be the referral offer, and
+// stay it: SetReferralOffer holds a discount to it when it is chosen, and
+// Update when the offer is edited, so an edit cannot leave members' cards
+// promising what their friends will be refused.
+func referralOfferRules(usage domain.CouponUsageLimit, appliesTo domain.DiscountAppliesTo, t domain.DiscountType) error {
+	switch {
+	case usage != domain.CouponUsageOncePerCustomer:
+		return fmt.Errorf("a referral offer must be once per customer: %w", ErrReferralOfferInvalid)
+	case appliesTo != domain.DiscountAppliesToSubscriptionSignup:
+		return fmt.Errorf("a referral offer must be for the first subscription order: %w", ErrReferralOfferInvalid)
+	case t != domain.DiscountTypePercentage && t != domain.DiscountTypeFixedAmount:
+		return fmt.Errorf("a referral offer must take money off: %w", ErrReferralOfferInvalid)
+	}
+	return nil
 }
 
 // discountLive reports whether a discount's codes can be used at now: switched

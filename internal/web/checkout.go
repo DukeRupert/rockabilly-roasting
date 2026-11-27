@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -117,6 +118,10 @@ type checkoutAddressResponse struct {
 type checkoutApplyCouponRequest struct {
 	CartID string `json:"cart_id"`
 	Code   string `json:"code"`
+	// CustomerID is sent once the information step has named the shopper, so
+	// a code they have already used is refused at the box rather than at the
+	// payment step. Optional: the box is usable before that step.
+	CustomerID string `json:"customer_id,omitempty"`
 }
 
 type checkoutApplyCouponResponse struct {
@@ -125,6 +130,10 @@ type checkoutApplyCouponResponse struct {
 	DiscountType  string `json:"discount_type,omitempty"`
 	DiscountValue int    `json:"discount_value,omitempty"`
 	ErrorMessage  string `json:"error_message,omitempty"`
+	// SignInURL is set when the code is for members and the shopper is not
+	// signed in. Signing in keeps the cart (its cookie is not the session's),
+	// and the login page returns them here.
+	SignInURL string `json:"sign_in_url,omitempty"`
 }
 
 type checkoutRemoveCouponRequest struct {
@@ -150,6 +159,14 @@ type checkoutPaymentIntentResponse struct {
 	TaxLabel      string `json:"tax_label,omitempty"`
 	ShippingTotal int    `json:"shipping_total"`
 	ShippingLabel string `json:"shipping_label,omitempty"`
+	// CouponNotice says why a coupon on the cart was dropped while pricing
+	// this intent — typically a once-per-customer code applied before the
+	// shopper was known, who turns out to have used it. The coupon has been
+	// taken off the cart; the client shows this beside the code box.
+	CouponNotice string `json:"coupon_notice,omitempty"`
+	// CouponSignInURL accompanies a notice that the dropped code is for
+	// members, as checkoutApplyCouponResponse.SignInURL does at the code box.
+	CouponSignInURL string `json:"coupon_sign_in_url,omitempty"`
 	// FreeShippingRemaining is set only when the order ships by carrier and a
 	// threshold is configured — pickup and local delivery are already free, so
 	// there is nothing to nudge toward.
@@ -326,8 +343,9 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Surface the applied coupon (if still valid) so the UI can restore
-		// the applied state on reload. Mirrors the payment-intent validity
-		// rules: unredeemed, active, minimum met.
+		// the applied state on reload. Same rules as the payment intent; a
+		// signed-in shopper is known here, so a code they have already used
+		// is not shown as applied.
 		discountCents, coupon := d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, resp.Subtotal)
 		resp.Coupon = coupon
 
@@ -581,6 +599,18 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid cart_id"})
 		return
 	}
+	var use app.CouponUse
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		use.SignedInCustomerID = &customer.ID
+	}
+	if req.CustomerID != "" {
+		customerID, parseErr := uuid.Parse(req.CustomerID)
+		if parseErr != nil {
+			JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid customer_id"})
+			return
+		}
+		use.CustomerID = &customerID
+	}
 
 	var resp checkoutApplyCouponResponse
 
@@ -594,34 +624,18 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 			subtotal += ci.UnitPrice * ci.Quantity
 		}
 
-		discount, txErr := d.CheckoutService.ApplyCoupon(ctx, tx, code, subtotal)
+		discount, coupon, txErr := d.CheckoutService.ApplyCoupon(ctx, tx, code, subtotal, use)
 		if txErr != nil {
-			switch {
-			case errors.Is(txErr, app.ErrCouponNotFound):
-				d.Metrics.CouponRejected.WithLabelValues("not_found").Inc()
-				resp = checkoutApplyCouponResponse{ErrorMessage: "That code doesn't look right."}
-			case errors.Is(txErr, app.ErrCouponAlreadyUsed):
-				d.Metrics.CouponRejected.WithLabelValues("already_used").Inc()
-				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has already been used."}
-			case errors.Is(txErr, app.ErrDiscountNotActive):
-				d.Metrics.CouponRejected.WithLabelValues("not_active").Inc()
-				resp = checkoutApplyCouponResponse{ErrorMessage: "That code is no longer active."}
-			case errors.Is(txErr, app.ErrDiscountExpired):
-				d.Metrics.CouponRejected.WithLabelValues("expired").Inc()
-				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has expired."}
-			case errors.Is(txErr, app.ErrMinimumOrderNotMet):
-				d.Metrics.CouponRejected.WithLabelValues("minimum_not_met").Inc()
-				resp = checkoutApplyCouponResponse{ErrorMessage: "Your order doesn't meet the minimum for that code."}
-			default:
+			msg, label, ok := couponRefusal(txErr)
+			if !ok {
 				return txErr
 			}
+			d.Metrics.CouponRejected.WithLabelValues(label).Inc()
+			resp = checkoutApplyCouponResponse{ErrorMessage: msg}
+			if errors.Is(txErr, app.ErrCouponSignInRequired) {
+				resp.SignInURL = checkoutSignInURL
+			}
 			return nil
-		}
-
-		// Look up the coupon code to get its ID for cart storage.
-		coupon, txErr := d.CheckoutService.GetCouponCodeByCode(ctx, tx, code)
-		if txErr != nil {
-			return fmt.Errorf("get coupon code: %w", txErr)
 		}
 
 		// Apply to cart.
@@ -716,19 +730,29 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// The session's customer, if any. customerID above is whoever the
+	// information step resolved from the email typed in; only the session
+	// can vouch for a members-only coupon.
+	var signedIn *uuid.UUID
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		signedIn = &customer.ID
+	}
+
 	// Phase 1: load cart + compute totals (tx, no external calls).
 	var (
-		subtotal      int
-		discountTotal int
-		discountName  string
-		couponCode    string
-		taxTotal      int
-		taxLabel      string
-		shippingTotal int
-		shippingLabel string
-		shippingAddr  *domain.Address
-		orderItems    []app.CartItem
-		chosenMethod  *domain.ShippingMethod
+		subtotal        int
+		discountTotal   int
+		discountName    string
+		couponCode      string
+		couponNotice    string
+		couponSignInURL string
+		taxTotal        int
+		taxLabel        string
+		shippingTotal   int
+		shippingLabel   string
+		shippingAddr    *domain.Address
+		orderItems      []app.CartItem
+		chosenMethod    *domain.ShippingMethod
 
 		freeShippingRemaining *int
 	)
@@ -792,15 +816,30 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get cart: %w", txErr)
 		}
 		if cart.AppliedCouponCodeID != nil {
-			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
-			if ccErr == nil && cc.RedeemedAt == nil {
-				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
-				if dErr == nil && discount.Active &&
-					(discount.MinimumOrderCents == nil || subtotal >= *discount.MinimumOrderCents) {
-					discountTotal = calculateDiscountAmount(discount, subtotal)
-					discountName = discount.Name
-					couponCode = cc.Code
+			discount, cc, ccErr := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *cart.AppliedCouponCodeID, subtotal, app.CouponUse{
+				CustomerID:         &customerID,
+				SignedInCustomerID: signedIn,
+			})
+			switch msg, label, refused := couponRefusal(ccErr); {
+			case ccErr == nil:
+				discountTotal = calculateDiscountAmount(discount, subtotal)
+				discountName = discount.Name
+				couponCode = cc.Code
+			case refused:
+				// Price without it, take it off the cart so the summary and
+				// the next intent agree, and say why. This used to drop the
+				// discount silently, leaving the shopper looking at a higher
+				// total with no explanation.
+				d.Metrics.CouponRejected.WithLabelValues(label).Inc()
+				if _, clearErr := d.OrderService.UpdateCartDiscount(ctx, tx, cartID, nil, nil); clearErr != nil {
+					return fmt.Errorf("clear refused coupon: %w", clearErr)
 				}
+				couponNotice = msg
+				if errors.Is(ccErr, app.ErrCouponSignInRequired) {
+					couponSignInURL = checkoutSignInURL
+				}
+			default:
+				return fmt.Errorf("check applied coupon: %w", ccErr)
 			}
 		}
 
@@ -956,16 +995,17 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:        customerID,
-			Items:             orderItems,
-			ShippingAddressID: addressID,
-			BillingAddressID:  addressID,
-			CurrencyCode:      "USD",
-			CouponCode:        couponCodePtr,
-			BasePrice:         true, // as phase 1 priced them; see there
-			ShippingCents:     shippingTotal,
-			TaxCents:          taxTotal,
-			ShippingMethod:    chosenMethod,
+			CustomerID:         customerID,
+			Items:              orderItems,
+			ShippingAddressID:  addressID,
+			BillingAddressID:   addressID,
+			CurrencyCode:       "USD",
+			CouponCode:         couponCodePtr,
+			SignedInCustomerID: signedIn,
+			BasePrice:          true, // as phase 1 priced them; see there
+			ShippingCents:      shippingTotal,
+			TaxCents:           taxTotal,
+			ShippingMethod:     chosenMethod,
 			Metadata: map[string]any{
 				"cart_id":           cartID.String(),
 				"payment_intent_id": pi.ID,
@@ -1010,20 +1050,56 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
-		ClientSecret:  pi.ClientSecret,
-		Amount:        totalCents,
-		Currency:      "usd",
-		Subtotal:      subtotal,
-		DiscountTotal: discountTotal,
-		DiscountName:  discountName,
-		CouponCode:    couponCode,
-		TaxTotal:      taxTotal,
-		TaxLabel:      taxLabel,
-		ShippingTotal: shippingTotal,
-		ShippingLabel: shippingLabel,
+		ClientSecret:    pi.ClientSecret,
+		Amount:          totalCents,
+		Currency:        "usd",
+		Subtotal:        subtotal,
+		DiscountTotal:   discountTotal,
+		DiscountName:    discountName,
+		CouponCode:      couponCode,
+		TaxTotal:        taxTotal,
+		TaxLabel:        taxLabel,
+		ShippingTotal:   shippingTotal,
+		ShippingLabel:   shippingLabel,
+		CouponNotice:    couponNotice,
+		CouponSignInURL: couponSignInURL,
 
 		FreeShippingRemaining: freeShippingRemaining,
 	})
+}
+
+// checkoutSignInURL sends a shopper to sign in and back to checkout. Their cart
+// survives: its cookie is not the session's.
+var checkoutSignInURL = "/account/login?next=" + url.QueryEscape("/checkout")
+
+// couponRefusal is the shopper-facing sentence and metric label for a coupon
+// the rules refused. ok is false for anything else, which callers treat as a
+// real failure.
+func couponRefusal(err error) (msg, label string, ok bool) {
+	switch {
+	case err == nil:
+		return "", "", false
+	case errors.Is(err, app.ErrCouponNotFound):
+		return "That code doesn't look right.", "not_found", true
+	case errors.Is(err, app.ErrCouponAlreadyUsed):
+		return "That code has already been used.", "already_used", true
+	case errors.Is(err, app.ErrCouponSignInRequired):
+		return "That code is for Daily Grind members. Sign in to use it.", "sign_in_required", true
+	case errors.Is(err, app.ErrCouponSubscribersOnly):
+		return "That code is for Daily Grind members, on orders placed from their own account.", "subscribers_only", true
+	case errors.Is(err, app.ErrCouponUsedByCustomer):
+		return "You've already used that code. It's good for one order per customer.", "used_by_customer", true
+	case errors.Is(err, app.ErrDiscountNotActive), errors.Is(err, app.ErrDiscountNotFound):
+		return "That code is no longer active.", "not_active", true
+	case errors.Is(err, app.ErrDiscountNotStarted):
+		return "That code isn't active yet.", "not_started", true
+	case errors.Is(err, app.ErrDiscountExpired):
+		return "That code has expired.", "expired", true
+	case errors.Is(err, app.ErrMinimumOrderNotMet):
+		return "Your order doesn't meet the minimum for that code.", "minimum_not_met", true
+	default:
+		return "", "", false
+	}
 }
 
 // failCheckout answers a checkout endpoint whose order could not be placed, and
@@ -1390,6 +1466,16 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 		analytics.TaxCents = order.TaxTotal
 		analytics.ShippingCents = order.ShippingTotal
 		analytics.Items = items
+
+		// The code the order was placed with, which is also what it was
+		// discounted by — including when a capture race lost the redemption,
+		// since the discount stood. A failed lookup costs only this field:
+		// the purchase event matters more than its coupon.
+		if coupon, cErr := d.DiscountService.GetCouponCodeForOrder(ctx, tx, order); cErr != nil {
+			logging.FromContext(ctx).Warn("order analytics: coupon lookup", "error", cErr, "order_number", orderNumber)
+		} else if coupon != nil {
+			analytics.Coupon = coupon.Code
+		}
 		return nil
 	})
 	if err != nil {
@@ -1399,21 +1485,23 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 }
 
 // appliedCouponDiscount returns the discount a cart's applied coupon is worth
-// against subtotal, and the coupon for display, using the same validity rules
-// as payment-intent pricing: unredeemed, active, minimum met. A missing or
-// no-longer-valid coupon is worth 0 and returns nil — this feeds display only,
-// so lookup failures are swallowed rather than failing the page.
+// against subtotal, and the coupon for display, by the same rules as the
+// payment intent (CheckoutService.CheckAppliedCoupon). The signed-in shopper,
+// if any, is the customer: a code they have already used, or a members-only
+// code they cannot use, is not shown as applied. A missing or no-longer-valid
+// coupon is worth 0 and returns nil — this feeds display only, so lookup
+// failures are swallowed rather than failing the page.
 func (d *Deps) appliedCouponDiscount(ctx context.Context, tx pgx.Tx, couponCodeID *uuid.UUID, subtotal int) (int, *checkoutCartCoupon) {
 	if couponCodeID == nil {
 		return 0, nil
 	}
-	cc, err := d.CheckoutService.GetCouponCodeByID(ctx, tx, *couponCodeID)
-	if err != nil || cc.RedeemedAt != nil {
-		return 0, nil
+	var use app.CouponUse
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		use.CustomerID = &customer.ID
+		use.SignedInCustomerID = &customer.ID
 	}
-	discount, err := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
-	if err != nil || !discount.Active ||
-		(discount.MinimumOrderCents != nil && subtotal < *discount.MinimumOrderCents) {
+	discount, cc, err := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *couponCodeID, subtotal, use)
+	if err != nil {
 		return 0, nil
 	}
 	return calculateDiscountAmount(discount, subtotal), &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}

@@ -50,6 +50,8 @@
   let appliedCoupon = $state<AppliedCoupon | null>(null);
   let couponInput = $state('');
   let couponError = $state('');
+  // A members-only code tried by a guest: link to sign in (the cart survives).
+  let couponSignInUrl = $state('');
   let couponBusy = $state(false);
   let pricingVersion = $state(0);
 
@@ -163,10 +165,12 @@
     if (!cart || !couponInput.trim() || couponBusy) return;
     couponBusy = true;
     couponError = '';
+    couponSignInUrl = '';
     try {
-      const result = await applyCoupon(cart.cart_id, couponInput.trim());
+      const result = await applyCoupon(cart.cart_id, couponInput.trim(), customerId);
       if (!result.valid) {
         couponError = result.error_message || "That code didn't work.";
+        couponSignInUrl = result.sign_in_url || '';
         return;
       }
       appliedCoupon = { code: couponInput.trim().toUpperCase(), name: result.discount_name || 'Discount' };
@@ -234,6 +238,14 @@
 
   function handleTotalsLoaded(pi: PaymentIntentResponse) {
     totals = pi;
+    // The server dropped the cart's coupon while pricing (and already priced
+    // without it), so clear the applied state and say why. No pricingVersion
+    // bump: this intent is already the coupon-free one.
+    if (pi.coupon_notice) {
+      appliedCoupon = null;
+      couponError = pi.coupon_notice;
+      couponSignInUrl = pi.coupon_sign_in_url || '';
+    }
   }
 </script>
 
@@ -491,7 +503,12 @@
                 </form>
               {/if}
               {#if couponError}
-                <p class="mt-2 font-oswald font-bold text-rust text-xs" role="alert">{couponError}</p>
+                <p class="mt-2 font-oswald font-bold text-rust text-xs" role="alert">
+                  {couponError}
+                  {#if couponSignInUrl}
+                    <a href={couponSignInUrl} class="underline text-ink hover:text-rust">Go to sign in</a>
+                  {/if}
+                </p>
               {/if}
             </div>
             <dl class="mt-4 pt-4 border-t-2 border-ink space-y-2">

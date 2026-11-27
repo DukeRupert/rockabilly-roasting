@@ -15,6 +15,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/testutil"
@@ -33,7 +34,7 @@ import (
 // sweep. So the second intent found the code already spent, by an order the
 // same customer was still trying to pay for.
 //
-// It did not refuse. Phase 1 skips a redeemed coupon (`cc.RedeemedAt == nil`)
+// It did not refuse. Phase 1 skipped a redeemed coupon (`cc.RedeemedAt == nil`)
 // and priced the cart without it, so the customer was quietly charged full
 // price for the cart they were shown a discount on, and the code stayed locked
 // for a day. A refusal would at least have been legible. That was the discount
@@ -46,6 +47,10 @@ import (
 // for the service-level facts. This test is the seam that pins the behaviour —
 // it fails with a discount of 0 and an amount of 5000 the moment redemption
 // moves back.
+//
+// Phase 1 no longer drops a refused coupon silently either: it takes the code
+// off the cart and says why in coupon_notice. See
+// checkout_coupon_per_customer_test.go.
 //
 // These commit, like everything else driving a handler here — see setup_test.go.
 
@@ -119,6 +124,26 @@ func newCheckoutPaymentDeps(t *testing.T) (*Deps, *fakePaymentProvider) {
 	fake := &fakePaymentProvider{}
 	d.PaymentProvider = fake
 	return d, fake
+}
+
+// postIntentAs posts an intent with session as the signed-in customer, nil
+// for a guest.
+func (f checkoutCouponFixture) postIntentAs(t *testing.T, d *Deps, session *domain.Customer) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(checkoutPaymentIntentRequest{
+		CartID:     f.cartID.String(),
+		AddressID:  f.addressID.String(),
+		CustomerID: f.customer.ID.String(),
+	})
+	require.NoError(t, err)
+	r := httptest.NewRequest(http.MethodPost, "/api/checkout/payment-intent", strings.NewReader(string(body)))
+	r.Header.Set("Content-Type", "application/json")
+	if session != nil {
+		r = r.WithContext(auth.WithCustomer(r.Context(), session))
+	}
+	w := httptest.NewRecorder()
+	d.handleCheckoutPaymentIntent(w, r)
+	return w
 }
 
 func (f checkoutCouponFixture) postIntent(t *testing.T, d *Deps, method string) *httptest.ResponseRecorder {

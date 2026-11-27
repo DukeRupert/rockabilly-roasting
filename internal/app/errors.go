@@ -121,6 +121,16 @@ var (
 	ErrCouponCodeExists   = errors.New("coupon code already exists")
 	ErrDiscountInvalid    = errors.New("discount fields are invalid")
 	ErrMinimumOrderNotMet = errors.New("minimum order amount not met")
+	ErrDiscountNotStarted = errors.New("discount has not started")
+	// ErrCouponUsedByCustomer: this customer already has a paid order on a
+	// once-per-customer discount.
+	ErrCouponUsedByCustomer = errors.New("customer has already used this discount")
+	// ErrCouponSignInRequired: a subscribers-only discount, tried by a shopper
+	// who is not signed in, so membership cannot be proven.
+	ErrCouponSignInRequired = errors.New("sign in required for this discount")
+	// ErrCouponSubscribersOnly: a subscribers-only discount, and the signed-in
+	// customer has no live subscription or the order is for someone else.
+	ErrCouponSubscribersOnly = errors.New("discount is for subscribers only")
 
 	// Auth errors
 	ErrSessionExpired   = errors.New("session expired")

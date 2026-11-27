@@ -565,7 +565,10 @@ type createDiscountInput struct {
 	Value             int
 	Active            bool
 	MinimumOrderCents *int
+	StartsAt          *time.Time
 	ExpiresAt         *time.Time
+	UsageLimit        domain.CouponUsageLimit
+	Eligibility       domain.DiscountEligibility
 }
 
 func WithDiscountType(dt domain.DiscountType) DiscountOption {
@@ -588,13 +591,27 @@ func WithDiscountExpiry(t time.Time) DiscountOption {
 	return func(p *createDiscountInput) { p.ExpiresAt = &t }
 }
 
+func WithDiscountStart(t time.Time) DiscountOption {
+	return func(p *createDiscountInput) { p.StartsAt = &t }
+}
+
+func WithUsageLimit(l domain.CouponUsageLimit) DiscountOption {
+	return func(p *createDiscountInput) { p.UsageLimit = l }
+}
+
+func WithEligibility(e domain.DiscountEligibility) DiscountOption {
+	return func(p *createDiscountInput) { p.Eligibility = e }
+}
+
 func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Discount {
 	t.Helper()
 	input := createDiscountInput{
-		Name:   fmt.Sprintf("discount-%s", uuid.New().String()[:8]),
-		Type:   domain.DiscountTypePercentage,
-		Value:  10,
-		Active: true,
+		Name:        fmt.Sprintf("discount-%s", uuid.New().String()[:8]),
+		Type:        domain.DiscountTypePercentage,
+		Value:       10,
+		Active:      true,
+		UsageLimit:  domain.CouponUsageSingleUse,
+		Eligibility: domain.DiscountEligibilityAnyone,
 	}
 	for _, o := range opts {
 		o(&input)
@@ -613,6 +630,11 @@ func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Dis
 		Value:             int32(input.Value),
 		MinimumOrderCents: minCents,
 		Active:            input.Active,
+		UsageLimit:        string(input.UsageLimit),
+		Eligibility:       string(input.Eligibility),
+	}
+	if input.StartsAt != nil {
+		params.StartsAt = pgtype.Timestamptz{Time: *input.StartsAt, Valid: true}
 	}
 	if input.ExpiresAt != nil {
 		params.ExpiresAt = pgtype.Timestamptz{Time: *input.ExpiresAt, Valid: true}
@@ -642,6 +664,8 @@ func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Dis
 		StartsAt:          startsAt,
 		ExpiresAt:         expiresAt,
 		Active:            row.Active,
+		UsageLimit:        domain.CouponUsageLimit(row.UsageLimit),
+		Eligibility:       domain.DiscountEligibility(row.Eligibility),
 		CreatedAt:         row.CreatedAt,
 		UpdatedAt:         row.UpdatedAt,
 	}

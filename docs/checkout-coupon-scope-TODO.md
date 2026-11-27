@@ -322,6 +322,9 @@ either teach it that column or stop using it.
   code, rather than on every second intent, but the customer is still shown a
   higher total with nothing said. Telling them properly means a response field
   and copy on the payment step — a change to the client, not to this seam.
+  **Since fixed** (holiday promos, `docs/holiday-promos-TODO.md`): phase 1 now
+  takes a refused coupon off the cart and returns `coupon_notice`, which the
+  checkout shows beside the code box.
 - The two items in *Related, smaller* above — the missing Stripe idempotency
   key and the missing per-IP limit on the checkout PI route — are untouched and
   still open.

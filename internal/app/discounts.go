@@ -99,6 +99,29 @@ func (s *DiscountService) ListCouponCodes(ctx context.Context, tx pgx.Tx, discou
 	return codes, nil
 }
 
+// ListRedemptions returns a once-per-customer discount's most recent paid
+// redemptions, newest first, and how many there are in all.
+func (s *DiscountService) ListRedemptions(ctx context.Context, tx pgx.Tx, discountID uuid.UUID, limit int) ([]domain.CouponRedemption, int, error) {
+	total, err := s.discounts.CountRedemptions(ctx, tx, discountID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if total == 0 {
+		return nil, 0, nil
+	}
+	rows, err := s.discounts.ListRedemptions(ctx, tx, discountID, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+// CountRedemptions returns how many paid orders used a once-per-customer
+// discount.
+func (s *DiscountService) CountRedemptions(ctx context.Context, tx pgx.Tx, discountID uuid.UUID) (int, error) {
+	return s.discounts.CountRedemptions(ctx, tx, discountID)
+}
+
 // CreateDiscountParams holds the validated inputs for creating a discount
 // with its first coupon code.
 type CreateDiscountParams struct {
@@ -109,6 +132,11 @@ type CreateDiscountParams struct {
 	MinimumOrderCents *int
 	ExpiresAt         *time.Time
 	Code              string
+	// UsageLimit is fixed at creation; see domain.CouponUsageLimit. Empty
+	// means single-use, the only shape that existed before.
+	UsageLimit domain.CouponUsageLimit
+	// Eligibility is who may use it; empty means anyone.
+	Eligibility domain.DiscountEligibility
 }
 
 // CreateWithCode creates a discount and its first coupon code in one step.
@@ -122,6 +150,18 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 	}
 	if err := validateDiscountShape(p.Type, p.Value); err != nil {
 		return nil, err
+	}
+	if p.UsageLimit == "" {
+		p.UsageLimit = domain.CouponUsageSingleUse
+	}
+	if !p.UsageLimit.Valid() {
+		return nil, ErrDiscountInvalid
+	}
+	if p.Eligibility == "" {
+		p.Eligibility = domain.DiscountEligibilityAnyone
+	}
+	if !p.Eligibility.Valid() {
+		return nil, ErrDiscountInvalid
 	}
 
 	if _, err := s.discounts.GetCouponCodeByCode(ctx, tx, p.Code); err == nil {
@@ -138,6 +178,8 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 		MinimumOrderCents: p.MinimumOrderCents,
 		ExpiresAt:         p.ExpiresAt,
 		Active:            true,
+		UsageLimit:        p.UsageLimit,
+		Eligibility:       p.Eligibility,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create discount: %w", err)
@@ -201,6 +243,10 @@ type EditDiscountParams struct {
 	MinimumOrderCents *int
 	StartsAt          *time.Time
 	ExpiresAt         *time.Time
+	// Eligibility is editable, unlike the usage limit: nothing is recorded
+	// against it, so changing it only changes who can use the code next.
+	// Empty leaves it as it is.
+	Eligibility domain.DiscountEligibility
 }
 
 // Update edits an existing discount.
@@ -218,6 +264,9 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 	if err := validateDiscountShape(p.Type, p.Value); err != nil {
 		return nil, err
 	}
+	if p.Eligibility != "" && !p.Eligibility.Valid() {
+		return nil, ErrDiscountInvalid
+	}
 	if p.StartsAt != nil && p.ExpiresAt != nil && !p.ExpiresAt.After(*p.StartsAt) {
 		return nil, fmt.Errorf("expiry must fall after the start date: %w", ErrDiscountInvalid)
 	}
@@ -228,6 +277,9 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 			return nil, ErrDiscountNotFound
 		}
 		return nil, fmt.Errorf("get discount for update: %w", err)
+	}
+	if p.Eligibility == "" {
+		p.Eligibility = existing.Eligibility
 	}
 
 	discount, err := s.discounts.Update(ctx, tx, store.UpdateDiscountParams{
@@ -240,6 +292,7 @@ func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p
 		StartsAt:          p.StartsAt,
 		ExpiresAt:         p.ExpiresAt,
 		Active:            existing.Active,
+		Eligibility:       p.Eligibility,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update discount: %w", err)
@@ -283,6 +336,7 @@ func (s *DiscountService) SetActive(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		StartsAt:          discount.StartsAt,
 		ExpiresAt:         discount.ExpiresAt,
 		Active:            active,
+		Eligibility:       discount.Eligibility,
 	})
 	if err != nil {
 		return fmt.Errorf("update discount active: %w", err)

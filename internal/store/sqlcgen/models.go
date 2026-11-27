@@ -181,6 +181,15 @@ type CouponCode struct {
 	RedeemedByOrderID *uuid.UUID         `json:"redeemed_by_order_id"`
 }
 
+type CouponRedemption struct {
+	ID           uuid.UUID `json:"id"`
+	DiscountID   uuid.UUID `json:"discount_id"`
+	CouponCodeID uuid.UUID `json:"coupon_code_id"`
+	CustomerID   uuid.UUID `json:"customer_id"`
+	OrderID      uuid.UUID `json:"order_id"`
+	RedeemedAt   time.Time `json:"redeemed_at"`
+}
+
 type Customer struct {
 	ID                        uuid.UUID          `json:"id"`
 	Email                     string             `json:"email"`
@@ -283,6 +292,8 @@ type Discount struct {
 	Active            bool               `json:"active"`
 	CreatedAt         time.Time          `json:"created_at"`
 	UpdatedAt         time.Time          `json:"updated_at"`
+	UsageLimit        string             `json:"usage_limit"`
+	Eligibility       string             `json:"eligibility"`
 }
 
 type EmailVerification struct {

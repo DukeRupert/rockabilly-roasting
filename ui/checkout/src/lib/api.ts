@@ -101,6 +101,12 @@ export interface PaymentIntentResponse {
   tax_label?: string;
   shipping_total: number;
   shipping_label?: string;
+  // Set when a coupon on the cart was refused while pricing this intent (for
+  // example a one-per-customer code this shopper has already used). The
+  // server has already taken it off the cart and priced without it.
+  coupon_notice?: string;
+  // Set with coupon_notice when the dropped code is for members.
+  coupon_sign_in_url?: string;
   // Present only for carrier-shipped orders when a threshold is configured.
   free_shipping_remaining?: number;
 }
@@ -184,12 +190,16 @@ export interface ApplyCouponResponse {
   discount_type?: string;
   discount_value?: number;
   error_message?: string;
+  // Set when the code is for members and the shopper isn't signed in.
+  sign_in_url?: string;
 }
 
-export function applyCoupon(cartId: string, code: string): Promise<ApplyCouponResponse> {
+// customerId is sent once the information step has identified the shopper,
+// so a code they have already used is refused here rather than at payment.
+export function applyCoupon(cartId: string, code: string, customerId?: string): Promise<ApplyCouponResponse> {
   return request<ApplyCouponResponse>('/api/checkout/coupon', {
     method: 'POST',
-    body: JSON.stringify({ cart_id: cartId, code }),
+    body: JSON.stringify({ cart_id: cartId, code, customer_id: customerId || undefined }),
   });
 }
 

@@ -310,7 +310,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx)
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		got, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
+		got, _, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000, app.CouponUse{})
 		require.NoError(t, err)
 		assert.Equal(t, discount.ID, got.ID)
 	})
@@ -320,7 +320,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx)
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		got, err := svc.ApplyCoupon(ctx, tx, strings.ToLower(coupon.Code), 1000)
+		got, _, err := svc.ApplyCoupon(ctx, tx, strings.ToLower(coupon.Code), 1000, app.CouponUse{})
 		require.NoError(t, err)
 		assert.Equal(t, discount.ID, got.ID)
 	})
@@ -330,7 +330,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx, testutil.WithMinimumOrder(50000))
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
+		_, _, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000, app.CouponUse{})
 		assert.ErrorIs(t, err, app.ErrMinimumOrderNotMet)
 	})
 
@@ -340,7 +340,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx, testutil.WithDiscountExpiry(past))
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
+		_, _, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000, app.CouponUse{})
 		assert.ErrorIs(t, err, app.ErrDiscountExpired)
 	})
 
@@ -352,7 +352,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 
 		require.NoError(t, store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID))
 
-		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
+		_, _, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000, app.CouponUse{})
 		assert.ErrorIs(t, err, app.ErrCouponAlreadyUsed)
 	})
 }

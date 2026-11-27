@@ -405,6 +405,10 @@ type PlaceOrderParams struct {
 	CurrencyCode      string
 	CouponCode        *string
 	SubscriptionID    *uuid.UUID
+	// SignedInCustomerID is the customer of the authenticated session placing
+	// the order, nil for a guest. It is what a subscribers-only coupon is held
+	// against; CustomerID comes from the checkout form and proves nothing.
+	SignedInCustomerID *uuid.UUID
 	// BasePrice is PriceLinesParams.BasePrice. Set for a subscription signup,
 	// whose lines are priced from the base price as every renewal is, and for
 	// retail checkout, whose cart was.
@@ -466,39 +470,15 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	discountAmount := 0
 
 	if p.CouponCode != nil {
-		coupon, err = s.discounts.GetCouponCodeByCode(ctx, tx, *p.CouponCode)
+		// The order's customer is always known here, so the per-customer rule
+		// is checked even if the code was applied before the shopper was.
+		appliedDiscount, coupon, err = s.ApplyCoupon(ctx, tx, *p.CouponCode, subtotal, CouponUse{
+			CustomerID:         &p.CustomerID,
+			SignedInCustomerID: p.SignedInCustomerID,
+		})
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrCouponNotFound
-			}
-			return nil, fmt.Errorf("get coupon code: %w", err)
+			return nil, err
 		}
-
-		if coupon.RedeemedAt != nil {
-			return nil, ErrCouponAlreadyUsed
-		}
-
-		appliedDiscount, err = s.discounts.GetByID(ctx, tx, coupon.DiscountID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrDiscountNotFound
-			}
-			return nil, fmt.Errorf("get discount: %w", err)
-		}
-
-		if !appliedDiscount.Active {
-			return nil, ErrDiscountNotActive
-		}
-
-		now := time.Now()
-		if appliedDiscount.ExpiresAt != nil && now.After(*appliedDiscount.ExpiresAt) {
-			return nil, ErrDiscountExpired
-		}
-
-		if appliedDiscount.MinimumOrderCents != nil && subtotal < *appliedDiscount.MinimumOrderCents {
-			return nil, ErrMinimumOrderNotMet
-		}
-
 		discountAmount = calculateDiscount(appliedDiscount, subtotal)
 	}
 
@@ -601,42 +581,70 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	return order, nil
 }
 
-// GetCouponCodeByID returns a coupon code by ID.
-func (s *CheckoutService) GetCouponCodeByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.CouponCode, error) {
-	coupon, err := s.discounts.GetCouponCodeByID(ctx, tx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCouponNotFound
-		}
-		return nil, fmt.Errorf("get coupon code: %w", err)
-	}
-	return coupon, nil
+// CouponUse is who a coupon is being used by.
+//
+// CustomerID is nil while the shopper is still unknown. The code box sits
+// beside both checkout steps, so a code can be tried before the information
+// step has named a customer; the once-per-customer rule is checked whenever
+// the customer is known, and PlaceOrder always knows.
+//
+// SignedInCustomerID is the customer of the authenticated session, nil for a
+// guest. It is kept apart from CustomerID because the checkout takes the
+// order's customer from a form — anyone can type a member's email — so only
+// the session can prove membership.
+type CouponUse struct {
+	CustomerID         *uuid.UUID
+	SignedInCustomerID *uuid.UUID
 }
 
-// GetCouponCodeByCode returns a coupon code by its code string.
-func (s *CheckoutService) GetCouponCodeByCode(ctx context.Context, tx pgx.Tx, code string) (*domain.CouponCode, error) {
-	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, code)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCouponNotFound
-		}
-		return nil, fmt.Errorf("get coupon code: %w", err)
-	}
-	return coupon, nil
-}
-
-// ApplyCoupon validates a coupon code against the cart subtotal and returns
-// its associated discount for preview. The code lookup is case-insensitive
-// (handled in SQL), so customers can type codes however they like.
-func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code string, subtotalCents int) (*domain.Discount, error) {
+// ApplyCoupon looks a coupon code up and checks it against every rule —
+// see checkCoupon — returning the discount it carries and the code row. The
+// lookup is case-insensitive (handled in SQL), so customers can type codes
+// however they like.
+func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code string, subtotalCents int, use CouponUse) (*domain.Discount, *domain.CouponCode, error) {
 	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, strings.TrimSpace(code))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCouponNotFound
+			return nil, nil, ErrCouponNotFound
 		}
-		return nil, fmt.Errorf("get coupon code: %w", err)
+		return nil, nil, fmt.Errorf("get coupon code: %w", err)
 	}
+	discount, err := s.checkCoupon(ctx, tx, coupon, subtotalCents, use)
+	if err != nil {
+		return nil, nil, err
+	}
+	return discount, coupon, nil
+}
 
+// CheckAppliedCoupon is ApplyCoupon for a code already on a cart, which holds
+// the code's ID rather than its text. Pricing re-checks it every time, because
+// whatever was true when it was applied — still active, not yet used by this
+// customer — can have stopped being true since.
+func (s *CheckoutService) CheckAppliedCoupon(ctx context.Context, tx pgx.Tx, couponID uuid.UUID, subtotalCents int, use CouponUse) (*domain.Discount, *domain.CouponCode, error) {
+	coupon, err := s.discounts.GetCouponCodeByID(ctx, tx, couponID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, ErrCouponNotFound
+		}
+		return nil, nil, fmt.Errorf("get coupon code: %w", err)
+	}
+	discount, err := s.checkCoupon(ctx, tx, coupon, subtotalCents, use)
+	if err != nil {
+		return nil, nil, err
+	}
+	return discount, coupon, nil
+}
+
+// checkCoupon is the one place the coupon rules live. Applying a code,
+// pricing a cart and placing an order each used to carry their own copy of
+// these checks, and the copies had already drifted: none of them read
+// starts_at, so a discount went live the moment it was created whatever its
+// start date said.
+//
+// RedeemedAt is only ever stamped on single-use codes, so the first check
+// cannot trip for a once-per-customer one; that rule is the ledger lookup at
+// the end.
+func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *domain.CouponCode, subtotalCents int, use CouponUse) (*domain.Discount, error) {
 	if coupon.RedeemedAt != nil {
 		return nil, ErrCouponAlreadyUsed
 	}
@@ -654,12 +662,31 @@ func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code strin
 	}
 
 	now := time.Now()
-	if discount.ExpiresAt != nil && now.After(*discount.ExpiresAt) {
+	if discount.StartsAt != nil && now.Before(*discount.StartsAt) {
+		return nil, ErrDiscountNotStarted
+	}
+	if discount.ExpiresAt != nil && !now.Before(*discount.ExpiresAt) {
 		return nil, ErrDiscountExpired
 	}
 
 	if discount.MinimumOrderCents != nil && subtotalCents < *discount.MinimumOrderCents {
 		return nil, ErrMinimumOrderNotMet
+	}
+
+	if discount.Eligibility == domain.DiscountEligibilitySubscribers {
+		if err := s.checkSubscriber(ctx, tx, use); err != nil {
+			return nil, err
+		}
+	}
+
+	if discount.UsageLimit == domain.CouponUsageOncePerCustomer && use.CustomerID != nil {
+		used, err := s.discounts.CustomerHasRedeemed(ctx, tx, discount.ID, *use.CustomerID)
+		if err != nil {
+			return nil, err
+		}
+		if used {
+			return nil, ErrCouponUsedByCustomer
+		}
 	}
 
 	return discount, nil
@@ -805,13 +832,36 @@ func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx,
 // moved at Stripe, and stranding a paid order to protect a coupon helps
 // nobody. The lost redemption is recorded in the audit log so the merchant can
 // see that a single-use code went out twice.
+//
+// A once-per-customer discount is claimed the same way, through its own ledger;
+// see claimPerCustomerRedemption.
 func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, order *domain.Order, actor Actor) error {
 	couponID, ok := couponCodeIDFromMetadata(order.Metadata)
 	if !ok {
 		return nil
 	}
 
-	_, err := s.discounts.RedeemCouponCode(ctx, tx, couponID, order.CustomerID, order.ID)
+	coupon, err := s.discounts.GetCouponCodeByID(ctx, tx, couponID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Deleted since the order was placed. There is nothing left to
+			// claim, and failing here would fail the capture of a paid order.
+			return nil
+		}
+		return fmt.Errorf("get coupon code to redeem: %w", err)
+	}
+	discount, err := s.discounts.GetByID(ctx, tx, coupon.DiscountID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("get discount to redeem: %w", err)
+	}
+	if discount.UsageLimit == domain.CouponUsageOncePerCustomer {
+		return s.claimPerCustomerRedemption(ctx, tx, order, coupon, actor)
+	}
+
+	_, err = s.discounts.RedeemCouponCode(ctx, tx, couponID, order.CustomerID, order.ID)
 	if err == nil {
 		return nil
 	}
@@ -834,6 +884,75 @@ func (s *CheckoutService) redeemOrderCoupon(ctx context.Context, tx pgx.Tx, orde
 		return nil
 	}
 
+	return s.recordLostRedemption(ctx, tx, order, couponID, actor)
+}
+
+// checkSubscriber holds a subscribers-only discount to a signed-in member
+// buying for themselves.
+//
+// A guest is asked to sign in rather than refused outright: they may well be
+// a member, and the checkout cannot tell from an email address typed into a
+// form. A signed-in member placing an order under some other customer — the
+// information step resolves the customer by the email entered — is refused,
+// or the member's sign-in would discount anybody's order.
+func (s *CheckoutService) checkSubscriber(ctx context.Context, tx pgx.Tx, use CouponUse) error {
+	if use.SignedInCustomerID == nil {
+		return ErrCouponSignInRequired
+	}
+	if use.CustomerID != nil && *use.CustomerID != *use.SignedInCustomerID {
+		return ErrCouponSubscribersOnly
+	}
+	member, err := s.discounts.CustomerIsSubscriber(ctx, tx, *use.SignedInCustomerID)
+	if err != nil {
+		return err
+	}
+	if !member {
+		return ErrCouponSubscribersOnly
+	}
+	return nil
+}
+
+// claimPerCustomerRedemption writes the ledger row for a once-per-customer
+// discount, under the same first-to-pay-wins rule as a single-use code.
+//
+// The insert is refused by one of two unique keys, and as with the single-use
+// claim the refusal alone cannot say which: this order already holds its row
+// from an earlier pass through capture, or the same customer paid for another
+// order on this discount first (two tabs, two orders, one offer). Only the
+// second is a loss.
+func (s *CheckoutService) claimPerCustomerRedemption(ctx context.Context, tx pgx.Tx, order *domain.Order, coupon *domain.CouponCode, actor Actor) error {
+	if order.CustomerID == nil {
+		// Every checkout order has a customer; with none, there is no one to
+		// hold the limit against.
+		return nil
+	}
+
+	_, err := s.discounts.CreateRedemption(ctx, tx, store.CreateRedemptionParams{
+		DiscountID:   coupon.DiscountID,
+		CouponCodeID: coupon.ID,
+		CustomerID:   *order.CustomerID,
+		OrderID:      order.ID,
+	})
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("redeem coupon for customer: %w", err)
+	}
+
+	if _, getErr := s.discounts.GetRedemptionByOrderID(ctx, tx, order.ID); getErr == nil {
+		return nil
+	} else if !errors.Is(getErr, pgx.ErrNoRows) {
+		return fmt.Errorf("get coupon redemption after failed claim: %w", getErr)
+	}
+
+	return s.recordLostRedemption(ctx, tx, order, coupon.ID, actor)
+}
+
+// recordLostRedemption files the audit entry for a paid order whose coupon
+// claim lost to an earlier one. The order keeps its discount; see
+// redeemOrderCoupon for why.
+func (s *CheckoutService) recordLostRedemption(ctx context.Context, tx pgx.Tx, order *domain.Order, couponID uuid.UUID, actor Actor) error {
 	if auditErr := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    actor.Type,
 		ActorID:      actor.ID,

@@ -1,6 +1,6 @@
 -- name: CreateDiscount :one
-INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: GetDiscountByID :one
@@ -9,7 +9,7 @@ SELECT * FROM discounts WHERE id = $1;
 -- name: UpdateDiscount :one
 UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
-    starts_at = $7, expires_at = $8, active = $9, updated_at = now()
+    starts_at = $7, expires_at = $8, active = $9, eligibility = $10, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
@@ -66,3 +66,45 @@ WHERE redeemed_by_order_id = $1;
 -- name: GetCouponCodeByOrderID :one
 SELECT * FROM coupon_codes
 WHERE redeemed_by_order_id = $1;
+
+-- name: CreateCouponRedemption :one
+-- Records a once-per-customer redemption. Either unique key can refuse it:
+-- this customer already used the discount on another order, or this order
+-- already holds its row from an earlier pass through capture. Both come back
+-- as no row; GetCouponRedemptionByOrderID tells them apart.
+INSERT INTO coupon_redemptions (discount_id, coupon_code_id, customer_id, order_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+RETURNING *;
+
+-- name: GetCouponRedemptionByOrderID :one
+SELECT * FROM coupon_redemptions WHERE order_id = $1;
+
+-- name: CustomerHasRedeemedDiscount :one
+SELECT EXISTS (
+    SELECT 1 FROM coupon_redemptions
+    WHERE discount_id = $1 AND customer_id = $2
+);
+
+-- name: DeleteCouponRedemptionByOrderID :exec
+-- The once-per-customer half of releasing a cancelled order's coupon.
+DELETE FROM coupon_redemptions WHERE order_id = $1;
+
+-- name: CountCouponRedemptionsByDiscount :one
+SELECT count(*) FROM coupon_redemptions WHERE discount_id = $1;
+
+-- name: ListCouponRedemptionsByDiscount :many
+SELECT * FROM coupon_redemptions
+WHERE discount_id = $1
+ORDER BY redeemed_at DESC
+LIMIT $2;
+
+-- name: CustomerIsSubscriber :one
+-- Whether a customer counts as a member for a subscribers-only discount: they
+-- hold an active subscription. Paused and past-due subscriptions do not count;
+-- the client's offer is for active members only.
+SELECT EXISTS (
+    SELECT 1 FROM subscriptions
+    WHERE customer_id = $1
+      AND status = 'active'
+);

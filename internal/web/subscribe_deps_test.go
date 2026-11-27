@@ -55,6 +55,9 @@ func newSubscribeDeps(t *testing.T) *Deps {
 		store.NewSettingsStore(), store.NewShippingStore(), nil, d.PricingService,
 		audit.NewAuditWriter(), metrics.NewRegistry(),
 	).WithMerchantTZ(time.UTC)
+	// The confirmation paths build the GA4 purchase payload, which reads the
+	// order's coupon through this.
+	d.DiscountService = app.NewDiscountService(store.NewDiscountStore(), audit.NewAuditWriter(), metrics.NewRegistry())
 	d.Metrics = metrics.NewRegistry()
 
 	ctx := context.Background()

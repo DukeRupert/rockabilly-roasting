@@ -15,6 +15,24 @@ const (
 	DiscountTypeFreeShipping DiscountType = "free_shipping"
 )
 
+// CouponUsageLimit says how many times a discount's codes can be redeemed.
+type CouponUsageLimit string
+
+const (
+	// CouponUsageSingleUse: each code is spent by the first paid order that
+	// uses it, whoever placed it.
+	CouponUsageSingleUse CouponUsageLimit = "single_use"
+	// CouponUsageOncePerCustomer: a code anyone can use, each customer once.
+	// The limit is per discount, not per code, so a customer cannot use the
+	// same offer twice through two of its codes.
+	CouponUsageOncePerCustomer CouponUsageLimit = "once_per_customer"
+)
+
+// Valid reports whether l is one of the defined limits.
+func (l CouponUsageLimit) Valid() bool {
+	return l == CouponUsageSingleUse || l == CouponUsageOncePerCustomer
+}
+
 // Discount represents a discount rule.
 type Discount struct {
 	ID                uuid.UUID
@@ -26,6 +44,7 @@ type Discount struct {
 	StartsAt          *time.Time
 	ExpiresAt         *time.Time
 	Active            bool
+	UsageLimit        CouponUsageLimit
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -40,6 +59,17 @@ type CouponCode struct {
 	RedeemedBy        *uuid.UUID
 	RedeemedByOrderID *uuid.UUID
 	CreatedAt         time.Time
+}
+
+// CouponRedemption is one paid order's use of a once-per-customer discount.
+// Single-use codes record their redemption on CouponCode instead.
+type CouponRedemption struct {
+	ID           uuid.UUID
+	DiscountID   uuid.UUID
+	CouponCodeID uuid.UUID
+	CustomerID   uuid.UUID
+	OrderID      uuid.UUID
+	RedeemedAt   time.Time
 }
 
 // AppliedDiscount represents the result of evaluating a discount against a cart.

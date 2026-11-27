@@ -130,7 +130,7 @@
     couponBusy = true;
     couponError = '';
     try {
-      const result = await applyCoupon(cart.cart_id, couponInput.trim());
+      const result = await applyCoupon(cart.cart_id, couponInput.trim(), customerId);
       if (!result.valid) {
         couponError = result.error_message || "That code didn't work.";
         return;
@@ -198,6 +198,13 @@
 
   function handleTotalsLoaded(pi: PaymentIntentResponse) {
     totals = pi;
+    // The server dropped the cart's coupon while pricing (and already priced
+    // without it), so clear the applied state and say why. No pricingVersion
+    // bump: this intent is already the coupon-free one.
+    if (pi.coupon_notice) {
+      appliedCoupon = null;
+      couponError = pi.coupon_notice;
+    }
   }
 </script>
 

@@ -98,6 +98,10 @@ export interface PaymentIntentResponse {
   tax_label?: string;
   shipping_total: number;
   shipping_label?: string;
+  // Set when a coupon on the cart was refused while pricing this intent (for
+  // example a one-per-customer code this shopper has already used). The
+  // server has already taken it off the cart and priced without it.
+  coupon_notice?: string;
 }
 
 export interface ConfirmRequest {
@@ -181,10 +185,12 @@ export interface ApplyCouponResponse {
   error_message?: string;
 }
 
-export function applyCoupon(cartId: string, code: string): Promise<ApplyCouponResponse> {
+// customerId is sent once the information step has identified the shopper,
+// so a code they have already used is refused here rather than at payment.
+export function applyCoupon(cartId: string, code: string, customerId?: string): Promise<ApplyCouponResponse> {
   return request<ApplyCouponResponse>('/api/checkout/coupon', {
     method: 'POST',
-    body: JSON.stringify({ cart_id: cartId, code }),
+    body: JSON.stringify({ cart_id: cartId, code, customer_id: customerId || undefined }),
   });
 }
 

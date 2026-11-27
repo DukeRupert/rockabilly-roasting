@@ -365,6 +365,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrSkipUndoTooLate),
 		errors.Is(err, app.ErrDiscountExpired),
 		errors.Is(err, app.ErrDiscountNotActive),
+		errors.Is(err, app.ErrDiscountNotStarted),
+		errors.Is(err, app.ErrCouponUsedByCustomer),
 		errors.Is(err, app.ErrMinimumOrderNotMet),
 		errors.Is(err, app.ErrSessionExpired),
 		errors.Is(err, app.ErrTokenExpired),

@@ -1,6 +1,6 @@
 -- name: CreateDiscount :one
-INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetDiscountByID :one
@@ -66,3 +66,35 @@ WHERE redeemed_by_order_id = $1;
 -- name: GetCouponCodeByOrderID :one
 SELECT * FROM coupon_codes
 WHERE redeemed_by_order_id = $1;
+
+-- name: CreateCouponRedemption :one
+-- Records a once-per-customer redemption. Either unique key can refuse it:
+-- this customer already used the discount on another order, or this order
+-- already holds its row from an earlier pass through capture. Both come back
+-- as no row; GetCouponRedemptionByOrderID tells them apart.
+INSERT INTO coupon_redemptions (discount_id, coupon_code_id, customer_id, order_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+RETURNING *;
+
+-- name: GetCouponRedemptionByOrderID :one
+SELECT * FROM coupon_redemptions WHERE order_id = $1;
+
+-- name: CustomerHasRedeemedDiscount :one
+SELECT EXISTS (
+    SELECT 1 FROM coupon_redemptions
+    WHERE discount_id = $1 AND customer_id = $2
+);
+
+-- name: DeleteCouponRedemptionByOrderID :exec
+-- The once-per-customer half of releasing a cancelled order's coupon.
+DELETE FROM coupon_redemptions WHERE order_id = $1;
+
+-- name: CountCouponRedemptionsByDiscount :one
+SELECT count(*) FROM coupon_redemptions WHERE discount_id = $1;
+
+-- name: ListCouponRedemptionsByDiscount :many
+SELECT * FROM coupon_redemptions
+WHERE discount_id = $1
+ORDER BY redeemed_at DESC
+LIMIT $2;

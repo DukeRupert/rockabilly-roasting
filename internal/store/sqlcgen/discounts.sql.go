@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countCouponRedemptionsByDiscount = `-- name: CountCouponRedemptionsByDiscount :one
+SELECT count(*) FROM coupon_redemptions WHERE discount_id = $1
+`
+
+func (q *Queries) CountCouponRedemptionsByDiscount(ctx context.Context, discountID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCouponRedemptionsByDiscount, discountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCouponCode = `-- name: CreateCouponCode :one
 INSERT INTO coupon_codes (id, discount_id, code, customer_id)
 VALUES ($1, $2, $3, $4)
@@ -46,10 +57,47 @@ func (q *Queries) CreateCouponCode(ctx context.Context, arg CreateCouponCodePara
 	return i, err
 }
 
+const createCouponRedemption = `-- name: CreateCouponRedemption :one
+INSERT INTO coupon_redemptions (discount_id, coupon_code_id, customer_id, order_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+RETURNING id, discount_id, coupon_code_id, customer_id, order_id, redeemed_at
+`
+
+type CreateCouponRedemptionParams struct {
+	DiscountID   uuid.UUID `json:"discount_id"`
+	CouponCodeID uuid.UUID `json:"coupon_code_id"`
+	CustomerID   uuid.UUID `json:"customer_id"`
+	OrderID      uuid.UUID `json:"order_id"`
+}
+
+// Records a once-per-customer redemption. Either unique key can refuse it:
+// this customer already used the discount on another order, or this order
+// already holds its row from an earlier pass through capture. Both come back
+// as no row; GetCouponRedemptionByOrderID tells them apart.
+func (q *Queries) CreateCouponRedemption(ctx context.Context, arg CreateCouponRedemptionParams) (CouponRedemption, error) {
+	row := q.db.QueryRow(ctx, createCouponRedemption,
+		arg.DiscountID,
+		arg.CouponCodeID,
+		arg.CustomerID,
+		arg.OrderID,
+	)
+	var i CouponRedemption
+	err := row.Scan(
+		&i.ID,
+		&i.DiscountID,
+		&i.CouponCodeID,
+		&i.CustomerID,
+		&i.OrderID,
+		&i.RedeemedAt,
+	)
+	return i, err
+}
+
 const createDiscount = `-- name: CreateDiscount :one
-INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at
+INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit
 `
 
 type CreateDiscountParams struct {
@@ -62,6 +110,7 @@ type CreateDiscountParams struct {
 	StartsAt          pgtype.Timestamptz `json:"starts_at"`
 	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
 	Active            bool               `json:"active"`
+	UsageLimit        string             `json:"usage_limit"`
 }
 
 func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error) {
@@ -75,6 +124,7 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		arg.StartsAt,
 		arg.ExpiresAt,
 		arg.Active,
+		arg.UsageLimit,
 	)
 	var i Discount
 	err := row.Scan(
@@ -89,8 +139,28 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UsageLimit,
 	)
 	return i, err
+}
+
+const customerHasRedeemedDiscount = `-- name: CustomerHasRedeemedDiscount :one
+SELECT EXISTS (
+    SELECT 1 FROM coupon_redemptions
+    WHERE discount_id = $1 AND customer_id = $2
+)
+`
+
+type CustomerHasRedeemedDiscountParams struct {
+	DiscountID uuid.UUID `json:"discount_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+func (q *Queries) CustomerHasRedeemedDiscount(ctx context.Context, arg CustomerHasRedeemedDiscountParams) (bool, error) {
+	row := q.db.QueryRow(ctx, customerHasRedeemedDiscount, arg.DiscountID, arg.CustomerID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const deleteCouponCode = `-- name: DeleteCouponCode :exec
@@ -99,6 +169,16 @@ DELETE FROM coupon_codes WHERE id = $1
 
 func (q *Queries) DeleteCouponCode(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteCouponCode, id)
+	return err
+}
+
+const deleteCouponRedemptionByOrderID = `-- name: DeleteCouponRedemptionByOrderID :exec
+DELETE FROM coupon_redemptions WHERE order_id = $1
+`
+
+// The once-per-customer half of releasing a cancelled order's coupon.
+func (q *Queries) DeleteCouponRedemptionByOrderID(ctx context.Context, orderID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCouponRedemptionByOrderID, orderID)
 	return err
 }
 
@@ -174,8 +254,26 @@ func (q *Queries) GetCouponCodeByOrderID(ctx context.Context, redeemedByOrderID 
 	return i, err
 }
 
+const getCouponRedemptionByOrderID = `-- name: GetCouponRedemptionByOrderID :one
+SELECT id, discount_id, coupon_code_id, customer_id, order_id, redeemed_at FROM coupon_redemptions WHERE order_id = $1
+`
+
+func (q *Queries) GetCouponRedemptionByOrderID(ctx context.Context, orderID uuid.UUID) (CouponRedemption, error) {
+	row := q.db.QueryRow(ctx, getCouponRedemptionByOrderID, orderID)
+	var i CouponRedemption
+	err := row.Scan(
+		&i.ID,
+		&i.DiscountID,
+		&i.CouponCodeID,
+		&i.CustomerID,
+		&i.OrderID,
+		&i.RedeemedAt,
+	)
+	return i, err
+}
+
 const getDiscountByID = `-- name: GetDiscountByID :one
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at FROM discounts WHERE id = $1
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit FROM discounts WHERE id = $1
 `
 
 func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error) {
@@ -193,6 +291,7 @@ func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, 
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UsageLimit,
 	)
 	return i, err
 }
@@ -221,6 +320,45 @@ func (q *Queries) ListCouponCodesByDiscount(ctx context.Context, discountID uuid
 			&i.RedeemedBy,
 			&i.CreatedAt,
 			&i.RedeemedByOrderID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCouponRedemptionsByDiscount = `-- name: ListCouponRedemptionsByDiscount :many
+SELECT id, discount_id, coupon_code_id, customer_id, order_id, redeemed_at FROM coupon_redemptions
+WHERE discount_id = $1
+ORDER BY redeemed_at DESC
+LIMIT $2
+`
+
+type ListCouponRedemptionsByDiscountParams struct {
+	DiscountID uuid.UUID `json:"discount_id"`
+	Limit      int32     `json:"limit"`
+}
+
+func (q *Queries) ListCouponRedemptionsByDiscount(ctx context.Context, arg ListCouponRedemptionsByDiscountParams) ([]CouponRedemption, error) {
+	rows, err := q.db.Query(ctx, listCouponRedemptionsByDiscount, arg.DiscountID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponRedemption{}
+	for rows.Next() {
+		var i CouponRedemption
+		if err := rows.Scan(
+			&i.ID,
+			&i.DiscountID,
+			&i.CouponCodeID,
+			&i.CustomerID,
+			&i.OrderID,
+			&i.RedeemedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -303,7 +441,7 @@ UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
     starts_at = $7, expires_at = $8, active = $9, updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit
 `
 
 type UpdateDiscountParams struct {
@@ -343,6 +481,7 @@ func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) 
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UsageLimit,
 	)
 	return i, err
 }

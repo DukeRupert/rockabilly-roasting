@@ -44,6 +44,7 @@ func (d *Deps) handleAdminDiscountList(w http.ResponseWriter, r *http.Request) {
 	var discounts []domain.Discount
 	var hasMore bool
 	codes := map[uuid.UUID][]domain.CouponCode{}
+	redemptions := map[uuid.UUID]int{}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -61,6 +62,13 @@ func (d *Deps) handleAdminDiscountList(w http.ResponseWriter, r *http.Request) {
 				return ccErr
 			}
 			codes[disc.ID] = cc
+			if disc.UsageLimit == domain.CouponUsageOncePerCustomer {
+				n, nErr := d.DiscountService.CountRedemptions(ctx, tx, disc.ID)
+				if nErr != nil {
+					return nErr
+				}
+				redemptions[disc.ID] = n
+			}
 		}
 		return nil
 	})
@@ -73,6 +81,7 @@ func (d *Deps) handleAdminDiscountList(w http.ResponseWriter, r *http.Request) {
 	props := admin.DiscountListProps{
 		Discounts:    discounts,
 		Codes:        codes,
+		Redemptions:  redemptions,
 		ActiveFilter: activeFilter,
 		Page:         page,
 		PerPage:      perPage,
@@ -151,6 +160,15 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	usageLimit := domain.CouponUsageLimit(r.FormValue("usage_limit"))
+	if usageLimit == "" {
+		usageLimit = domain.CouponUsageSingleUse
+	}
+	if !usageLimit.Valid() {
+		renderDiscountError(w, r, "Pick who can use the code.")
+		return
+	}
+
 	var expiresAt *time.Time
 	if raw := r.FormValue("expires_at"); raw != "" {
 		day, err := time.ParseInLocation("2006-01-02", raw, d.MerchantTZ)
@@ -171,6 +189,7 @@ func (d *Deps) handleAdminDiscountCreate(w http.ResponseWriter, r *http.Request)
 			MinimumOrderCents: minimumOrderCents,
 			ExpiresAt:         expiresAt,
 			Code:              code,
+			UsageLimit:        usageLimit,
 		}, staffActor(r))
 		return txErr
 	})
@@ -259,11 +278,18 @@ func (d *Deps) handleAdminDiscountShow(w http.ResponseWriter, r *http.Request) {
 	admin.DiscountShow(*props).Render(ctx, w) //nolint:errcheck
 }
 
+// discountShowRedemptionLimit caps the redemptions listed on a discount's page.
+// The count above the list is the full total; the export (see
+// docs/holiday-promos-TODO.md) is where the complete record will live.
+const discountShowRedemptionLimit = 50
+
 // discountShowProps gathers everything the detail page renders.
 func (d *Deps) discountShowProps(ctx context.Context, r *http.Request, id uuid.UUID) (*admin.DiscountShowProps, error) {
 	var discount *domain.Discount
 	var codes []domain.CouponCode
 	var activity []domain.AuditEntry
+	var redemptions []domain.CouponRedemption
+	var redemptionCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -275,6 +301,12 @@ func (d *Deps) discountShowProps(ctx context.Context, r *http.Request, id uuid.U
 		if txErr != nil {
 			return txErr
 		}
+		if discount.UsageLimit == domain.CouponUsageOncePerCustomer {
+			redemptions, redemptionCount, txErr = d.DiscountService.ListRedemptions(ctx, tx, id, discountShowRedemptionLimit)
+			if txErr != nil {
+				return txErr
+			}
+		}
 		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "discount", id)
 		return txErr
 	})
@@ -284,12 +316,14 @@ func (d *Deps) discountShowProps(ctx context.Context, r *http.Request, id uuid.U
 
 	name, role := staffNameRole(r)
 	return &admin.DiscountShowProps{
-		Discount:   *discount,
-		Codes:      codes,
-		Activity:   activity,
-		MerchantTZ: d.MerchantTZ,
-		StaffName:  name,
-		StaffRole:  role,
+		Discount:        *discount,
+		Codes:           codes,
+		Redemptions:     redemptions,
+		RedemptionCount: redemptionCount,
+		Activity:        activity,
+		MerchantTZ:      d.MerchantTZ,
+		StaffName:       name,
+		StaffRole:       role,
 	}, nil
 }
 

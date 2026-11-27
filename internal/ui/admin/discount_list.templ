@@ -13,6 +13,9 @@ import (
 type DiscountListProps struct {
 	Discounts    []domain.Discount
 	Codes        map[uuid.UUID][]domain.CouponCode
+	// Redemptions counts paid orders per once-per-customer discount. Single-use
+	// codes show their redemption by being struck through instead.
+	Redemptions  map[uuid.UUID]int
 	ActiveFilter string
 	Page         int
 	PerPage      int
@@ -46,6 +49,24 @@ func discountMinimumLabel(d domain.Discount) string {
 	return "min " + formatCents(*d.MinimumOrderCents)
 }
 
+// discountUsageLabel says who can use a discount's codes, in the words staff
+// pick it by on the create form.
+func discountUsageLabel(l domain.CouponUsageLimit) string {
+	if l == domain.CouponUsageOncePerCustomer {
+		return "Once per customer"
+	}
+	return "Single-use"
+}
+
+// discountUsesLabel is the list's one-line redemption count for a
+// once-per-customer discount.
+func discountUsesLabel(n int) string {
+	if n == 1 {
+		return "Once per customer · used once"
+	}
+	return fmt.Sprintf("Once per customer · used %d times", n)
+}
+
 func discountValueDisplay(d domain.Discount) string {
 	switch d.Type {
 	case domain.DiscountTypePercentage:
@@ -70,7 +91,7 @@ templ DiscountListContent(props DiscountListProps) {
 	<!-- Create form -->
 	<div class="mt-6 border border-rr-border bg-rr-surface p-6">
 		<h2 class="text-sm font-semibold text-rr-heading">New Discount</h2>
-		<p class="mt-1 text-sm text-rr-muted">Each discount carries one single-use coupon code. Codes are stored uppercase.</p>
+		<p class="mt-1 text-sm text-rr-muted">Each discount carries one coupon code, stored uppercase. A single-use code is spent by the first order that pays with it. A once-per-customer code can go out to everyone, and each customer can use it on one order.</p>
 		<form method="post" action="/admin/discounts" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
 			<div class="sm:col-span-2">
 				<label for="discount-name" class="block text-sm font-medium text-rr-body">Name</label>
@@ -132,6 +153,25 @@ templ DiscountListContent(props DiscountListProps) {
 					placeholder="Optional"
 					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
 				/>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="discount-usage" class="block text-sm font-medium text-rr-body">Who can use it</label>
+				<div class="mt-1 grid grid-cols-1">
+					<select
+						id="discount-usage"
+						name="usage_limit"
+						required
+						aria-describedby="discount-usage-hint"
+						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						<option value="single_use" selected>Single-use: one order, anyone</option>
+						<option value="once_per_customer">Once per customer: shareable</option>
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<p id="discount-usage-hint" class="mt-1 text-xs text-rr-muted">Can't be changed later</p>
 			</div>
 			<div class="sm:col-span-1">
 				<label for="discount-expires" class="block text-sm font-medium text-rr-body">Expires</label>
@@ -217,6 +257,9 @@ templ DiscountListContent(props DiscountListProps) {
 									}
 									if len(props.Codes[d.ID]) == 0 {
 										<span class="text-rr-border">&mdash;</span>
+									}
+									if d.UsageLimit == domain.CouponUsageOncePerCustomer {
+										<span class="block text-xs text-rr-muted">{ discountUsesLabel(props.Redemptions[d.ID]) }</span>
 									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">

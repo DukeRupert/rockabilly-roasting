@@ -34,6 +34,7 @@ type Querier interface {
 	ClearSubscriptionRenewalPaymentIntent(ctx context.Context, paymentIntentID string) ([]uuid.UUID, error)
 	CountActiveStaffByRole(ctx context.Context, role string) (int64, error)
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
+	CountCouponRedemptionsByDiscount(ctx context.Context, discountID uuid.UUID) (int64, error)
 	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
 	// Subscriptions that will still renew to this address: everything not
 	// cancelled or expired. Paused ones count, because they resume to it.
@@ -49,6 +50,11 @@ type Querier interface {
 	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
 	CreateCartForSession(ctx context.Context, arg CreateCartForSessionParams) (Cart, error)
 	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
+	// Records a once-per-customer redemption. Either unique key can refuse it:
+	// this customer already used the discount on another order, or this order
+	// already holds its row from an earlier pass through capture. Both come back
+	// as no row; GetCouponRedemptionByOrderID tells them apart.
+	CreateCouponRedemption(ctx context.Context, arg CreateCouponRedemptionParams) (CouponRedemption, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
 	CreateCustomerUser(ctx context.Context, arg CreateCustomerUserParams) (CustomerUser, error)
 	CreateCustomerUserInviteToken(ctx context.Context, arg CreateCustomerUserInviteTokenParams) (CustomerUserInviteToken, error)
@@ -84,6 +90,7 @@ type Querier interface {
 	CreateVariantOptionValue(ctx context.Context, arg CreateVariantOptionValueParams) error
 	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	CreateWholesaleCustomer(ctx context.Context, arg CreateWholesaleCustomerParams) (Customer, error)
+	CustomerHasRedeemedDiscount(ctx context.Context, arg CustomerHasRedeemedDiscountParams) (bool, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
 	DeleteAttributeKey(ctx context.Context, id uuid.UUID) error
@@ -94,6 +101,8 @@ type Querier interface {
 	DeleteCartItem(ctx context.Context, id uuid.UUID) error
 	DeleteCartItemByCartAndVariant(ctx context.Context, arg DeleteCartItemByCartAndVariantParams) error
 	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
+	// The once-per-customer half of releasing a cancelled order's coupon.
+	DeleteCouponRedemptionByOrderID(ctx context.Context, orderID uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
 	// DeleteCustomerUser is scoped by customer_id as well as id so a caller cannot
 	// revoke a member of an account it does not own — the same ownership-by-query
@@ -133,6 +142,7 @@ type Querier interface {
 	GetCouponCodeByCode(ctx context.Context, upper interface{}) (CouponCode, error)
 	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
 	GetCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) (CouponCode, error)
+	GetCouponRedemptionByOrderID(ctx context.Context, orderID uuid.UUID) (CouponRedemption, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
 	GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error)
@@ -212,6 +222,7 @@ type Querier interface {
 	ListBoxPresetsByMaxWeightAsc(ctx context.Context) ([]BoxPreset, error)
 	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
+	ListCouponRedemptionsByDiscount(ctx context.Context, arg ListCouponRedemptionsByDiscountParams) ([]CouponRedemption, error)
 	ListCustomerUsersByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListDeadPaymentMethods(ctx context.Context, customerID uuid.UUID) ([]string, error)

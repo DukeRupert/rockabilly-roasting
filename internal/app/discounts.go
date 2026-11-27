@@ -99,6 +99,29 @@ func (s *DiscountService) ListCouponCodes(ctx context.Context, tx pgx.Tx, discou
 	return codes, nil
 }
 
+// ListRedemptions returns a once-per-customer discount's most recent paid
+// redemptions, newest first, and how many there are in all.
+func (s *DiscountService) ListRedemptions(ctx context.Context, tx pgx.Tx, discountID uuid.UUID, limit int) ([]domain.CouponRedemption, int, error) {
+	total, err := s.discounts.CountRedemptions(ctx, tx, discountID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if total == 0 {
+		return nil, 0, nil
+	}
+	rows, err := s.discounts.ListRedemptions(ctx, tx, discountID, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+// CountRedemptions returns how many paid orders used a once-per-customer
+// discount.
+func (s *DiscountService) CountRedemptions(ctx context.Context, tx pgx.Tx, discountID uuid.UUID) (int, error) {
+	return s.discounts.CountRedemptions(ctx, tx, discountID)
+}
+
 // CreateDiscountParams holds the validated inputs for creating a discount
 // with its first coupon code.
 type CreateDiscountParams struct {
@@ -109,6 +132,9 @@ type CreateDiscountParams struct {
 	MinimumOrderCents *int
 	ExpiresAt         *time.Time
 	Code              string
+	// UsageLimit is fixed at creation; see domain.CouponUsageLimit. Empty
+	// means single-use, the only shape that existed before.
+	UsageLimit domain.CouponUsageLimit
 }
 
 // CreateWithCode creates a discount and its first coupon code in one step.
@@ -122,6 +148,12 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 	}
 	if err := validateDiscountShape(p.Type, p.Value); err != nil {
 		return nil, err
+	}
+	if p.UsageLimit == "" {
+		p.UsageLimit = domain.CouponUsageSingleUse
+	}
+	if !p.UsageLimit.Valid() {
+		return nil, ErrDiscountInvalid
 	}
 
 	if _, err := s.discounts.GetCouponCodeByCode(ctx, tx, p.Code); err == nil {
@@ -138,6 +170,7 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 		MinimumOrderCents: p.MinimumOrderCents,
 		ExpiresAt:         p.ExpiresAt,
 		Active:            true,
+		UsageLimit:        p.UsageLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create discount: %w", err)

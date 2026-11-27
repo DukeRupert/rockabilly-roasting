@@ -121,6 +121,10 @@ var (
 	ErrCouponCodeExists   = errors.New("coupon code already exists")
 	ErrDiscountInvalid    = errors.New("discount fields are invalid")
 	ErrMinimumOrderNotMet = errors.New("minimum order amount not met")
+	ErrDiscountNotStarted = errors.New("discount has not started")
+	// ErrCouponUsedByCustomer: this customer already has a paid order on a
+	// once-per-customer discount.
+	ErrCouponUsedByCustomer = errors.New("customer has already used this discount")
 
 	// Auth errors
 	ErrSessionExpired   = errors.New("session expired")

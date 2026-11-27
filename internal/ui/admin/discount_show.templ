@@ -17,6 +17,11 @@ import (
 type DiscountShowProps struct {
 	Discount domain.Discount
 	Codes    []domain.CouponCode
+	// Redemptions are the most recent paid orders on a once-per-customer
+	// discount, newest first; RedemptionCount is the full total. Both empty
+	// for a single-use discount, whose codes carry their own redemption.
+	Redemptions     []domain.CouponRedemption
+	RedemptionCount int
 	// Activity is the discount's audit history, newest first.
 	Activity   []domain.AuditEntry
 	Error      string
@@ -68,7 +73,18 @@ func discountDateInput(t *time.Time, loc *time.Location, isExclusiveEnd bool) st
 }
 
 // discountRedemptionSummary is the headline staff want: has this been used.
-func discountRedemptionSummary(codes []domain.CouponCode) string {
+func discountRedemptionSummary(props DiscountShowProps) string {
+	codes := props.Codes
+	if props.Discount.UsageLimit == domain.CouponUsageOncePerCustomer {
+		switch props.RedemptionCount {
+		case 0:
+			return "Not used yet. Each customer can use this code on one order."
+		case 1:
+			return "Used on 1 order. Each customer can use this code on one order."
+		default:
+			return fmt.Sprintf("Used on %d orders. Each customer can use this code on one order.", props.RedemptionCount)
+		}
+	}
 	if len(codes) == 0 {
 		return "No codes issued."
 	}
@@ -108,6 +124,8 @@ templ DiscountShowContent(props DiscountShowProps) {
 					{ discountMinimumLabel(props.Discount) }
 				}
 				<span class="mx-1.5 text-rr-border">&middot;</span>
+				{ discountUsageLabel(props.Discount.UsageLimit) }
+				<span class="mx-1.5 text-rr-border">&middot;</span>
 				Created { props.Discount.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 			</p>
 		</div>
@@ -135,8 +153,10 @@ templ DiscountShowContent(props DiscountShowProps) {
 templ discountCodesTable(props DiscountShowProps) {
 	<div>
 		<h2 class="text-sm font-semibold text-rr-heading">Coupon codes</h2>
-		<p class="mt-1 text-sm text-rr-muted">{ discountRedemptionSummary(props.Codes) }</p>
-		if len(props.Codes) > 0 {
+		<p class="mt-1 text-sm text-rr-muted">{ discountRedemptionSummary(props) }</p>
+		if props.Discount.UsageLimit == domain.CouponUsageOncePerCustomer {
+			@discountSharedCodes(props)
+		} else if len(props.Codes) > 0 {
 			<div class="mt-2 overflow-x-auto border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
@@ -179,6 +199,45 @@ templ discountCodesTable(props DiscountShowProps) {
 			</div>
 		}
 	</div>
+}
+
+// discountSharedCodes lists a once-per-customer discount's codes and the
+// orders that used it. Its codes are never spent, so the single-use table's
+// status/redeemed/order columns would read "available" forever.
+templ discountSharedCodes(props DiscountShowProps) {
+	<p class="mt-2 text-sm text-rr-heading">
+		for i, c := range props.Codes {
+			if i > 0 {
+				<span class="text-rr-border"> · </span>
+			}
+			<span class="font-mono">{ c.Code }</span>
+		}
+	</p>
+	if len(props.Redemptions) > 0 {
+		<div class="mt-2 overflow-x-auto border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Paid</th>
+						<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					for _, rd := range props.Redemptions {
+						<tr>
+							<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-rr-muted sm:pl-6">{ rd.RedeemedAt.In(props.MerchantTZ).Format("Jan 2, 2006 3:04 PM") }</td>
+							<td class="whitespace-nowrap px-3 py-4 text-sm">
+								<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", rd.OrderID.String())) } class="font-semibold text-rr-red hover:text-rr-red-lt">View order &rarr;</a>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		if props.RedemptionCount > len(props.Redemptions) {
+			<p class="mt-2 text-xs text-rr-muted">Showing the latest { fmt.Sprintf("%d", len(props.Redemptions)) } of { fmt.Sprintf("%d", props.RedemptionCount) }.</p>
+		}
+	}
 }
 
 // discountEditCard is the whole point of this page: every rule on a discount

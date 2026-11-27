@@ -41,6 +41,9 @@ export interface CartResponse {
   // Present only when the visitor has a customer session.
   prefill?: CheckoutPrefill;
   coupon?: AppliedCoupon;
+  // Cents still needed (after coupon) for free shipping; 0 once met. Absent
+  // when the shop has no free-shipping threshold.
+  free_shipping_remaining?: number;
 }
 
 export interface AddressRequest {
@@ -104,6 +107,8 @@ export interface PaymentIntentResponse {
   coupon_notice?: string;
   // Set with coupon_notice when the dropped code is for members.
   coupon_sign_in_url?: string;
+  // Present only for carrier-shipped orders when a threshold is configured.
+  free_shipping_remaining?: number;
 }
 
 export interface ConfirmRequest {

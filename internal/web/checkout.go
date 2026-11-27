@@ -51,6 +51,10 @@ type checkoutCartResponse struct {
 	// Coupon reports a coupon already applied to this cart (and still
 	// valid) so the checkout UI can show the applied state after a reload.
 	Coupon *checkoutCartCoupon `json:"coupon,omitempty"`
+	// FreeShippingRemaining is how many more cents (after the applied coupon)
+	// clear the free-shipping threshold; 0 once met. Omitted when no threshold
+	// is configured.
+	FreeShippingRemaining *int `json:"free_shipping_remaining,omitempty"`
 }
 
 type checkoutCartCoupon struct {
@@ -163,6 +167,10 @@ type checkoutPaymentIntentResponse struct {
 	// CouponSignInURL accompanies a notice that the dropped code is for
 	// members, as checkoutApplyCouponResponse.SignInURL does at the code box.
 	CouponSignInURL string `json:"coupon_sign_in_url,omitempty"`
+	// FreeShippingRemaining is set only when the order ships by carrier and a
+	// threshold is configured — pickup and local delivery are already free, so
+	// there is nothing to nudge toward.
+	FreeShippingRemaining *int `json:"free_shipping_remaining,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -338,16 +346,15 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 		// the applied state on reload. Same rules as the payment intent; a
 		// signed-in shopper is known here, so a code they have already used
 		// is not shown as applied.
-		if cart.AppliedCouponCodeID != nil {
-			var use app.CouponUse
-			if customer, ok := auth.CustomerFromContext(ctx); ok {
-				use.CustomerID = &customer.ID
-				use.SignedInCustomerID = &customer.ID
-			}
-			discount, cc, ccErr := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *cart.AppliedCouponCodeID, resp.Subtotal, use)
-			if ccErr == nil {
-				resp.Coupon = &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}
-			}
+		discountCents, coupon := d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, resp.Subtotal)
+		resp.Coupon = coupon
+
+		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return fmt.Errorf("get shipping config: %w", txErr)
+		}
+		if remaining, ok := shipCfg.FreeShippingRemaining(resp.Subtotal - discountCents); ok {
+			resp.FreeShippingRemaining = &remaining
 		}
 
 		if customer, ok := auth.CustomerFromContext(ctx); ok {
@@ -746,6 +753,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		shippingAddr    *domain.Address
 		orderItems      []app.CartItem
 		chosenMethod    *domain.ShippingMethod
+
+		freeShippingRemaining *int
 	)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -907,6 +916,11 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		chosenMethod = resolveLocalMethod(eligible, req.ShippingMethod, customer.PreferredLocalFulfillment)
 		shippingTotal = shipCfg.CalculateForMethod(discountedSubtotal, shippingAddr.PostalCode, chosenMethod)
 		shippingLabel = shippingDisplayLabel(shipCfg, shippingTotal, shippingAddr.PostalCode, chosenMethod)
+		if chosenMethod == nil || *chosenMethod == domain.ShippingMethodShipped {
+			if remaining, ok := shipCfg.FreeShippingRemaining(discountedSubtotal); ok {
+				freeShippingRemaining = &remaining
+			}
+		}
 
 		return nil
 	})
@@ -1049,6 +1063,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		ShippingLabel:   shippingLabel,
 		CouponNotice:    couponNotice,
 		CouponSignInURL: couponSignInURL,
+
+		FreeShippingRemaining: freeShippingRemaining,
 	})
 }
 
@@ -1466,6 +1482,29 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 		return nil, err
 	}
 	return &analytics, nil
+}
+
+// appliedCouponDiscount returns the discount a cart's applied coupon is worth
+// against subtotal, and the coupon for display, by the same rules as the
+// payment intent (CheckoutService.CheckAppliedCoupon). The signed-in shopper,
+// if any, is the customer: a code they have already used, or a members-only
+// code they cannot use, is not shown as applied. A missing or no-longer-valid
+// coupon is worth 0 and returns nil — this feeds display only, so lookup
+// failures are swallowed rather than failing the page.
+func (d *Deps) appliedCouponDiscount(ctx context.Context, tx pgx.Tx, couponCodeID *uuid.UUID, subtotal int) (int, *checkoutCartCoupon) {
+	if couponCodeID == nil {
+		return 0, nil
+	}
+	var use app.CouponUse
+	if customer, ok := auth.CustomerFromContext(ctx); ok {
+		use.CustomerID = &customer.ID
+		use.SignedInCustomerID = &customer.ID
+	}
+	discount, cc, err := d.CheckoutService.CheckAppliedCoupon(ctx, tx, *couponCodeID, subtotal, use)
+	if err != nil {
+		return 0, nil
+	}
+	return calculateDiscountAmount(discount, subtotal), &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}
 }
 
 // calculateDiscountAmount computes the discount amount in cents.

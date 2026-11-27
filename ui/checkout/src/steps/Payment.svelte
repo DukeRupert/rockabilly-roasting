@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import type { Stripe, StripeElements } from '@stripe/stripe-js';
   import { getStripe, createElements } from '../lib/stripe';
   import {
@@ -104,7 +104,11 @@
       (shippingMethod !== initializedMethod || pricingVersion !== initializedPricingVersion) &&
       !processing
     ) {
-      initializePayment();
+      // untrack: initializePayment reads cart/address props synchronously,
+      // and without this the effect would subscribe to them. The parent
+      // replaces `cart` after a coupon change, so a tracked read re-fired
+      // this effect before the first PI returned — two PIs, two orders.
+      untrack(() => initializePayment());
     }
   });
 

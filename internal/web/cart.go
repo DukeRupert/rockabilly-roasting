@@ -16,17 +16,25 @@ import (
 )
 
 // freeShippingHint returns customer-facing messaging nudging the shopper toward
-// the free-shipping threshold, or "" if no nudge applies (no threshold set, or
-// already above it).
-func freeShippingHint(cfg *domain.ShippingConfig, subtotalCents int) string {
-	if cfg == nil || cfg.FreeShippingThreshold == nil {
+// the free-shipping threshold, or "" if no threshold is set. qualifyingCents is
+// the subtotal after any applied coupon, matching what checkout prices
+// shipping on. The cart page doesn't itemize the coupon, so when one applies
+// the copy says so; otherwise "$54 subtotal, $6.80 away" reads as an error.
+func freeShippingHint(cfg *domain.ShippingConfig, qualifyingCents int, couponApplied bool) string {
+	if cfg == nil {
 		return ""
 	}
-	remaining := *cfg.FreeShippingThreshold - subtotalCents
-	if remaining <= 0 {
+	remaining, ok := cfg.FreeShippingRemaining(qualifyingCents)
+	if !ok {
+		return ""
+	}
+	if remaining == 0 {
 		return "You've unlocked free shipping."
 	}
-	return fmt.Sprintf("Spend $%.2f more for free shipping.", float64(remaining)/100)
+	if couponApplied {
+		return fmt.Sprintf("You're $%.2f away from free shipping after your coupon.", float64(remaining)/100)
+	}
+	return fmt.Sprintf("You're $%.2f away from free shipping.", float64(remaining)/100)
 }
 
 const cartCookieName = "cart_id"
@@ -134,7 +142,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var items []storefront.CartItemDisplay
-	var subtotal int
+	var subtotal, discountCents int
 	var shippingConfig *domain.ShippingConfig
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -187,6 +195,13 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		// A coupon applied at checkout lowers the subtotal shipping is priced
+		// on, so the nudge must count it too. Display-only: a missing cart just
+		// means no coupon.
+		if cart, cErr := d.CartService.GetCart(ctx, tx, *cartID); cErr == nil {
+			discountCents, _ = d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, subtotal)
+		}
+
 		shippingConfig, txErr = d.CheckoutService.GetShippingConfig(ctx, tx)
 		if txErr != nil {
 			return txErr
@@ -209,7 +224,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 		Items:            items,
 		Subtotal:         subtotal,
 		CartCount:        cartCount,
-		FreeShippingHint: freeShippingHint(shippingConfig, subtotal),
+		FreeShippingHint: freeShippingHint(shippingConfig, subtotal-discountCents, discountCents > 0),
 	}
 	if IsHTMX(r) {
 		storefront.CartContent(props).Render(ctx, w)   //nolint:errcheck

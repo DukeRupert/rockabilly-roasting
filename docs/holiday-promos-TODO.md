@@ -23,8 +23,8 @@ Deadlines: GIFT20 ends **2026-12-21**, WELCOME50 ends **2026-12-31**.
 
 ## Checklist
 
-In build order. Items 1 to 3 shipped in #81 (v1.129.0); item 4 is on
-`feat/welcome-subscription-coupons`.
+In build order. Items 1 to 3 shipped in #81 (v1.129.0), item 4 in #82
+(v1.130.0). GIFT20 and WELCOME50 are live.
 
 ### 1. Codes many customers can use, each once per customer
 - [x] Discount-level usage setting: `single_use` (today's behaviour) or
@@ -70,7 +70,7 @@ In build order. Items 1 to 3 shipped in #81 (v1.129.0); item 4 is on
       subscription, in any status
 - [x] Redemption on signup capture, using the ledger from item 1
 - [x] Tax and shipping priced on the discounted subtotal, as at cart checkout
-- [ ] Create WELCOME50 in admin once deployed: 50%, once per customer, new
+- [x] Create WELCOME50 in admin once deployed: 50%, once per customer, new
       subscribers only, first subscription order, last valid day 12/31
 
 ### 5. Referral program

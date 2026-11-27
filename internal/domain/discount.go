@@ -91,8 +91,22 @@ type Discount struct {
 	// IsReferral marks the one discount members share: each member's own
 	// code on it says who referred the friend. See ReferralReward.
 	IsReferral bool
+	// BannerText is the line staff wrote to promote it in the storefront's
+	// offer strip; empty when it is not promoted.
+	BannerText string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+}
+
+// MaxBannerTextLen is the longest banner line staff may write, in characters.
+// The column enforces the same limit (migration 098).
+const MaxBannerTextLen = 120
+
+// PromoBanner is one line of the storefront's offer strip: staff's copy for a
+// live discount, and where it leads.
+type PromoBanner struct {
+	Text string
+	Href string
 }
 
 // CouponCode represents a redeemable coupon tied to a discount.

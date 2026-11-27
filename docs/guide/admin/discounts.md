@@ -93,6 +93,30 @@ If a code is refused, the customer sees a message saying why. The code is checke
 
 Coupon entry is rate-limited by IP address to prevent abuse.
 
+## Promoting a Discount in the Site Banner
+
+A discount can be promoted in a strip of offers above the header on every storefront page. Open the discount and use the **Site banner** card on the right:
+
+1. Write one short line, at most 120 characters, and **include the code**. For example: *Holiday gift: 20% off any bag with code GIFT20*. The referral offer is the exception: leave the code out, because each member has their own. For example: *Share your Daily Grind code: friends get 50% off, you get a free bag*.
+2. Click **Save banner**.
+
+The line links to where the code is used: the shop for one-time orders, the Daily Grind page for a first subscription order, and a member's subscriptions page for the referral offer. The card says who will see the line and where it links before you save.
+
+The banner only shows while the discount is **active and within its dates**, so it goes away when the discount ends. Nobody has to remember to take it down. To stop showing it sooner, empty the line and save, or deactivate the discount.
+
+The site shows each line only to the customers the discount is for:
+
+| Discount | Who sees the banner |
+|---|---|
+| Anyone | Everyone |
+| Daily Grind members only | Signed-in active members |
+| New subscribers only | Everyone except signed-in customers who have subscribed before |
+| The referral offer | Signed-in active members, who share their own codes. Friends arrive with a member's code instead. |
+
+Wholesale accounts don't see storefront banners. If several discounts are promoted, each gets its own line, with the one ending soonest first.
+
+A member who isn't signed in sees what a guest sees. Members-only offers need sign-in at checkout anyway, so email is still the way to reach every member.
+
 ## Referral Program
 
 Each active Daily Grind member can share their own code. A friend who uses it gets the referral discount on their first subscription order, and the member earns a free bag.

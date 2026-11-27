@@ -313,6 +313,7 @@ templ Storefront(props StorefrontProps) {
 			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-rust focus:text-paper focus:border-2 focus:border-ink focus:px-4 focus:py-2 focus:font-oswald focus:font-bold focus:text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
 				Skip to main content
 			</a>
+			@promoStrip(promoBanners(ctx))
 			<!-- Header -->
 			<header class="sticky top-0 z-40 bg-ink border-b-2 border-ink-soft">
 				<nav class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
@@ -746,6 +747,25 @@ templ Storefront(props StorefrontProps) {
 			</script>
 		</body>
 	</html>
+}
+
+// promoStrip is the offer strip above the header: one line per live discount
+// staff are promoting to this shopper. Outside the sticky header, so it
+// scrolls away and the header keeps its height. Outside #main-content too, so
+// boosted navigation leaves it as the page first rendered it, like the account
+// menu beside it.
+templ promoStrip(banners []domain.PromoBanner) {
+	if len(banners) > 0 {
+		<aside aria-label="Current offers" class="bg-candle text-ink border-b-2 border-ink">
+			<ul class="mx-auto max-w-screen-2xl px-4 py-2 sm:px-6 lg:px-8 flex flex-col items-center gap-y-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-10 text-center font-oswald text-sm font-semibold">
+				for _, b := range banners {
+					<li>
+						<a href={ templ.SafeURL(b.Href) } class="underline decoration-2 underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">{ b.Text }</a>
+					</li>
+				}
+			</ul>
+		</aside>
+	}
 }
 
 // CartBadge renders the header cart count chip. Count 0 collapses to a

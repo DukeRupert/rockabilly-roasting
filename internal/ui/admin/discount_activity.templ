@@ -18,6 +18,8 @@ func discountEventLabel(action string) string {
 		return "Deactivated"
 	case audit.AuditDiscountReferralOffer:
 		return "Referral offer changed"
+	case audit.AuditDiscountBanner:
+		return "Site banner changed"
 	}
 	parts := strings.SplitN(action, ".", 2)
 	if len(parts) == 2 {

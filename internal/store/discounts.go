@@ -143,7 +143,7 @@ type DiscountFilter struct {
 // List returns discounts matching the given filter (hand-written for dynamic WHERE).
 func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) ([]domain.Discount, error) {
 	query := `SELECT id, name, description, type, value, minimum_order_cents,
-	                 starts_at, expires_at, active, usage_limit, eligibility, applies_to, is_referral, created_at, updated_at
+	                 starts_at, expires_at, active, usage_limit, eligibility, applies_to, is_referral, banner_text, created_at, updated_at
 	          FROM discounts WHERE true`
 	args := []any{}
 	argN := 1
@@ -184,7 +184,7 @@ func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) (
 		var discountType, usageLimit, eligibility, appliesTo string
 		if err := rows.Scan(
 			&d.ID, &d.Name, &d.Description, &discountType, &value, &minimumOrderCents,
-			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &appliesTo, &d.IsReferral, &d.CreatedAt, &d.UpdatedAt,
+			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &appliesTo, &d.IsReferral, &d.BannerText, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan discount: %w", err)
 		}
@@ -438,6 +438,7 @@ func discountFromRow(r sqlcgen.Discount) *domain.Discount {
 		Eligibility:       domain.DiscountEligibility(r.Eligibility),
 		AppliesTo:         domain.DiscountAppliesTo(r.AppliesTo),
 		IsReferral:        r.IsReferral,
+		BannerText:        r.BannerText,
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,
 	}
@@ -602,4 +603,27 @@ func referralRewardFromRow(r sqlcgen.ReferralReward) *domain.ReferralReward {
 		SentBy:             r.SentBy,
 		CreatedAt:          r.CreatedAt,
 	}
+}
+
+// SetBannerText sets a discount's storefront banner copy; empty stops
+// promoting it.
+func (s *DiscountStore) SetBannerText(ctx context.Context, tx pgx.Tx, id uuid.UUID, text string) error {
+	if err := sqlcgen.New(tx).SetDiscountBannerText(ctx, sqlcgen.SetDiscountBannerTextParams{ID: id, BannerText: text}); err != nil {
+		return fmt.Errorf("set discount banner text: %w", err)
+	}
+	return nil
+}
+
+// ListBannerDiscounts returns the live discounts that have banner copy,
+// soonest to end first.
+func (s *DiscountStore) ListBannerDiscounts(ctx context.Context, tx pgx.Tx) ([]domain.Discount, error) {
+	rows, err := sqlcgen.New(tx).ListBannerDiscounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list banner discounts: %w", err)
+	}
+	out := make([]domain.Discount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, *discountFromRow(r))
+	}
+	return out, nil
 }

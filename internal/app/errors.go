@@ -143,6 +143,8 @@ var (
 	// ErrReferralOfferInvalid: a discount that cannot be the referral offer
 	// as it stands. See DiscountService.SetReferralOffer.
 	ErrReferralOfferInvalid = errors.New("discount cannot be the referral offer")
+	// ErrBannerTextTooLong: storefront banner copy over domain.MaxBannerTextLen.
+	ErrBannerTextTooLong = errors.New("banner text is too long")
 	// ErrReferralRewardNotOwed: marking a reward sent that is not owed.
 	ErrReferralRewardNotOwed = errors.New("referral reward is not owed")
 

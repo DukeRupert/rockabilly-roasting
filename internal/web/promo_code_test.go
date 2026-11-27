@@ -75,6 +75,14 @@ func TestCapturePromoParam(t *testing.T) {
 		}
 	})
 
+	t.Run("a code may be 64 characters, not 65", func(t *testing.T) {
+		long := strings.Repeat("A", 64)
+		c := promoCookie(serve(http.MethodGet, "/?promo="+long))
+		require.NotNil(t, c)
+		assert.Equal(t, long, c.Value)
+		assert.Nil(t, promoCookie(serve(http.MethodGet, "/?promo="+long+"A")))
+	})
+
 	t.Run("the redirect can only name this site", func(t *testing.T) {
 		// The path as the client sent it: this runs before ServeMux cleans it.
 		for target, want := range map[string]string{
@@ -284,5 +292,78 @@ func TestSubscribe_PendingPromo(t *testing.T) {
 		w, resp := post(t, "NOSUCHCODE", "WELCOME50")
 		require.NotEmpty(t, resp.CouponNotice)
 		assert.Nil(t, promoCookie(w))
+	})
+}
+
+// Each checkout offers only a code for its own kind of order, so a code
+// waiting for the other checkout is not refused at this one on every visit.
+func TestPendingPromo_OfferedOnlyWhereItWorks(t *testing.T) {
+	cartCode := newSignupCode(t) // one-time orders
+	signupCode := welcomeCode(t)
+
+	t.Run("cart checkout", func(t *testing.T) {
+		f := newCheckoutCouponFixture(t)
+		clearCartCoupon(t, f)
+		d, _ := newCheckoutPaymentDeps(t)
+		offered := func(pending string) string {
+			t.Helper()
+			r := httptest.NewRequest(http.MethodGet, "/api/checkout/cart", nil)
+			r.AddCookie(&http.Cookie{Name: cartCookieName, Value: f.cartID.String()})
+			w := httptest.NewRecorder()
+			d.handleCheckoutCart(w, withPending(r, pending))
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var resp checkoutCartResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			return resp.PendingCoupon
+		}
+		assert.Equal(t, cartCode, offered(cartCode))
+		assert.Empty(t, offered(signupCode), "a signup code waits for the subscribe page")
+		assert.Equal(t, "NOSUCHCODE", offered("NOSUCHCODE"), "unknown: offered, refused once, forgotten")
+	})
+
+	t.Run("subscribe page", func(t *testing.T) {
+		f := newSubscribeFixture(t)
+		d, _ := newSubscribePaymentDeps(t)
+		prefilled := func(pending string) string {
+			t.Helper()
+			target := "/subscribe?line=" + url.QueryEscape(f.planID.String()+":"+f.variantID.String()+":1")
+			w := httptest.NewRecorder()
+			props, ok := d.subscribePageProps(w, withPending(httptest.NewRequest(http.MethodGet, target, nil), pending))
+			require.True(t, ok, w.Body.String())
+			return props.PendingCoupon
+		}
+		assert.Equal(t, signupCode, prefilled(signupCode))
+		assert.Empty(t, prefilled(cartCode), "a cart code waits for cart checkout")
+		assert.Equal(t, "NOSUCHCODE", prefilled("NOSUCHCODE"))
+	})
+}
+
+// After a signup goes through, a signup code from a promo link is done with;
+// a cart code is still waiting for cart checkout.
+func TestSubscribeConfirm_SettlesThePendingPromo(t *testing.T) {
+	f := newMultiLineFixture(t)
+	confirm := func(t *testing.T, pending string) *httptest.ResponseRecorder {
+		t.Helper()
+		d, fake := newSubscribePaymentDeps(t)
+		withRiver(t, d)
+		intentID, _ := signUp(t, d, fake, f.twoLines()[:1])
+		r := httptest.NewRequest(http.MethodPost, "/api/subscribe/confirm",
+			strings.NewReader(`{"payment_intent_id":"`+intentID+`"}`))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		d.handleSubscribeConfirm(w, withPending(r, pending))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		return w
+	}
+
+	t.Run("a signup code is forgotten", func(t *testing.T) {
+		c := promoCookie(confirm(t, welcomeCode(t)))
+		require.NotNil(t, c)
+		assert.Negative(t, c.MaxAge)
+		assert.Equal(t, "/", c.Path)
+	})
+
+	t.Run("a cart code is kept", func(t *testing.T) {
+		assert.Nil(t, promoCookie(confirm(t, newSignupCode(t))))
 	})
 }

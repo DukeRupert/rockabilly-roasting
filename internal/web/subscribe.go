@@ -419,15 +419,20 @@ func (d *Deps) subscribePageProps(w http.ResponseWriter, r *http.Request) (store
 	}
 
 	props := storefront.SubscribePageProps{
-		Lines:         pageLines,
-		LinesJSON:     string(linesJSON),
-		Subtotal:      subtotal,
-		MultiPlan:     len(distinctPlans) > 1,
-		MerchantTZ:    d.MerchantTZ,
-		StripeKey:     os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-		CartCount:     d.cartItemCountFromCookie(r),
-		PendingCoupon: pendingPromo(r),
+		Lines:      pageLines,
+		LinesJSON:  string(linesJSON),
+		Subtotal:   subtotal,
+		MultiPlan:  len(distinctPlans) > 1,
+		MerchantTZ: d.MerchantTZ,
+		StripeKey:  os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		CartCount:  d.cartItemCountFromCookie(r),
 	}
+	// Best-effort and outside the page's transaction: a failed lookup only
+	// leaves the code box empty.
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		props.PendingCoupon = d.pendingPromoFor(ctx, tx, r, domain.DiscountAppliesToSubscriptionSignup)
+		return nil
+	})
 	return props, true
 }
 
@@ -1176,6 +1181,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to finalize subscription"})
 		return
 	}
+
+	// Signed up: a signup code from a promo link is spent or no longer
+	// wanted, and would only be refused on the next visit. A cart code waits
+	// for cart checkout.
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if pendingPromo(r) != "" && d.pendingPromoFor(ctx, tx, r, domain.DiscountAppliesToSubscriptionSignup) != "" {
+			clearPendingPromo(w)
+		}
+		return nil
+	})
 
 	// The analytics payload is best-effort: the signup has already succeeded,
 	// so a failed load costs the tracking event, not the response.

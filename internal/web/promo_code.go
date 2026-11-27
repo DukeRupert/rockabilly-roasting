@@ -1,10 +1,14 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/logging"
 )
 
 // A promo link: any storefront page with ?promo=CODE, from the offer strip or
@@ -91,4 +95,26 @@ func clearPendingPromo(w http.ResponseWriter) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+// pendingPromoFor is the promo link's code if this checkout should offer it:
+// its discount works on this kind of order, or the code is unknown (offered,
+// so checkout refuses it once and it is forgotten). A signup code is never
+// put in the cart's code box, nor a cart code on the subscribe page — each
+// would be refused there on every visit while it waits for the other.
+// Best-effort: a failed lookup offers nothing.
+func (d *Deps) pendingPromoFor(ctx context.Context, tx pgx.Tx, r *http.Request, kind domain.DiscountAppliesTo) string {
+	code := pendingPromo(r)
+	if code == "" {
+		return ""
+	}
+	appliesTo, found, err := d.CheckoutService.CouponAppliesTo(ctx, tx, code)
+	if err != nil {
+		logging.FromContext(ctx).Warn("pending promo lookup", "error", err)
+		return ""
+	}
+	if found && appliesTo != kind {
+		return ""
+	}
+	return code
 }

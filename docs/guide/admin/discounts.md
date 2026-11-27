@@ -126,8 +126,10 @@ Add `?promo=CODE` to any storefront link, in an email, a post or a printed QR co
 
 The site remembers the code for 30 days while the customer browses, and takes it out of the address bar so it isn't shared further by accident. Then:
 
-- **Cart checkout** applies it automatically when the cart has no code yet. If it doesn't apply, the customer sees why, just as if they had typed it, with the code left in the box.
-- **Subscription signup** starts with the code filled in, and the payment step prices it or says why not.
+- **Cart checkout** applies a one-time-order code automatically when the cart has no code yet. If it doesn't apply, the customer sees why, just as if they had typed it, with the code left in the box.
+- **Subscription signup** starts with a first-subscription-order code filled in, and the payment step prices it or says why not.
+
+Each checkout only offers a code meant for it, so a WELCOME50 link never puts WELCOME50 in the cart's code box. A signup code is forgotten once the customer has signed up.
 
 The code is forgotten once it is on a cart, or once checkout finds it can't be used anywhere: it doesn't exist, its discount is deactivated or over, or a single-use code is spent. Any other refusal keeps it, because it may still work after a change. For example, a members-only code works after signing in, and a signup code still works on the subscribe page.
 

@@ -353,7 +353,7 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 		discountCents, coupon := d.appliedCouponDiscount(ctx, tx, cart.AppliedCouponCodeID, resp.Subtotal)
 		resp.Coupon = coupon
 		if coupon == nil {
-			resp.PendingCoupon = pendingPromo(r)
+			resp.PendingCoupon = d.pendingPromoFor(ctx, tx, r, domain.DiscountAppliesToOneTime)
 		}
 
 		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)

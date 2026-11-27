@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -261,7 +262,7 @@ func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
 		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
 	})
 
-	t.Run("an escaped character survives the link", func(t *testing.T) {
+	t.Run("a code with an underscore is carried", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		d, text := bannerDiscount(t, tx, svc)
 		code := "GIFT_" + strings.ToUpper(uuid.NewString()[:6])
@@ -280,4 +281,26 @@ func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
 		member.subscribe(t, tx, domain.SubscriptionStatusActive)
 		assert.Equal(t, "/account/subscriptions", bannerHref(t, tx, svc, member.customer, text))
 	})
+}
+
+// Which refusals forget a promo link's code. Only those true at every
+// checkout, for every shopper, from now on; each other refusal depends on
+// the order, the cart, the session or the email, and a change can fix it.
+func TestCouponDeadEverywhere(t *testing.T) {
+	dead := []error{
+		app.ErrCouponNotFound, app.ErrDiscountNotFound, app.ErrDiscountNotActive,
+		app.ErrDiscountExpired, app.ErrCouponAlreadyUsed,
+	}
+	alive := []error{
+		app.ErrDiscountNotStarted, app.ErrMinimumOrderNotMet, app.ErrCouponSignInRequired,
+		app.ErrCouponSubscribersOnly, app.ErrCouponSignupOnly, app.ErrCouponOneTimeOnly,
+		app.ErrCouponNewSubscribersOnly, app.ErrCouponUsedByCustomer, app.ErrCouponOwnCode,
+	}
+	for _, err := range dead {
+		assert.True(t, app.CouponDeadEverywhere(fmt.Errorf("wrapped: %w", err)), "%v", err)
+	}
+	for _, err := range alive {
+		assert.False(t, app.CouponDeadEverywhere(err), "%v", err)
+	}
+	assert.False(t, app.CouponDeadEverywhere(nil))
 }

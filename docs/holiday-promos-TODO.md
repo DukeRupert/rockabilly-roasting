@@ -45,7 +45,8 @@ In build order. Items 1 to 3 shipped in #81 (v1.129.0), item 4 in #82
 ### 2. GA4 coupon field
 - [x] `loadOrderAnalytics` sets `coupon` from the order's coupon code
 - [x] `rrPurchase` passes it through to `gtag('event','purchase')`
-- [ ] Subscription signup purchase gets it too, once item 4 lands
+- [x] Subscription signup purchase gets it too (the signup order records its
+      coupon, and the subscribe confirm sends the same payload)
 
 ### 3. GIFT20: active members only, one-time checkout
 - [x] Discount-level eligibility setting: `anyone` or `subscribers`. Editable,

@@ -1556,9 +1556,10 @@ func addressShippable(a *domain.Address) bool {
 //
 // Confirm-path errors only: its one caller is handleCheckoutConfirm, which
 // reaches GetPaymentIntent, ConfirmCheckoutPayment and an order read. A coupon
-// refusal cannot arrive here — every one comes from CheckoutService.checkCoupon,
-// through ApplyCoupon, CheckAppliedCoupon or PlaceOrder, none on this path — so
-// there is no coupon label. The placement paths label their own refusals.
+// refusal cannot arrive here — every one comes from ApplyCoupon or
+// CheckAppliedCoupon (the code lookup, then the rules in checkCoupon), directly
+// or through PlaceOrder, none on this path — so there is no coupon label. The
+// placement paths label their own refusals.
 func classifyCheckoutError(err error) string {
 	switch {
 	case errors.Is(err, app.ErrPaymentFailed):

@@ -101,6 +101,10 @@ You will also receive a separate subscription confirmation email.
 
 ---
 
+## Share the Daily Grind
+
+If you have an active subscription, your subscriptions page shows your own referral code. Give it to a friend: they get money off their first subscription order, and once their first order is paid, we send you a free bag. Use **Copy code** to copy it, or read it out -- it's your first name and four characters, like LOGAN-7KQ2. The card also shows how many friends have joined with your code. Your own code can't be used on your own orders.
+
 ## Managing Your Subscription
 
 After subscribing, you can manage everything from your account. Go to **Account > Subscriptions** to see all your active subscriptions.

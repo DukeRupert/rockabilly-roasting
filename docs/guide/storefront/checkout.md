@@ -50,6 +50,7 @@ If you have a coupon or discount code, you can enter it during checkout. The sys
 - "That code is for Daily Grind members. Sign in to use it." -- Members-only codes need you to be signed in. Use the **Go to sign in** link; your cart will still be here when you come back.
 - "That code is for Daily Grind members, on orders placed from their own account." -- You're signed in, but either your subscription isn't active, or the order is going under a different email address than your account's.
 - "That code is for new Daily Grind subscriptions. Use it when you sign up." -- Welcome codes work on the subscribe page, not at regular checkout.
+- "That's your own referral code. Share it with a friend: it's for their first order." -- Referral codes are for friends you share them with.
 - "That code isn't active yet." -- The promotion hasn't started.
 - "That code is no longer active." -- The promotion has been turned off.
 - "That code has expired." -- The promotion's end date has passed.

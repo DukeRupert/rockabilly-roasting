@@ -1,87 +1,89 @@
 # Discounts and Coupons
 
-Discounts let you offer price reductions, fixed-dollar savings, or free shipping to customers. Each discount is linked to one or more **coupon codes** that customers enter during checkout.
+Discounts let you offer a percentage or a fixed-dollar saving to customers. Each discount has a **coupon code** that customers enter during checkout.
 
 ## Concepts
 
-A **discount** is a rule that defines the type and amount of the reduction. A **coupon code** is a redeemable string tied to a discount -- it is what the customer actually types in.
+A **discount** is a rule that defines the type and amount of the reduction, and who can use it. A **coupon code** is what the customer actually types in.
 
-Coupon codes are single-use by default. Once a coupon has been redeemed against an order, it cannot be used again.
+Every discount has two settings that decide who can use its code and how often:
+
+- **How often** -- chosen when the discount is created, and fixed after that:
+  - **Single-use** -- the code works for one order. The first customer to pay with it uses it up for everyone. Good for a one-off code given to one person.
+  - **Once per customer** -- the code can go out to everyone, and each customer can use it on one order. Good for a code sent to a whole mailing list.
+- **Who can use it** -- can be changed at any time:
+  - **Anyone** -- any shopper, signed in or not.
+  - **Daily Grind members only** -- the shopper must be signed in, with an **active** subscription. Paused, past-due, cancelled and expired subscriptions don't count. The order must be for the signed-in member's own account. A shopper who isn't signed in is asked to sign in, and their cart is kept when they do.
+
+"Once per customer" goes by the customer's account, which checkout finds from the email address entered. A shopper who checks out as a guest with a different email address counts as a new customer.
 
 ## Discount Types
 
 | Type | How It Works | Example Display |
 |------|-------------|-----------------|
-| **Percentage** | Reduces the cart total by a percentage of the subtotal | `15%` |
-| **Fixed Amount** | Subtracts a flat dollar amount from the cart total | `$5.00` |
-| **Free Shipping** | Waives the shipping charge entirely | `Free` |
+| **Percentage** | Takes a percentage off the subtotal | `15%` |
+| **Fixed Amount** | Takes a flat dollar amount off the subtotal, never more than the subtotal | `$5.00` |
 
-## Discount Fields
+Free-shipping discounts are not available.
 
-Each discount has the following properties:
+## Creating a Discount
 
-- **Name** -- A human-readable label shown in the admin panel (e.g., "Summer Sale 15% Off").
-- **Type** -- One of the three types listed above.
-- **Value** -- The numeric value of the discount. For percentage discounts this is the percent (e.g., `15` for 15%). For fixed-amount discounts this is stored in cents (e.g., `500` for $5.00).
-- **Minimum Order (cents)** -- Optional. If set, the discount only applies when the cart subtotal meets or exceeds this amount.
-- **Starts At** -- Optional. The date the discount becomes valid.
-- **Expires At** -- Optional. The date the discount stops being valid.
-- **Active** -- Whether the discount is currently enabled. An inactive discount cannot be redeemed even if it has not expired.
+Go to **Admin > Discounts**. The **New Discount** form at the top of the page has:
+
+- **Name** -- A label shown in the admin panel and to the customer when the code is applied (e.g., "Holiday Gift 20% Off").
+- **Coupon code** -- What customers type. Stored in capitals; customers can type it in any case. A code can't be changed once created; to change it, create a new discount.
+- **Type** -- Percentage or Fixed amount.
+- **Value** -- A whole percent (e.g., `20`) or a dollar amount (e.g., `5.00`).
+- **Min order $** -- Optional. The code only works when the subtotal is at least this much.
+- **How often** -- Single-use or Once per customer. See above. This can't be changed later.
+- **Who can use it** -- Anyone or Daily Grind members only.
+- **Expires** -- Optional. The code works through the end of this day.
+
+## Editing a Discount
+
+Click a discount's name to open its page. The **Edit** panel on the right lets you change the name, a staff-only description, the type and value, the minimum order, **Who can use it**, the **Starts** date and the **Last valid day**.
+
+- **Starts** -- The code doesn't work before this day.
+- **Last valid day** -- The code works through the end of this day.
+
+Changes only affect future orders. Orders already placed keep the discount they were given.
+
+The **Status** panel turns the discount on or off. An inactive discount can't be used, even if it hasn't expired.
 
 ## Viewing the Discount List
 
-Navigate to **Admin > Discounts** in the sidebar.
+The list page shows each discount with:
 
-The list page displays a table with the following columns:
+- **Name** -- Click it to open the discount's page.
+- **Code** -- The coupon code. A used-up single-use code is struck through. Once-per-customer codes show how many orders have used them, and members-only discounts say "Daily Grind members only".
+- **Type** and **Value** -- Including the minimum order, if any.
+- **Status** -- Active or inactive.
+- **Dates** -- The start and expiry dates, if set.
+- **Created** -- When the discount was created (on larger screens).
 
-- **Name** -- The discount name.
-- **Type** -- Percentage, Fixed Amount, or Free Shipping.
-- **Value** -- The formatted discount value.
-- **Status** -- An active/inactive badge.
-- **Dates** -- The start and expiration dates, if set. A dash indicates no date constraint on that side.
-- **Created** -- When the discount was created (visible on larger screens).
+Use the dropdown above the list to show all, active or inactive discounts. The list shows 25 discounts per page.
 
-### Filtering
+## Tracking Who Used a Code
 
-Use the dropdown at the top of the page to filter by status:
+A discount's page shows how it has been used:
 
-- **All discounts** -- Shows everything.
-- **Active** -- Only discounts that are currently enabled.
-- **Inactive** -- Only disabled discounts.
+- **Single-use** -- whether the code has been used, when, and a link to the order.
+- **Once per customer** -- how many orders have used it, with the most recent 50 listed by date and linked to their orders.
 
-The filter selection is preserved in the URL, so you can bookmark or share filtered views.
+A code only counts as used once the order is paid. An order that's started but never paid doesn't use it up, and cancelling an order makes the code available to that customer again.
 
-### Pagination
-
-The list shows 25 discounts per page. Use the Previous and Next links at the bottom to navigate.
-
-## Redemption Tracking
-
-Each coupon code tracks:
-
-- **Who redeemed it** -- The customer ID of the person who used the code.
-- **When it was redeemed** -- The exact timestamp.
-- **Which order** -- The order ID the coupon was applied to.
-
-A coupon that has already been redeemed cannot be used again. If a customer tries to enter a used code, they will see the message "That code has already been used."
+Very rarely, two orders using the same code are paid at almost the same moment. The first payment gets the code; the second customer still keeps the discount they were charged, and the order's activity log shows "Coupon already used by another order".
 
 ## How Customers Apply Coupons
 
-During checkout, customers see a coupon code input field. The flow works as follows:
+Customers enter a code in the order summary at checkout. A code is accepted only if:
 
-1. The customer enters a code and submits it.
-2. The system validates the code:
-   - The code must exist and be tied to an active discount.
-   - The discount must not have expired.
-   - The code must not have been previously redeemed.
-3. If valid, the discount is applied to the cart and the customer sees the discount name and savings amount.
-4. If invalid, the customer sees a specific error message explaining why (code not found, already used, expired, or no longer active).
-5. Customers can remove an applied coupon before completing their purchase.
+- it exists and its discount is active;
+- its start date has arrived and it hasn't expired;
+- the cart meets any minimum order;
+- it hasn't already been used up (single-use), or used by this customer before (once per customer);
+- for members-only codes, the shopper is signed in with an active subscription.
 
-Coupon application is rate-limited by IP address to prevent abuse.
+If a code is refused, the customer sees a message saying why. The code is checked again when the payment is set up; if it no longer applies (for example, a once-per-customer code entered before checkout knew who the customer was), it's removed and the customer is told why before they pay.
 
-When the order is finalized, the coupon code is marked as redeemed and linked to the completed order.
-
-## Creating Discounts and Coupons
-
-Discount and coupon creation is not yet available through the admin panel UI. To create a new discount or generate coupon codes, contact the administrator.
+Coupon entry is rate-limited by IP address to prevent abuse.

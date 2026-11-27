@@ -46,8 +46,15 @@ If you have a coupon or discount code, you can enter it during checkout. The sys
 
 - "That code doesn't look right." -- The code was not recognized. Double-check for typos.
 - "That code has already been used." -- Single-use codes can only be redeemed once.
+- "You've already used that code. It's good for one order per customer." -- Some codes can be used by everyone, but only once each. Once you've entered your email, checkout can tell you've used it before.
+- "That code is for Daily Grind members. Sign in to use it." -- Members-only codes need you to be signed in. Use the **Go to sign in** link; your cart will still be here when you come back.
+- "That code is for Daily Grind members, on orders placed from their own account." -- You're signed in, but either your subscription isn't active, or the order is going under a different email address than your account's.
+- "That code isn't active yet." -- The promotion hasn't started.
 - "That code is no longer active." -- The promotion has been turned off.
 - "That code has expired." -- The promotion's end date has passed.
+- "Your order doesn't meet the minimum for that code." -- Add more to your cart to reach the code's minimum order.
+
+A code is checked again when the payment form loads. If it no longer applies (for example, it's a one-per-customer code and the email you entered has used it before), it's removed, your total is updated, and the message explains why before you pay.
 
 If a code is accepted, you will see the discount name and how much you are saving. You can remove an applied coupon if you change your mind.
 

@@ -131,6 +131,13 @@ var (
 	// ErrCouponSubscribersOnly: a subscribers-only discount, and the signed-in
 	// customer has no live subscription or the order is for someone else.
 	ErrCouponSubscribersOnly = errors.New("discount is for subscribers only")
+	// ErrCouponSignupOnly: a subscription-signup code tried at cart checkout.
+	ErrCouponSignupOnly = errors.New("discount is for new subscription orders only")
+	// ErrCouponOneTimeOnly: a cart-checkout code tried on a subscription signup.
+	ErrCouponOneTimeOnly = errors.New("discount is for one-time orders only")
+	// ErrCouponNewSubscribersOnly: a new-subscribers discount, and the
+	// customer has held a subscription before.
+	ErrCouponNewSubscribersOnly = errors.New("discount is for new subscribers only")
 
 	// Auth errors
 	ErrSessionExpired   = errors.New("session expired")

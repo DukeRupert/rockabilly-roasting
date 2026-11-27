@@ -569,6 +569,7 @@ type createDiscountInput struct {
 	ExpiresAt         *time.Time
 	UsageLimit        domain.CouponUsageLimit
 	Eligibility       domain.DiscountEligibility
+	AppliesTo         domain.DiscountAppliesTo
 }
 
 func WithDiscountType(dt domain.DiscountType) DiscountOption {
@@ -603,6 +604,10 @@ func WithEligibility(e domain.DiscountEligibility) DiscountOption {
 	return func(p *createDiscountInput) { p.Eligibility = e }
 }
 
+func WithAppliesTo(a domain.DiscountAppliesTo) DiscountOption {
+	return func(p *createDiscountInput) { p.AppliesTo = a }
+}
+
 func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Discount {
 	t.Helper()
 	input := createDiscountInput{
@@ -612,6 +617,7 @@ func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Dis
 		Active:      true,
 		UsageLimit:  domain.CouponUsageSingleUse,
 		Eligibility: domain.DiscountEligibilityAnyone,
+		AppliesTo:   domain.DiscountAppliesToOneTime,
 	}
 	for _, o := range opts {
 		o(&input)
@@ -632,6 +638,7 @@ func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Dis
 		Active:            input.Active,
 		UsageLimit:        string(input.UsageLimit),
 		Eligibility:       string(input.Eligibility),
+		AppliesTo:         string(input.AppliesTo),
 	}
 	if input.StartsAt != nil {
 		params.StartsAt = pgtype.Timestamptz{Time: *input.StartsAt, Valid: true}
@@ -666,6 +673,7 @@ func CreateDiscount(t *testing.T, tx pgx.Tx, opts ...DiscountOption) *domain.Dis
 		Active:            row.Active,
 		UsageLimit:        domain.CouponUsageLimit(row.UsageLimit),
 		Eligibility:       domain.DiscountEligibility(row.Eligibility),
+		AppliesTo:         domain.DiscountAppliesTo(row.AppliesTo),
 		CreatedAt:         row.CreatedAt,
 		UpdatedAt:         row.UpdatedAt,
 	}

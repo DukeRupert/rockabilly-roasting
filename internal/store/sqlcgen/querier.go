@@ -90,6 +90,9 @@ type Querier interface {
 	CreateVariantOptionValue(ctx context.Context, arg CreateVariantOptionValueParams) error
 	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	CreateWholesaleCustomer(ctx context.Context, arg CreateWholesaleCustomerParams) (Customer, error)
+	// Whether a customer has held a subscription in any status, for a
+	// new-subscribers-only discount.
+	CustomerHasEverSubscribed(ctx context.Context, customerID uuid.UUID) (bool, error)
 	CustomerHasRedeemedDiscount(ctx context.Context, arg CustomerHasRedeemedDiscountParams) (bool, error)
 	// Whether a customer counts as a member for a subscribers-only discount: they
 	// hold an active subscription. Paused and past-due subscriptions do not count;

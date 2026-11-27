@@ -61,8 +61,20 @@ func discountUsageLabel(l domain.CouponUsageLimit) string {
 // discountEligibilityLabel names who may use a discount, blank for anyone so
 // the common case adds nothing to the list.
 func discountEligibilityLabel(e domain.DiscountEligibility) string {
-	if e == domain.DiscountEligibilitySubscribers {
+	switch e {
+	case domain.DiscountEligibilitySubscribers:
 		return "Daily Grind members only"
+	case domain.DiscountEligibilityNewSubscribers:
+		return "New subscribers only"
+	}
+	return ""
+}
+
+// discountAppliesToLabel names the kind of order a discount works on, blank
+// for one-time orders so the common case adds nothing to the list.
+func discountAppliesToLabel(a domain.DiscountAppliesTo) string {
+	if a == domain.DiscountAppliesToSubscriptionSignup {
+		return "First subscription order"
 	}
 	return ""
 }
@@ -194,12 +206,32 @@ templ DiscountListContent(props DiscountListProps) {
 					>
 						<option value="anyone" selected>Anyone</option>
 						<option value="subscribers">Daily Grind members only</option>
+						<option value="new_subscribers">New subscribers only</option>
 					</select>
 					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
 						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 					</svg>
 				</div>
-				<p id="discount-eligibility-hint" class="mt-1 text-xs text-rr-muted">Members must be signed in, with an active subscription</p>
+				<p id="discount-eligibility-hint" class="mt-1 text-xs text-rr-muted">Members: signed in, active subscription. New subscribers: never subscribed before</p>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="discount-applies-to" class="block text-sm font-medium text-rr-body">Order type</label>
+				<div class="mt-1 grid grid-cols-1">
+					<select
+						id="discount-applies-to"
+						name="applies_to"
+						required
+						aria-describedby="discount-applies-to-hint"
+						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						<option value="one_time" selected>One-time orders</option>
+						<option value="subscription_signup">First subscription order</option>
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<p id="discount-applies-to-hint" class="mt-1 text-xs text-rr-muted">Subscription codes take money off the signup order only, never renewals</p>
 			</div>
 			<div class="sm:col-span-1">
 				<label for="discount-expires" class="block text-sm font-medium text-rr-body">Expires</label>
@@ -291,6 +323,9 @@ templ DiscountListContent(props DiscountListProps) {
 									}
 									if discountEligibilityLabel(d.Eligibility) != "" {
 										<span class="block text-xs text-rr-muted">{ discountEligibilityLabel(d.Eligibility) }</span>
+									}
+									if discountAppliesToLabel(d.AppliesTo) != "" {
+										<span class="block text-xs text-rr-muted">{ discountAppliesToLabel(d.AppliesTo) }</span>
 									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">

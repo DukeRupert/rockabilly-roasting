@@ -37,6 +37,8 @@ type CreateDiscountParams struct {
 	UsageLimit domain.CouponUsageLimit
 	// Eligibility defaults to anyone when empty.
 	Eligibility domain.DiscountEligibility
+	// AppliesTo defaults to one-time orders when empty.
+	AppliesTo domain.DiscountAppliesTo
 }
 
 // Create inserts a new discount and returns it.
@@ -46,6 +48,9 @@ func (s *DiscountStore) Create(ctx context.Context, tx pgx.Tx, p CreateDiscountP
 	}
 	if p.Eligibility == "" {
 		p.Eligibility = domain.DiscountEligibilityAnyone
+	}
+	if p.AppliesTo == "" {
+		p.AppliesTo = domain.DiscountAppliesToOneTime
 	}
 	row, err := sqlcgen.New(tx).CreateDiscount(ctx, sqlcgen.CreateDiscountParams{
 		ID:                uuid.New(),
@@ -59,6 +64,7 @@ func (s *DiscountStore) Create(ctx context.Context, tx pgx.Tx, p CreateDiscountP
 		Active:            p.Active,
 		UsageLimit:        string(p.UsageLimit),
 		Eligibility:       string(p.Eligibility),
+		AppliesTo:         string(p.AppliesTo),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert discount: %w", err)
@@ -88,12 +94,17 @@ type UpdateDiscountParams struct {
 	Active            bool
 	// Eligibility defaults to anyone when empty.
 	Eligibility domain.DiscountEligibility
+	// AppliesTo defaults to one-time orders when empty.
+	AppliesTo domain.DiscountAppliesTo
 }
 
 // Update updates a discount and returns it.
 func (s *DiscountStore) Update(ctx context.Context, tx pgx.Tx, p UpdateDiscountParams) (*domain.Discount, error) {
 	if p.Eligibility == "" {
 		p.Eligibility = domain.DiscountEligibilityAnyone
+	}
+	if p.AppliesTo == "" {
+		p.AppliesTo = domain.DiscountAppliesToOneTime
 	}
 	row, err := sqlcgen.New(tx).UpdateDiscount(ctx, sqlcgen.UpdateDiscountParams{
 		ID:                p.ID,
@@ -106,6 +117,7 @@ func (s *DiscountStore) Update(ctx context.Context, tx pgx.Tx, p UpdateDiscountP
 		ExpiresAt:         timestampToPG(p.ExpiresAt),
 		Active:            p.Active,
 		Eligibility:       string(p.Eligibility),
+		AppliesTo:         string(p.AppliesTo),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update discount: %w", err)
@@ -131,7 +143,7 @@ type DiscountFilter struct {
 // List returns discounts matching the given filter (hand-written for dynamic WHERE).
 func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) ([]domain.Discount, error) {
 	query := `SELECT id, name, description, type, value, minimum_order_cents,
-	                 starts_at, expires_at, active, usage_limit, eligibility, created_at, updated_at
+	                 starts_at, expires_at, active, usage_limit, eligibility, applies_to, created_at, updated_at
 	          FROM discounts WHERE true`
 	args := []any{}
 	argN := 1
@@ -169,16 +181,17 @@ func (s *DiscountStore) List(ctx context.Context, tx pgx.Tx, f DiscountFilter) (
 		var value int32
 		var startsAt, expiresAt pgtype.Timestamptz
 		var minimumOrderCents *int32
-		var discountType, usageLimit, eligibility string
+		var discountType, usageLimit, eligibility, appliesTo string
 		if err := rows.Scan(
 			&d.ID, &d.Name, &d.Description, &discountType, &value, &minimumOrderCents,
-			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &d.CreatedAt, &d.UpdatedAt,
+			&startsAt, &expiresAt, &d.Active, &usageLimit, &eligibility, &appliesTo, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan discount: %w", err)
 		}
 		d.Type = domain.DiscountType(discountType)
 		d.UsageLimit = domain.CouponUsageLimit(usageLimit)
 		d.Eligibility = domain.DiscountEligibility(eligibility)
+		d.AppliesTo = domain.DiscountAppliesTo(appliesTo)
 		d.Value = int(value)
 		d.MinimumOrderCents = int32PtrToIntPtr(minimumOrderCents)
 		d.StartsAt = timestampFromPG(startsAt)
@@ -366,6 +379,16 @@ func (s *DiscountStore) CustomerIsSubscriber(ctx context.Context, tx pgx.Tx, cus
 	return ok, nil
 }
 
+// CustomerHasEverSubscribed reports whether a customer has held a subscription
+// in any status, for a new-subscribers-only discount.
+func (s *DiscountStore) CustomerHasEverSubscribed(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (bool, error) {
+	ok, err := sqlcgen.New(tx).CustomerHasEverSubscribed(ctx, customerID)
+	if err != nil {
+		return false, fmt.Errorf("check subscription history: %w", err)
+	}
+	return ok, nil
+}
+
 // CountRedemptions returns how many paid orders used a once-per-customer
 // discount.
 func (s *DiscountStore) CountRedemptions(ctx context.Context, tx pgx.Tx, discountID uuid.UUID) (int, error) {
@@ -408,6 +431,7 @@ func discountFromRow(r sqlcgen.Discount) *domain.Discount {
 		Active:            r.Active,
 		UsageLimit:        domain.CouponUsageLimit(r.UsageLimit),
 		Eligibility:       domain.DiscountEligibility(r.Eligibility),
+		AppliesTo:         domain.DiscountAppliesTo(r.AppliesTo),
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,
 	}

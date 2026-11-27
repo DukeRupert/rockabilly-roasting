@@ -83,6 +83,13 @@ The subscribe page includes a secure payment form powered by Stripe. You will ne
 
 Your card is saved securely so future deliveries can be charged automatically. Rockabilly Roasting does not store your card number -- Stripe handles all payment security.
 
+**Have a coupon code?** Enter it in the box above the payment form and press **Apply**. A welcome code takes money off your first delivery only; every delivery after that is charged the plan's normal price. The summary shows the discount as its own line, and the **Charged today** total includes it. If the code can't be used, you'll see a message saying why, and the total is shown without it:
+
+- "That code is for new Daily Grind members. This email already has a subscription with us." -- Welcome codes are for people who have never subscribed before.
+- "That code can't be used on a subscription." -- The code is for one-time orders. Use it at regular checkout instead.
+- "You've already used that code. It's good for one order per customer."
+- The other messages (expired, not active yet, no longer active) mean the same as at regular checkout.
+
 ### Step 5: Confirmation
 
 Once your payment is processed, two things happen:

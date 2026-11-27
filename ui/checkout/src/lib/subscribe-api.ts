@@ -23,6 +23,8 @@ export interface SubscribePaymentIntentRequest {
    * pre-created order is cleaned up via the payment_intent.canceled webhook.
    */
   previous_payment_intent_id?: string;
+  /** A coupon code the shopper entered, sent with every create. */
+  coupon_code?: string;
 }
 
 // SubscribeLinePriced is what one line of the box actually costs, read back
@@ -48,6 +50,15 @@ export interface SubscribePaymentIntentResponse {
   shipping_label?: string;
   tax_total: number;
   tax_label?: string;
+  /** What the coupon took off this first order; 0 without one. */
+  discount_total: number;
+  discount_name?: string;
+  /** The code that was applied, when one was. */
+  coupon_code?: string;
+  /** Why the code sent was not applied; the total is priced without it. */
+  coupon_notice?: string;
+  /** Set with coupon_notice when the code is for signed-in members. */
+  coupon_sign_in_url?: string;
   lines: SubscribeLinePriced[];
 }
 

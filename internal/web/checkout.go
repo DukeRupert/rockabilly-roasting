@@ -1087,6 +1087,12 @@ func couponRefusal(err error) (msg, label string, ok bool) {
 		return "That code is for Daily Grind members. Sign in to use it.", "sign_in_required", true
 	case errors.Is(err, app.ErrCouponSubscribersOnly):
 		return "That code is for Daily Grind members, on orders placed from their own account.", "subscribers_only", true
+	case errors.Is(err, app.ErrCouponSignupOnly):
+		return "That code is for new Daily Grind subscriptions. Use it when you sign up.", "signup_only", true
+	case errors.Is(err, app.ErrCouponOneTimeOnly):
+		return "That code can't be used on a subscription.", "one_time_only", true
+	case errors.Is(err, app.ErrCouponNewSubscribersOnly):
+		return "That code is for new Daily Grind members. This email already has a subscription with us.", "new_subscribers_only", true
 	case errors.Is(err, app.ErrCouponUsedByCustomer):
 		return "You've already used that code. It's good for one order per customer.", "used_by_customer", true
 	case errors.Is(err, app.ErrDiscountNotActive), errors.Is(err, app.ErrDiscountNotFound):

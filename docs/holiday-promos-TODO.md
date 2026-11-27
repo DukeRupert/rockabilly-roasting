@@ -23,7 +23,8 @@ Deadlines: GIFT20 ends **2026-12-21**, WELCOME50 ends **2026-12-31**.
 
 ## Checklist
 
-In build order. Items 1 to 3 are done on `feat/promo-codes`.
+In build order. Items 1 to 3 shipped in #81 (v1.129.0); item 4 is on
+`feat/welcome-subscription-coupons`.
 
 ### 1. Codes many customers can use, each once per customer
 - [x] Discount-level usage setting: `single_use` (today's behaviour) or
@@ -58,11 +59,19 @@ In build order. Items 1 to 3 are done on `feat/promo-codes`.
 - [x] Admin create and edit forms expose it; list and show pages display it
 
 ### 4. WELCOME50: subscription signup coupons
-- [ ] Coupon field on the subscribe flow (`SubscribeApp.svelte`)
-- [ ] Discount applies to the **first order only**; renewals stay at the plan
-      price
-- [ ] Eligibility `new_subscribers`: the customer has never had a subscription
-- [ ] Redemption on signup capture, using the ledger from item 1
+- [x] Coupon field on the subscribe flow (`SubscribeApp.svelte`); the code
+      goes with every payment intent, and a refused one comes back as
+      `coupon_notice`
+- [x] `discounts.applies_to`: `one_time` (default) or `subscription_signup`.
+      Each kind of code is refused on the other kind of order
+- [x] Discount applies to the **first order only**; renewals are priced from
+      the plan and never see it
+- [x] Eligibility `new_subscribers`: the customer has never had a
+      subscription, in any status
+- [x] Redemption on signup capture, using the ledger from item 1
+- [x] Tax and shipping priced on the discounted subtotal, as at cart checkout
+- [ ] Create WELCOME50 in admin once deployed: 50%, once per customer, new
+      subscribers only, first subscription order, last valid day 12/31
 
 ### 5. Referral program
 - [ ] One code per active member under a single referral discount

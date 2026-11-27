@@ -129,6 +129,10 @@ templ DiscountShowContent(props DiscountShowProps) {
 					<span class="mx-1.5 text-rr-border">&middot;</span>
 					{ discountEligibilityLabel(props.Discount.Eligibility) }
 				}
+				if discountAppliesToLabel(props.Discount.AppliesTo) != "" {
+					<span class="mx-1.5 text-rr-border">&middot;</span>
+					{ discountAppliesToLabel(props.Discount.AppliesTo) }
+				}
 				<span class="mx-1.5 text-rr-border">&middot;</span>
 				Created { props.Discount.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 			</p>
@@ -308,8 +312,20 @@ templ discountEditCard(props DiscountShowProps) {
 					name="eligibility"
 					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 				>
-					<option value="anyone" selected?={ props.Discount.Eligibility != domain.DiscountEligibilitySubscribers }>Anyone</option>
+					<option value="anyone" selected?={ props.Discount.Eligibility == domain.DiscountEligibilityAnyone }>Anyone</option>
 					<option value="subscribers" selected?={ props.Discount.Eligibility == domain.DiscountEligibilitySubscribers }>Daily Grind members only</option>
+					<option value="new_subscribers" selected?={ props.Discount.Eligibility == domain.DiscountEligibilityNewSubscribers }>New subscribers only</option>
+				</select>
+			</div>
+			<div>
+				<label for="d-applies-to" class="block text-xs text-rr-muted">Order type</label>
+				<select
+					id="d-applies-to"
+					name="applies_to"
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				>
+					<option value="one_time" selected?={ props.Discount.AppliesTo != domain.DiscountAppliesToSubscriptionSignup }>One-time orders</option>
+					<option value="subscription_signup" selected?={ props.Discount.AppliesTo == domain.DiscountAppliesToSubscriptionSignup }>First subscription order</option>
 				</select>
 			</div>
 			<div>

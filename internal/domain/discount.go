@@ -43,11 +43,35 @@ const (
 	// expired), on an order
 	// for themselves.
 	DiscountEligibilitySubscribers DiscountEligibility = "subscribers"
+	// DiscountEligibilityNewSubscribers limits a discount to customers who
+	// have never held a subscription, in any status.
+	DiscountEligibilityNewSubscribers DiscountEligibility = "new_subscribers"
 )
 
 // Valid reports whether e is one of the defined eligibilities.
 func (e DiscountEligibility) Valid() bool {
-	return e == DiscountEligibilityAnyone || e == DiscountEligibilitySubscribers
+	switch e {
+	case DiscountEligibilityAnyone, DiscountEligibilitySubscribers, DiscountEligibilityNewSubscribers:
+		return true
+	}
+	return false
+}
+
+// DiscountAppliesTo says which kind of order a discount's code works on.
+type DiscountAppliesTo string
+
+const (
+	// DiscountAppliesToOneTime: cart checkout. Every code before this setting
+	// existed was one of these.
+	DiscountAppliesToOneTime DiscountAppliesTo = "one_time"
+	// DiscountAppliesToSubscriptionSignup: the first order of a new
+	// subscription. Renewals are priced from the plan and never see it.
+	DiscountAppliesToSubscriptionSignup DiscountAppliesTo = "subscription_signup"
+)
+
+// Valid reports whether a is one of the defined order kinds.
+func (a DiscountAppliesTo) Valid() bool {
+	return a == DiscountAppliesToOneTime || a == DiscountAppliesToSubscriptionSignup
 }
 
 // Discount represents a discount rule.
@@ -63,6 +87,7 @@ type Discount struct {
 	Active            bool
 	UsageLimit        CouponUsageLimit
 	Eligibility       DiscountEligibility
+	AppliesTo         DiscountAppliesTo
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

@@ -639,6 +639,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/discounts/{id}/activate", deps.handleAdminDiscountActivate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/referral", deps.handleAdminDiscountReferralSet)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/referral/clear", deps.handleAdminDiscountReferralClear)
+	adminMux.HandleFunc("POST /admin/discounts/{id}/banner", deps.handleAdminDiscountBanner)
 	adminMux.HandleFunc("GET /admin/referrals", deps.handleAdminReferralList)
 	adminMux.HandleFunc("POST /admin/referrals/{id}/sent", deps.handleAdminReferralSent)
 
@@ -891,6 +892,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = metrics.RecordRoute(mux)
+	handler = deps.withPromoBanners(handler) // reads the session, so inside it
 	handler = deps.optionalCustomerSession(handler)
 	handler = crossOriginProtection(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/

@@ -482,3 +482,32 @@ func parseMerchantDay(raw string, loc *time.Location, exclusiveEnd bool) (*time.
 	}
 	return &day, true
 }
+
+// handleAdminDiscountBanner saves the line that promotes a discount in the
+// storefront's offer strip. An empty line stops promoting it.
+func (d *Deps) handleAdminDiscountBanner(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.DiscountService.SetBannerText(ctx, tx, id, r.PostFormValue("banner_text"), staffActor(r))
+	})
+	back := "/admin/discounts/" + id.String()
+	switch {
+	case err == nil:
+		http.Redirect(w, r, back, http.StatusSeeOther)
+	case errors.Is(err, app.ErrDiscountNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, app.ErrBannerTextTooLong):
+		http.Redirect(w, r, back+"?error="+url.QueryEscape("The banner line can be at most "+strconv.Itoa(domain.MaxBannerTextLen)+" characters."), http.StatusSeeOther)
+	default:
+		Error(w, r, err)
+	}
+}

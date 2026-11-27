@@ -174,3 +174,39 @@ func TestDiscountReferralPanel(t *testing.T) {
 		t.Error("the edit form does not say why the order type is fixed")
 	}
 }
+
+// The banner card posts its saved line back on every save, so it must show
+// what is saved, and say who will see it before staff publish to the wrong
+// shoppers.
+func TestDiscountBannerCard(t *testing.T) {
+	render := func(d domain.Discount) string {
+		var b bytes.Buffer
+		if err := DiscountShowContent(DiscountShowProps{Discount: d, MerchantTZ: time.UTC}).Render(context.Background(), &b); err != nil {
+			t.Fatal(err)
+		}
+		return html.UnescapeString(b.String())
+	}
+
+	d := welcomeDiscount()
+	d.BannerText = `50% off your first box with "WELCOME50"`
+	page := render(d)
+	form := regexp.MustCompile(`(?s)<form[^>]*action="/admin/discounts/` + d.ID.String() + `/banner".*?</form>`).FindString(page)
+	if form == "" {
+		t.Fatal("no banner form")
+	}
+	if !strings.Contains(form, `name="banner_text"`) || !strings.Contains(form, `value="`+d.BannerText+`"`) {
+		t.Errorf("the field does not hold the saved line: %s", form)
+	}
+	if !strings.Contains(form, `maxlength="120"`) {
+		t.Error("the field does not stop at the column's limit")
+	}
+	if !strings.Contains(form, "except signed-in customers who have subscribed before") {
+		t.Error("a new-subscriber offer does not say who is left out")
+	}
+
+	d.Eligibility = domain.DiscountEligibilitySubscribers
+	d.AppliesTo = domain.DiscountAppliesToOneTime
+	if !strings.Contains(render(d), "Seen by signed-in Daily Grind members only") {
+		t.Error("a members-only offer does not say it is members only")
+	}
+}

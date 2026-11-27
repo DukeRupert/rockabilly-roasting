@@ -296,6 +296,7 @@ type Discount struct {
 	Eligibility       string             `json:"eligibility"`
 	AppliesTo         string             `json:"applies_to"`
 	IsReferral        bool               `json:"is_referral"`
+	BannerText        string             `json:"banner_text"`
 }
 
 type EmailVerification struct {

@@ -259,6 +259,9 @@ const (
 	// AuditDiscountReferralOffer records a discount being made, or stopping
 	// being, the referral offer members share.
 	AuditDiscountReferralOffer = "discount.referral_offer"
+	// AuditDiscountBanner records a change to the line that promotes a
+	// discount in the storefront's offer strip.
+	AuditDiscountBanner = "discount.banner"
 	// AuditReferralRewardEarned records a free bag a member earned when a
 	// friend's order placed with their code was paid.
 	AuditReferralRewardEarned = "referral.reward_earned"

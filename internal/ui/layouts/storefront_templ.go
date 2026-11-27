@@ -330,71 +330,79 @@ func Storefront(props StorefrontProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link rel=\"preconnect\" href=\"https://cdn.rockabillyroasting.shop\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Serif+Display:ital@0;1&family=Oswald:wght@400;500;600;700&family=Special+Elite&family=Yellowtail&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><style>[x-cloak] { display: none !important; }</style></head><body class=\"min-h-screen font-oswald text-ink bg-paper\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Skip navigation --><a href=\"#main-content\" class=\"sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-rust focus:text-paper focus:border-2 focus:border-ink focus:px-4 focus:py-2 focus:font-oswald focus:font-bold focus:text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Skip to main content</a><!-- Header --><header class=\"sticky top-0 z-40 bg-ink border-b-2 border-ink-soft\"><nav class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\"><div class=\"flex h-16 items-center justify-between\"><!-- Logo --><div class=\"flex items-center\"><a href=\"/\" class=\"flex items-center gap-3\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-10 w-auto flex-shrink-0\"><div class=\"hidden sm:block\"><p class=\"font-slab text-paper text-[11px] uppercase leading-none whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p></div></a></div><!-- Desktop nav --><div class=\"hidden sm:flex sm:items-center sm:gap-x-8\"><a href=\"/catalog\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Story</a></div><!-- Cart + Account + mobile menu --><div class=\"flex items-center gap-x-3\"><!-- Account link (desktop only) — icon when signed in, text when not -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link rel=\"preconnect\" href=\"https://cdn.rockabillyroasting.shop\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Serif+Display:ital@0;1&family=Oswald:wght@400;500;600;700&family=Special+Elite&family=Yellowtail&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><style>[x-cloak] { display: none !important; }</style></head><body class=\"min-h-screen font-oswald text-ink bg-paper\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Skip navigation --><a href=\"#main-content\" class=\"sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-rust focus:text-paper focus:border-2 focus:border-ink focus:px-4 focus:py-2 focus:font-oswald focus:font-bold focus:text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Skip to main content</a>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = promoStrip(promoBanners(ctx)).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<!-- Header --><header class=\"sticky top-0 z-40 bg-ink border-b-2 border-ink-soft\"><nav class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\"><div class=\"flex h-16 items-center justify-between\"><!-- Logo --><div class=\"flex items-center\"><a href=\"/\" class=\"flex items-center gap-3\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-10 w-auto flex-shrink-0\"><div class=\"hidden sm:block\"><p class=\"font-slab text-paper text-[11px] uppercase leading-none whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p></div></a></div><!-- Desktop nav --><div class=\"hidden sm:flex sm:items-center sm:gap-x-8\"><a href=\"/catalog\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"nav-link font-oswald text-sm font-semibold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Story</a></div><!-- Cart + Account + mobile menu --><div class=\"flex items-center gap-x-3\"><!-- Account link (desktop only) — icon when signed in, text when not -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if c, ok := auth.CustomerFromContext(ctx); ok {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<!-- Signed in: account menu. Sign out used to live only inside the\n\t\t\t\t\t\t\t\t     account pages, which left buyers with two accounts no way out\n\t\t\t\t\t\t\t\t     of the one they were in — so it belongs on every page. --> <div class=\"relative hidden sm:block\" x-data=\"{ open: false }\" @keydown.escape.window=\"open = false\" @click.outside=\"open = false\" @htmx:before-swap.window=\"open = false\"><button type=\"button\" @click=\"open = !open\" :aria-expanded=\"open ? 'true' : 'false'\" aria-haspopup=\"true\" aria-label=\"Account menu\" class=\"inline-flex items-center text-paper hover:text-candle transition-colors\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z\"></path></svg></button><div x-show=\"open\" x-transition.opacity.duration.200ms style=\"display:none;\" class=\"absolute right-0 z-50 mt-2 w-48 border-2 border-ink bg-cream-hi shadow-stamp\"><a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<!-- Signed in: account menu. Sign out used to live only inside the\n\t\t\t\t\t\t\t\t     account pages, which left buyers with two accounts no way out\n\t\t\t\t\t\t\t\t     of the one they were in — so it belongs on every page. --> <div class=\"relative hidden sm:block\" x-data=\"{ open: false }\" @keydown.escape.window=\"open = false\" @click.outside=\"open = false\" @htmx:before-swap.window=\"open = false\"><button type=\"button\" @click=\"open = !open\" :aria-expanded=\"open ? 'true' : 'false'\" aria-haspopup=\"true\" aria-label=\"Account menu\" class=\"inline-flex items-center text-paper hover:text-candle transition-colors\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z\"></path></svg></button><div x-show=\"open\" x-transition.opacity.duration.200ms style=\"display:none;\" class=\"absolute right-0 z-50 mt-2 w-48 border-2 border-ink bg-cream-hi shadow-stamp\"><a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 templ.SafeURL
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(accountHref(c)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 363, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 364, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" class=\"block px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" class=\"block px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if isWholesale(c) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<a href=\"/wholesale/login?switch=1\" class=\"block px-4 py-2.5 font-oswald font-bold text-xs text-ink border-t-2 border-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<a href=\"/wholesale/login?switch=1\" class=\"block px-4 py-2.5 font-oswald font-bold text-xs text-ink border-t-2 border-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<form method=\"POST\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<form method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 templ.SafeURL
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(logoutHref(c)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 367, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 368, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" class=\"border-t-2 border-ink\"><button type=\"submit\" class=\"block w-full text-left px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" class=\"border-t-2 border-ink\"><button type=\"submit\" class=\"block w-full text-left px-4 py-2.5 font-oswald font-bold text-xs text-ink hover:bg-paper hover:text-rust transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<a href=\"/account/login\" class=\"hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Log In</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"/account/login\" class=\"hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">Log In</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<!-- Cart — amber chip with paper double-rule on ink --><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<!-- Cart — amber chip with paper double-rule on ink --><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 templ.SafeURL
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.cartURL()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 379, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 380, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -402,58 +410,58 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><!-- Collapsed by max-height rather than `hidden`, so the open and close\n\t\t\t\t     can animate. `invisible` is applied once the collapse finishes, so a\n\t\t\t\t     closed drawer is out of the tab order rather than a 0px-tall strip of\n\t\t\t\t     focusable links. The transition is motion-safe: with reduced motion\n\t\t\t\t     the drawer snaps. --><div id=\"sf-mobile-menu\" class=\"sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear\" style=\"max-height:0;\" aria-hidden=\"true\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><!-- Collapsed by max-height rather than `hidden`, so the open and close\n\t\t\t\t     can animate. `invisible` is applied once the collapse finishes, so a\n\t\t\t\t     closed drawer is out of the tab order rather than a 0px-tall strip of\n\t\t\t\t     focusable links. The transition is motion-safe: with reduced motion\n\t\t\t\t     the drawer snaps. --><div id=\"sf-mobile-menu\" class=\"sm:hidden border-t border-ink-soft overflow-hidden invisible opacity-0 motion-safe:transition-[max-height,opacity] motion-safe:duration-200 motion-safe:ease-linear\" style=\"max-height:0;\" aria-hidden=\"true\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if c, ok := auth.CustomerFromContext(ctx); ok {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var17 templ.SafeURL
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(accountHref(c)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 417, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 418, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if isWholesale(c) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<a href=\"/wholesale/login?switch=1\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<a href=\"/wholesale/login?switch=1\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Switch account</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, " <form method=\"POST\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, " <form method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 templ.SafeURL
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(logoutHref(c)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 421, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 422, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\"><button type=\"submit\" class=\"block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\"><button type=\"submit\" class=\"block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Sign out</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<a href=\"/account/login\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<a href=\"/account/login\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -461,22 +469,22 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/quiz\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Roast Quiz</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/quiz\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Roast Quiz</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if _, ok := auth.CustomerFromContext(ctx); ok {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<li><a href=\"/account\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<li><a href=\"/account\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<li><a href=\"/account/login\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<li><a href=\"/account/login\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</ul></div><!-- Cafe hours --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Cafe Hours</p><dl class=\"space-y-1.5\"><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Mon &ndash; Thu</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 2p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Friday</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Saturday</dt><dd class=\"font-special text-paper-warm text-sm\">8a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-chrome-deep text-sm\" style=\"letter-spacing:0.04em;\">Sunday</dt><dd class=\"font-special text-chrome-deep text-sm\">Closed</dd></div></dl><div class=\"flex gap-4 mt-5 pt-4 border-t border-ink-soft\"><a href=\"https://www.facebook.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Facebook</a> <a href=\"https://www.instagram.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Instagram</a></div></div><!-- Newsletter --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Stay In The Loop</p><p class=\"font-oswald text-paper-warm text-sm mb-4 leading-relaxed\">Roast drops, fresh deals, nothing else. No spam — just the good stuff.</p><!--\n\t\t\t\t\t\t\t\tPosts to Hiri, not straight to Broadwave. The list name and API key\n\t\t\t\t\t\t\t\tlive in the server env now — keeping the key out of page source is the\n\t\t\t\t\t\t\t\tpoint, and routing through Hiri is what lets the honeypot and the\n\t\t\t\t\t\t\t\tper-IP rate limiter actually run.\n\t\t\t\t\t\t\t--><form method=\"post\" action=\"/newsletter/subscribe\" hx-target=\"#newsletter-status\" hx-swap=\"innerHTML\" class=\"flex flex-col gap-2\"><label for=\"newsletter-email\" class=\"sr-only\">Email address</label> <input type=\"email\" id=\"newsletter-email\" name=\"email\" required placeholder=\"name@example.com\" class=\"paper-input w-full border-2 border-paper bg-cream-hi px-3 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"> <input type=\"text\" name=\"website\" tabindex=\"-1\" autocomplete=\"off\" style=\"position:absolute; left:-9999px; width:1px; height:1px;\" aria-hidden=\"true\"> <button type=\"submit\" class=\"btn-stamp-paper w-full bg-rust text-paper border-2 border-paper px-4 py-2.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Join the list</button><div id=\"newsletter-status\" class=\"font-oswald text-paper-warm text-sm\" aria-live=\"polite\"></div></form></div></div><!-- Copyright bar --><div class=\"mt-14 pt-6 border-t-2 border-ink-soft flex flex-col sm:flex-row justify-between gap-3\"><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.08em;\">&copy; 2026 Rockabilly Roasting Co. &middot; Roasted in Kennewick.</p><div class=\"flex flex-wrap gap-x-5 gap-y-1\"><a href=\"/shipping\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shipping &amp; Returns</a> <a href=\"/privacy\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Privacy</a> <a href=\"/terms\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Terms</a> <a href=\"/help\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Help</a> <span class=\"font-special text-chrome-deep text-xs\">Powered by Hiri</span></div></div></div></footer><!-- Back to top — paper stamp on ink --><button id=\"back-to-top\" type=\"button\" aria-label=\"Back to top\" class=\"fixed bottom-6 right-6 z-40 hidden size-11 items-center justify-center bg-paper border-2 border-ink text-ink hover:bg-candle transition-colors\" style=\"box-shadow: var(--shadow-stamp-sm);\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 15.75l7.5-7.5 7.5 7.5\"></path></svg></button><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Back to top button\n\t\t\t\t\tvar btt = document.getElementById('back-to-top');\n\t\t\t\t\tif (btt) {\n\t\t\t\t\t\tvar shown = false;\n\t\t\t\t\t\twindow.addEventListener('scroll', function() {\n\t\t\t\t\t\t\tif (window.scrollY > 400 && !shown) {\n\t\t\t\t\t\t\t\tbtt.classList.remove('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.add('flex');\n\t\t\t\t\t\t\t\tshown = true;\n\t\t\t\t\t\t\t} else if (window.scrollY <= 400 && shown) {\n\t\t\t\t\t\t\t\tbtt.classList.add('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.remove('flex');\n\t\t\t\t\t\t\t\tshown = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}, { passive: true });\n\t\t\t\t\t\tbtt.addEventListener('click', function() {\n\t\t\t\t\t\t\twindow.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// A drawer should close when the page goes somewhere, and stay put\n\t\t\t\t\t// otherwise. Targeting #main-content is not that test: the order page's\n\t\t\t\t\t// label poller re-renders #main-content every 2s on its own, and the\n\t\t\t\t\t// cart's quantity forms post into it without going anywhere. What\n\t\t\t\t\t// actually means \"navigation\" is htmx's own `boosted` flag for boosted\n\t\t\t\t\t// links and forms, and hx-push-url for the hand-rolled ones that change\n\t\t\t\t\t// the address bar themselves.\n\t\t\t\t\tfunction htmxSwapIsNavigation(evt) {\n\t\t\t\t\t\tvar detail = evt.detail || {};\n\t\t\t\t\t\tif (detail.boosted) return true;\n\t\t\t\t\t\tvar elt = (detail.requestConfig && detail.requestConfig.elt) || evt.target;\n\t\t\t\t\t\tif (!elt || !elt.closest) return false;\n\t\t\t\t\t\tvar pushes = elt.closest('[hx-push-url]');\n\t\t\t\t\t\treturn !!pushes && pushes.getAttribute('hx-push-url') !== 'false';\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tvar iconOpen = document.getElementById('sf-menu-icon-open');\n\t\t\t\t\tvar iconClose = document.getElementById('sf-menu-icon-close');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tvar menuOpen = false;\n\t\t\t\t\t\tvar settleTimer;\n\n\t\t\t\t\t\t// Applied once the drawer has finished moving, and safe to run\n\t\t\t\t\t\t// more than once: it only ever asserts the resting state of\n\t\t\t\t\t\t// whichever direction we are in. An open drawer releases its\n\t\t\t\t\t\t// measured height so it can still grow if its contents change; a\n\t\t\t\t\t\t// closed one goes `invisible`, which takes its links out of the\n\t\t\t\t\t\t// tab order — a 0px-tall strip of focusable links is worse than\n\t\t\t\t\t\t// no drawer at all.\n\t\t\t\t\t\tfunction settle() {\n\t\t\t\t\t\t\tif (menuOpen) {\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = 'none';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tmenu.classList.add('invisible');\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t// transitionend alone would not do. It never fires when the\n\t\t\t\t\t\t// transition has no duration, which is exactly the case under\n\t\t\t\t\t\t// prefers-reduced-motion (the motion-safe: classes drop out) and\n\t\t\t\t\t\t// on the instant close below — so the timer is the one that\n\t\t\t\t\t\t// settles those, and whichever arrives first wins.\n\t\t\t\t\t\tmenu.addEventListener('transitionend', function(evt) {\n\t\t\t\t\t\t\tif (evt.propertyName === 'max-height') settle();\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\tfunction setMenu(open, animate) {\n\t\t\t\t\t\t\tmenuOpen = open;\n\t\t\t\t\t\t\tmenu.style.transitionDuration = animate ? '' : '0s';\n\t\t\t\t\t\t\tif (open) {\n\t\t\t\t\t\t\t\tmenu.classList.remove('invisible', 'opacity-0');\n\t\t\t\t\t\t\t\t// max-height cannot transition to `auto`, so it animates to\n\t\t\t\t\t\t\t\t// the drawer's own height; settle() releases it afterwards.\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = menu.scrollHeight + 'px';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t// There is nothing to transition from once the height has\n\t\t\t\t\t\t\t\t// been released, so pin the current one for a frame first.\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = menu.scrollHeight + 'px';\n\t\t\t\t\t\t\t\tvoid menu.offsetHeight;\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = '0';\n\t\t\t\t\t\t\t\tmenu.classList.add('opacity-0');\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tmenu.setAttribute('aria-hidden', String(!open));\n\t\t\t\t\t\t\tbtn.setAttribute('aria-expanded', String(open));\n\t\t\t\t\t\t\tif (iconOpen && iconClose) {\n\t\t\t\t\t\t\t\ticonOpen.classList.toggle('hidden', open);\n\t\t\t\t\t\t\t\ticonClose.classList.toggle('hidden', !open);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tclearTimeout(settleTimer);\n\t\t\t\t\t\t\tsettleTimer = setTimeout(settle, animate ? 260 : 0);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tsetMenu(!menuOpen, true);\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t// hx-boost swaps #main-content and leaves the header standing, so\n\t\t\t\t\t\t// without this the drawer stays open over the page it just\n\t\t\t\t\t\t// navigated to. Closed without animation: it should already be\n\t\t\t\t\t\t// gone by the time the new content lands.\n\t\t\t\t\t\t//\n\t\t\t\t\t\t// Navigations only, by the same test the admin uses. This drawer is\n\t\t\t\t\t\t// an in-flow accordion rather than a modal, so the page under it\n\t\t\t\t\t\t// stays clickable: a cart quantity form posts into #main-content\n\t\t\t\t\t\t// without going anywhere, and closing the menu for that would be\n\t\t\t\t\t\t// closing it out from under the reader. Catalog filters do change\n\t\t\t\t\t\t// the address bar, and do close it.\n\t\t\t\t\t\tdocument.body.addEventListener('htmx:beforeSwap', function(evt) {\n\t\t\t\t\t\t\tif (menuOpen && htmxSwapIsNavigation(evt)) setMenu(false, false);\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction animateToast(toast) {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (toast) animateToast(toast);\n\t\t\t\t\t});\n\n\t\t\t\t\t// A rate-limited request comes back 429, which htmx refuses to swap, so\n\t\t\t\t\t// without this the form simply does nothing and looks frozen. The limiter\n\t\t\t\t\t// sends its message as an HX-Trigger event; render it as the same error\n\t\t\t\t\t// toast the server's toast.Toast produces. textContent, never innerHTML.\n\t\t\t\t\tdocument.body.addEventListener('rateLimited', function(evt) {\n\t\t\t\t\t\tvar container = document.getElementById('toast-container');\n\t\t\t\t\t\tif (!container || !evt.detail || !evt.detail.message) return;\n\t\t\t\t\t\tvar wrap = document.createElement('div');\n\t\t\t\t\t\twrap.className = 'pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-6';\n\t\t\t\t\t\tvar toast = document.createElement('div');\n\t\t\t\t\t\ttoast.className = 'pointer-events-auto max-w-sm rounded-lg p-4 shadow-lg ring-1 bg-red-50 text-red-800 ring-red-600/10';\n\t\t\t\t\t\ttoast.style.transition = 'transform 300ms ease-out, opacity 300ms ease-out';\n\t\t\t\t\t\ttoast.setAttribute('role', 'alert');\n\t\t\t\t\t\ttoast.setAttribute('data-toast', '');\n\t\t\t\t\t\tvar row = document.createElement('div');\n\t\t\t\t\t\trow.className = 'flex items-start';\n\t\t\t\t\t\tvar msg = document.createElement('p');\n\t\t\t\t\t\tmsg.className = 'flex-1 text-sm font-medium';\n\t\t\t\t\t\tmsg.textContent = evt.detail.message;\n\t\t\t\t\t\tvar close = document.createElement('button');\n\t\t\t\t\t\tclose.type = 'button';\n\t\t\t\t\t\tclose.setAttribute('data-toast-close', '');\n\t\t\t\t\t\tclose.className = 'ml-4 inline-flex shrink-0 rounded-md hover:opacity-70 focus:outline-2 focus:outline-offset-2';\n\t\t\t\t\t\tclose.innerHTML = '<span class=\"sr-only\">Close</span><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z\"></path></svg>';\n\t\t\t\t\t\trow.appendChild(msg);\n\t\t\t\t\t\trow.appendChild(close);\n\t\t\t\t\t\ttoast.appendChild(row);\n\t\t\t\t\t\twrap.appendChild(toast);\n\t\t\t\t\t\tcontainer.replaceChildren(wrap);\n\t\t\t\t\t\tanimateToast(toast);\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</ul></div><!-- Cafe hours --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Cafe Hours</p><dl class=\"space-y-1.5\"><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Mon &ndash; Thu</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 2p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Friday</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Saturday</dt><dd class=\"font-special text-paper-warm text-sm\">8a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-chrome-deep text-sm\" style=\"letter-spacing:0.04em;\">Sunday</dt><dd class=\"font-special text-chrome-deep text-sm\">Closed</dd></div></dl><div class=\"flex gap-4 mt-5 pt-4 border-t border-ink-soft\"><a href=\"https://www.facebook.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Facebook</a> <a href=\"https://www.instagram.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Instagram</a></div></div><!-- Newsletter --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Stay In The Loop</p><p class=\"font-oswald text-paper-warm text-sm mb-4 leading-relaxed\">Roast drops, fresh deals, nothing else. No spam — just the good stuff.</p><!--\n\t\t\t\t\t\t\t\tPosts to Hiri, not straight to Broadwave. The list name and API key\n\t\t\t\t\t\t\t\tlive in the server env now — keeping the key out of page source is the\n\t\t\t\t\t\t\t\tpoint, and routing through Hiri is what lets the honeypot and the\n\t\t\t\t\t\t\t\tper-IP rate limiter actually run.\n\t\t\t\t\t\t\t--><form method=\"post\" action=\"/newsletter/subscribe\" hx-target=\"#newsletter-status\" hx-swap=\"innerHTML\" class=\"flex flex-col gap-2\"><label for=\"newsletter-email\" class=\"sr-only\">Email address</label> <input type=\"email\" id=\"newsletter-email\" name=\"email\" required placeholder=\"name@example.com\" class=\"paper-input w-full border-2 border-paper bg-cream-hi px-3 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"> <input type=\"text\" name=\"website\" tabindex=\"-1\" autocomplete=\"off\" style=\"position:absolute; left:-9999px; width:1px; height:1px;\" aria-hidden=\"true\"> <button type=\"submit\" class=\"btn-stamp-paper w-full bg-rust text-paper border-2 border-paper px-4 py-2.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Join the list</button><div id=\"newsletter-status\" class=\"font-oswald text-paper-warm text-sm\" aria-live=\"polite\"></div></form></div></div><!-- Copyright bar --><div class=\"mt-14 pt-6 border-t-2 border-ink-soft flex flex-col sm:flex-row justify-between gap-3\"><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.08em;\">&copy; 2026 Rockabilly Roasting Co. &middot; Roasted in Kennewick.</p><div class=\"flex flex-wrap gap-x-5 gap-y-1\"><a href=\"/shipping\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shipping &amp; Returns</a> <a href=\"/privacy\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Privacy</a> <a href=\"/terms\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Terms</a> <a href=\"/help\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Help</a> <span class=\"font-special text-chrome-deep text-xs\">Powered by Hiri</span></div></div></div></footer><!-- Back to top — paper stamp on ink --><button id=\"back-to-top\" type=\"button\" aria-label=\"Back to top\" class=\"fixed bottom-6 right-6 z-40 hidden size-11 items-center justify-center bg-paper border-2 border-ink text-ink hover:bg-candle transition-colors\" style=\"box-shadow: var(--shadow-stamp-sm);\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 15.75l7.5-7.5 7.5 7.5\"></path></svg></button><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Back to top button\n\t\t\t\t\tvar btt = document.getElementById('back-to-top');\n\t\t\t\t\tif (btt) {\n\t\t\t\t\t\tvar shown = false;\n\t\t\t\t\t\twindow.addEventListener('scroll', function() {\n\t\t\t\t\t\t\tif (window.scrollY > 400 && !shown) {\n\t\t\t\t\t\t\t\tbtt.classList.remove('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.add('flex');\n\t\t\t\t\t\t\t\tshown = true;\n\t\t\t\t\t\t\t} else if (window.scrollY <= 400 && shown) {\n\t\t\t\t\t\t\t\tbtt.classList.add('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.remove('flex');\n\t\t\t\t\t\t\t\tshown = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}, { passive: true });\n\t\t\t\t\t\tbtt.addEventListener('click', function() {\n\t\t\t\t\t\t\twindow.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// A drawer should close when the page goes somewhere, and stay put\n\t\t\t\t\t// otherwise. Targeting #main-content is not that test: the order page's\n\t\t\t\t\t// label poller re-renders #main-content every 2s on its own, and the\n\t\t\t\t\t// cart's quantity forms post into it without going anywhere. What\n\t\t\t\t\t// actually means \"navigation\" is htmx's own `boosted` flag for boosted\n\t\t\t\t\t// links and forms, and hx-push-url for the hand-rolled ones that change\n\t\t\t\t\t// the address bar themselves.\n\t\t\t\t\tfunction htmxSwapIsNavigation(evt) {\n\t\t\t\t\t\tvar detail = evt.detail || {};\n\t\t\t\t\t\tif (detail.boosted) return true;\n\t\t\t\t\t\tvar elt = (detail.requestConfig && detail.requestConfig.elt) || evt.target;\n\t\t\t\t\t\tif (!elt || !elt.closest) return false;\n\t\t\t\t\t\tvar pushes = elt.closest('[hx-push-url]');\n\t\t\t\t\t\treturn !!pushes && pushes.getAttribute('hx-push-url') !== 'false';\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tvar iconOpen = document.getElementById('sf-menu-icon-open');\n\t\t\t\t\tvar iconClose = document.getElementById('sf-menu-icon-close');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tvar menuOpen = false;\n\t\t\t\t\t\tvar settleTimer;\n\n\t\t\t\t\t\t// Applied once the drawer has finished moving, and safe to run\n\t\t\t\t\t\t// more than once: it only ever asserts the resting state of\n\t\t\t\t\t\t// whichever direction we are in. An open drawer releases its\n\t\t\t\t\t\t// measured height so it can still grow if its contents change; a\n\t\t\t\t\t\t// closed one goes `invisible`, which takes its links out of the\n\t\t\t\t\t\t// tab order — a 0px-tall strip of focusable links is worse than\n\t\t\t\t\t\t// no drawer at all.\n\t\t\t\t\t\tfunction settle() {\n\t\t\t\t\t\t\tif (menuOpen) {\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = 'none';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tmenu.classList.add('invisible');\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t// transitionend alone would not do. It never fires when the\n\t\t\t\t\t\t// transition has no duration, which is exactly the case under\n\t\t\t\t\t\t// prefers-reduced-motion (the motion-safe: classes drop out) and\n\t\t\t\t\t\t// on the instant close below — so the timer is the one that\n\t\t\t\t\t\t// settles those, and whichever arrives first wins.\n\t\t\t\t\t\tmenu.addEventListener('transitionend', function(evt) {\n\t\t\t\t\t\t\tif (evt.propertyName === 'max-height') settle();\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\tfunction setMenu(open, animate) {\n\t\t\t\t\t\t\tmenuOpen = open;\n\t\t\t\t\t\t\tmenu.style.transitionDuration = animate ? '' : '0s';\n\t\t\t\t\t\t\tif (open) {\n\t\t\t\t\t\t\t\tmenu.classList.remove('invisible', 'opacity-0');\n\t\t\t\t\t\t\t\t// max-height cannot transition to `auto`, so it animates to\n\t\t\t\t\t\t\t\t// the drawer's own height; settle() releases it afterwards.\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = menu.scrollHeight + 'px';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t// There is nothing to transition from once the height has\n\t\t\t\t\t\t\t\t// been released, so pin the current one for a frame first.\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = menu.scrollHeight + 'px';\n\t\t\t\t\t\t\t\tvoid menu.offsetHeight;\n\t\t\t\t\t\t\t\tmenu.style.maxHeight = '0';\n\t\t\t\t\t\t\t\tmenu.classList.add('opacity-0');\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tmenu.setAttribute('aria-hidden', String(!open));\n\t\t\t\t\t\t\tbtn.setAttribute('aria-expanded', String(open));\n\t\t\t\t\t\t\tif (iconOpen && iconClose) {\n\t\t\t\t\t\t\t\ticonOpen.classList.toggle('hidden', open);\n\t\t\t\t\t\t\t\ticonClose.classList.toggle('hidden', !open);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tclearTimeout(settleTimer);\n\t\t\t\t\t\t\tsettleTimer = setTimeout(settle, animate ? 260 : 0);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tsetMenu(!menuOpen, true);\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t// hx-boost swaps #main-content and leaves the header standing, so\n\t\t\t\t\t\t// without this the drawer stays open over the page it just\n\t\t\t\t\t\t// navigated to. Closed without animation: it should already be\n\t\t\t\t\t\t// gone by the time the new content lands.\n\t\t\t\t\t\t//\n\t\t\t\t\t\t// Navigations only, by the same test the admin uses. This drawer is\n\t\t\t\t\t\t// an in-flow accordion rather than a modal, so the page under it\n\t\t\t\t\t\t// stays clickable: a cart quantity form posts into #main-content\n\t\t\t\t\t\t// without going anywhere, and closing the menu for that would be\n\t\t\t\t\t\t// closing it out from under the reader. Catalog filters do change\n\t\t\t\t\t\t// the address bar, and do close it.\n\t\t\t\t\t\tdocument.body.addEventListener('htmx:beforeSwap', function(evt) {\n\t\t\t\t\t\t\tif (menuOpen && htmxSwapIsNavigation(evt)) setMenu(false, false);\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction animateToast(toast) {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (toast) animateToast(toast);\n\t\t\t\t\t});\n\n\t\t\t\t\t// A rate-limited request comes back 429, which htmx refuses to swap, so\n\t\t\t\t\t// without this the form simply does nothing and looks frozen. The limiter\n\t\t\t\t\t// sends its message as an HX-Trigger event; render it as the same error\n\t\t\t\t\t// toast the server's toast.Toast produces. textContent, never innerHTML.\n\t\t\t\t\tdocument.body.addEventListener('rateLimited', function(evt) {\n\t\t\t\t\t\tvar container = document.getElementById('toast-container');\n\t\t\t\t\t\tif (!container || !evt.detail || !evt.detail.message) return;\n\t\t\t\t\t\tvar wrap = document.createElement('div');\n\t\t\t\t\t\twrap.className = 'pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-6';\n\t\t\t\t\t\tvar toast = document.createElement('div');\n\t\t\t\t\t\ttoast.className = 'pointer-events-auto max-w-sm rounded-lg p-4 shadow-lg ring-1 bg-red-50 text-red-800 ring-red-600/10';\n\t\t\t\t\t\ttoast.style.transition = 'transform 300ms ease-out, opacity 300ms ease-out';\n\t\t\t\t\t\ttoast.setAttribute('role', 'alert');\n\t\t\t\t\t\ttoast.setAttribute('data-toast', '');\n\t\t\t\t\t\tvar row = document.createElement('div');\n\t\t\t\t\t\trow.className = 'flex items-start';\n\t\t\t\t\t\tvar msg = document.createElement('p');\n\t\t\t\t\t\tmsg.className = 'flex-1 text-sm font-medium';\n\t\t\t\t\t\tmsg.textContent = evt.detail.message;\n\t\t\t\t\t\tvar close = document.createElement('button');\n\t\t\t\t\t\tclose.type = 'button';\n\t\t\t\t\t\tclose.setAttribute('data-toast-close', '');\n\t\t\t\t\t\tclose.className = 'ml-4 inline-flex shrink-0 rounded-md hover:opacity-70 focus:outline-2 focus:outline-offset-2';\n\t\t\t\t\t\tclose.innerHTML = '<span class=\"sr-only\">Close</span><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z\"></path></svg>';\n\t\t\t\t\t\trow.appendChild(msg);\n\t\t\t\t\t\trow.appendChild(close);\n\t\t\t\t\t\ttoast.appendChild(row);\n\t\t\t\t\t\twrap.appendChild(toast);\n\t\t\t\t\t\tcontainer.replaceChildren(wrap);\n\t\t\t\t\t\tanimateToast(toast);\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -486,7 +494,12 @@ func Storefront(props StorefrontProps) templ.Component {
 
 // CartBadge renders the header cart count chip. Count 0 collapses to a
 // screen-reader-only "empty" so the badge never shows "· 0".
-func CartBadge(count int) templ.Component {
+// promoStrip is the offer strip above the header: one line per live discount
+// staff are promoting to this shopper. Outside the sticky header, so it
+// scrolls away and the header keeps its height. Outside #main-content too, so
+// boosted navigation leaves it as the page first rendered it, like the account
+// menu beside it.
+func promoStrip(banners []domain.PromoBanner) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -507,26 +520,93 @@ func CartBadge(count int) templ.Component {
 			templ_7745c5c3_Var19 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		if len(banners) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<aside aria-label=\"Current offers\" class=\"bg-candle text-ink border-b-2 border-ink\"><ul class=\"mx-auto max-w-screen-2xl px-4 py-2 sm:px-6 lg:px-8 flex flex-col items-center gap-y-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-10 text-center font-oswald text-sm font-semibold\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, b := range banners {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<li><a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var20 templ.SafeURL
+				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(b.Href))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 765, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" class=\"underline decoration-2 underline-offset-4 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var21 string
+				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(b.Text)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 765, Col: 198}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</a></li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</ul></aside>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		return nil
+	})
+}
+
+func CartBadge(count int) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var22 == nil {
+			templ_7745c5c3_Var22 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
 		if count > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span id=\"cart-badge\">· ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<span id=\"cart-badge\">· ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
+			var templ_7745c5c3_Var23 string
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 755, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 775, Col: 53}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<span id=\"cart-badge\" class=\"sr-only\">empty</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<span id=\"cart-badge\" class=\"sr-only\">empty</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -554,31 +634,31 @@ func CartBadgeOOB(count int) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var21 == nil {
-			templ_7745c5c3_Var21 = templ.NopComponent
+		templ_7745c5c3_Var24 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var24 == nil {
+			templ_7745c5c3_Var24 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		if count > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<span id=\"cart-badge\" hx-swap-oob=\"true\">· ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<span id=\"cart-badge\" hx-swap-oob=\"true\">· ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
+			var templ_7745c5c3_Var25 string
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 766, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 786, Col: 72}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span id=\"cart-badge\" class=\"sr-only\" hx-swap-oob=\"true\">empty</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<span id=\"cart-badge\" class=\"sr-only\" hx-swap-oob=\"true\">empty</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

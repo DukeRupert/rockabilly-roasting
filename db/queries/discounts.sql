@@ -171,3 +171,15 @@ LIMIT $2;
 -- name: CountReferralRewardsByReferrer :one
 SELECT count(*) FROM referral_rewards
 WHERE referrer_customer_id = $1 AND status <> 'void';
+
+-- name: SetDiscountBannerText :exec
+UPDATE discounts SET banner_text = $2, updated_at = now() WHERE id = $1;
+
+-- name: ListBannerDiscounts :many
+-- The live discounts with banner copy, soonest to end first: the offer about
+-- to run out is the one worth a shopper's attention.
+SELECT * FROM discounts
+WHERE active AND banner_text <> ''
+  AND (starts_at IS NULL OR starts_at <= now())
+  AND (expires_at IS NULL OR expires_at > now())
+ORDER BY expires_at ASC NULLS LAST, created_at;

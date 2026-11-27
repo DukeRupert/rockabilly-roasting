@@ -119,7 +119,7 @@ func (q *Queries) CreateCouponRedemption(ctx context.Context, arg CreateCouponRe
 const createDiscount = `-- name: CreateDiscount :one
 INSERT INTO discounts (id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, usage_limit, eligibility, applies_to)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text
 `
 
 type CreateDiscountParams struct {
@@ -169,6 +169,7 @@ func (q *Queries) CreateDiscount(ctx context.Context, arg CreateDiscountParams) 
 		&i.Eligibility,
 		&i.AppliesTo,
 		&i.IsReferral,
+		&i.BannerText,
 	)
 	return i, err
 }
@@ -372,7 +373,7 @@ func (q *Queries) GetCouponRedemptionByOrderID(ctx context.Context, orderID uuid
 }
 
 const getDiscountByID = `-- name: GetDiscountByID :one
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral FROM discounts WHERE id = $1
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text FROM discounts WHERE id = $1
 `
 
 func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error) {
@@ -394,6 +395,7 @@ func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, 
 		&i.Eligibility,
 		&i.AppliesTo,
 		&i.IsReferral,
+		&i.BannerText,
 	)
 	return i, err
 }
@@ -427,7 +429,7 @@ func (q *Queries) GetMemberCouponCode(ctx context.Context, arg GetMemberCouponCo
 }
 
 const getReferralDiscount = `-- name: GetReferralDiscount :one
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral FROM discounts WHERE is_referral
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text FROM discounts WHERE is_referral
 `
 
 func (q *Queries) GetReferralDiscount(ctx context.Context) (Discount, error) {
@@ -449,8 +451,56 @@ func (q *Queries) GetReferralDiscount(ctx context.Context) (Discount, error) {
 		&i.Eligibility,
 		&i.AppliesTo,
 		&i.IsReferral,
+		&i.BannerText,
 	)
 	return i, err
+}
+
+const listBannerDiscounts = `-- name: ListBannerDiscounts :many
+SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text FROM discounts
+WHERE active AND banner_text <> ''
+  AND (starts_at IS NULL OR starts_at <= now())
+  AND (expires_at IS NULL OR expires_at > now())
+ORDER BY expires_at ASC NULLS LAST, created_at
+`
+
+// The live discounts with banner copy, soonest to end first: the offer about
+// to run out is the one worth a shopper's attention.
+func (q *Queries) ListBannerDiscounts(ctx context.Context) ([]Discount, error) {
+	rows, err := q.db.Query(ctx, listBannerDiscounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Discount{}
+	for rows.Next() {
+		var i Discount
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Type,
+			&i.Value,
+			&i.MinimumOrderCents,
+			&i.StartsAt,
+			&i.ExpiresAt,
+			&i.Active,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UsageLimit,
+			&i.Eligibility,
+			&i.AppliesTo,
+			&i.IsReferral,
+			&i.BannerText,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCouponCodesByDiscount = `-- name: ListCouponCodesByDiscount :many
@@ -708,12 +758,26 @@ func (q *Queries) ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrde
 	return err
 }
 
+const setDiscountBannerText = `-- name: SetDiscountBannerText :exec
+UPDATE discounts SET banner_text = $2, updated_at = now() WHERE id = $1
+`
+
+type SetDiscountBannerTextParams struct {
+	ID         uuid.UUID `json:"id"`
+	BannerText string    `json:"banner_text"`
+}
+
+func (q *Queries) SetDiscountBannerText(ctx context.Context, arg SetDiscountBannerTextParams) error {
+	_, err := q.db.Exec(ctx, setDiscountBannerText, arg.ID, arg.BannerText)
+	return err
+}
+
 const updateDiscount = `-- name: UpdateDiscount :one
 UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,
     starts_at = $7, expires_at = $8, active = $9, eligibility = $10, applies_to = $11, updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral
+RETURNING id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text
 `
 
 type UpdateDiscountParams struct {
@@ -761,6 +825,7 @@ func (q *Queries) UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) 
 		&i.Eligibility,
 		&i.AppliesTo,
 		&i.IsReferral,
+		&i.BannerText,
 	)
 	return i, err
 }

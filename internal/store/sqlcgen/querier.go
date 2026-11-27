@@ -229,6 +229,9 @@ type Querier interface {
 	ListAuditByAction(ctx context.Context, action string) ([]AuditLog, error)
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
+	// The live discounts with banner copy, soonest to end first: the offer about
+	// to run out is the one worth a shopper's attention.
+	ListBannerDiscounts(ctx context.Context) ([]Discount, error)
 	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
 	ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error)
 	ListBoxPresets(ctx context.Context) ([]BoxPreset, error)
@@ -334,6 +337,7 @@ type Querier interface {
 	SetCartItemByVariant(ctx context.Context, arg SetCartItemByVariantParams) (CartItem, error)
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
+	SetDiscountBannerText(ctx context.Context, arg SetDiscountBannerTextParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
 	SetSubscriptionRenewalPaymentIntent(ctx context.Context, arg SetSubscriptionRenewalPaymentIntentParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)

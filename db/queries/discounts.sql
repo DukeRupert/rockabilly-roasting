@@ -119,11 +119,12 @@ SELECT EXISTS (
 -- name: GetReferralDiscount :one
 SELECT * FROM discounts WHERE is_referral;
 
--- name: SetReferralDiscount :exec
--- Makes one discount the referral offer and unmarks any other, in one
--- statement so the one-offer index never sees two.
-UPDATE discounts SET is_referral = (id = $1), updated_at = now()
-WHERE is_referral OR id = $1;
+-- name: MarkReferralDiscount :exec
+-- Marks one discount the referral offer. Run after ClearReferralDiscount in the
+-- same transaction: the one-offer index is a partial unique index, checked row
+-- by row and not deferrable, so a single UPDATE that unmarks one row and marks
+-- another fails whenever it reaches the new row first.
+UPDATE discounts SET is_referral = true, updated_at = now() WHERE id = $1;
 
 -- name: ClearReferralDiscount :exec
 UPDATE discounts SET is_referral = false, updated_at = now() WHERE is_referral;

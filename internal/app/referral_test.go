@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
@@ -227,5 +228,104 @@ func TestReferral_Rewards(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.ElementsMatch(t, []string{"void", "sent"}, rewardsFor(t, tx, m))
+	})
+}
+
+// Review found these. Each is the failure it names, run.
+func TestReferral_ReviewFixes(t *testing.T) {
+	ctx := context.Background()
+	svc := newDiscountService()
+	actor := testutil.TestActor()
+
+	t.Run("switching to an older discount works", func(t *testing.T) {
+		// The one-offer index is checked row by row. A single UPDATE that
+		// unmarked one row and marked another failed with a unique violation
+		// whenever it reached the new row first: older, so stored first.
+		tx := testutil.NewTestTx(t, testPool)
+		older, _ := newWelcomeCode(t, tx)
+		newer, _ := newWelcomeCode(t, tx)
+		require.NoError(t, svc.SetReferralOffer(ctx, tx, newer.ID, actor))
+		require.NoError(t, svc.SetReferralOffer(ctx, tx, older.ID, actor))
+
+		got, err := svc.ReferralOffer(ctx, tx)
+		require.NoError(t, err)
+		assert.Equal(t, older.ID, got.ID)
+
+		// And the one it replaced has its own entry saying so.
+		var n int
+		require.NoError(t, tx.QueryRow(ctx,
+			`SELECT count(*) FROM audit_log WHERE resource_type = 'discount' AND resource_id = $1
+			   AND action = $2 AND metadata->>'is_referral' = 'false'`,
+			newer.ID, audit.AuditDiscountReferralOffer).Scan(&n))
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("no code is shown for an offer that has expired or not started", func(t *testing.T) {
+		for name, opt := range map[string]testutil.DiscountOption{
+			"expired":     testutil.WithDiscountExpiry(time.Now().Add(-time.Hour)),
+			"not started": testutil.WithDiscountStart(time.Now().Add(24 * time.Hour)),
+		} {
+			// A subtest each: a test transaction rolls back when its test
+			// ends, and two open at once would wait on each other's
+			// uncommitted referral offer under the one-offer index.
+			t.Run(name, func(t *testing.T) {
+				tx := testutil.NewTestTx(t, testPool)
+				d := testutil.CreateDiscount(t, tx, opt,
+					testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer),
+					testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup))
+				require.NoError(t, svc.SetReferralOffer(ctx, tx, d.ID, actor))
+				m := newShopper(t, tx)
+				m.subscribe(t, tx, domain.SubscriptionStatusActive)
+
+				code, _, err := svc.MemberReferralCode(ctx, tx, m.customer)
+				require.NoError(t, err)
+				assert.Nil(t, code, "a code a friend would be refused is not shown")
+			})
+		}
+	})
+
+	t.Run("a signed-in member cannot use their own code under another email", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		newReferralOffer(t, tx)
+		m, code := newMember(t, tx)
+		other := newShopper(t, tx) // the second email's customer
+
+		_, _, err := newCheckoutService().ApplyCoupon(ctx, tx, code.Code, 5000, app.CouponUse{
+			SubscriptionSignup: true, CustomerID: &other.customer.ID, SignedInCustomerID: &m.customer.ID,
+		})
+		assert.ErrorIs(t, err, app.ErrCouponOwnCode)
+	})
+
+	t.Run("only a first-subscription-order discount can be the offer", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		cart := testutil.CreateDiscount(t, tx, testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer))
+		assert.ErrorIs(t, svc.SetReferralOffer(ctx, tx, cart.ID, actor), app.ErrReferralOfferInvalid)
+	})
+
+	t.Run("clearing a discount that is not the offer leaves the offer alone", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		offer := newReferralOffer(t, tx)
+		other := testutil.CreateDiscount(t, tx)
+		require.NoError(t, svc.ClearReferralOffer(ctx, tx, other.ID, actor))
+
+		got, err := svc.ReferralOffer(ctx, tx)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, offer.ID, got.ID)
+	})
+
+	t.Run("a cancelled friend no longer counts", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		newReferralOffer(t, tx)
+		m, code := newMember(t, tx)
+		order, err := newShopper(t, tx).placeOrderKind(t, tx, newCheckoutService(), code.Code, "pi_ref_count_cancel", true)
+		require.NoError(t, err)
+		capture(t, tx, newCheckoutService(), "pi_ref_count_cancel")
+		_, err = newOrderService().WithDiscounts(store.NewDiscountStore()).CancelOrder(ctx, tx, order.ID, actor)
+		require.NoError(t, err)
+
+		n, err := svc.ReferralFriendsCount(ctx, tx, m.customer.ID)
+		require.NoError(t, err)
+		assert.Zero(t, n)
 	})
 }

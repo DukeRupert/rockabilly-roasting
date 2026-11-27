@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -475,16 +476,65 @@ templ discountReferralCard(props DiscountShowProps) {
 						})... }
 					>Stop using as referral offer</button>
 				</form>
-			} else if props.Discount.UsageLimit != domain.CouponUsageOncePerCustomer {
-				<p class="text-sm text-rr-muted">Only a once-per-customer discount can be the referral offer: each member's code goes to many friends.</p>
+			} else if problems := referralOfferProblems(props.Discount); len(problems) > 0 {
+				<p class="text-sm text-rr-muted">This discount can't be the referral offer. It needs to be:</p>
+				<ul class="list-disc pl-5 text-sm text-rr-muted">
+					for _, p := range problems {
+						<li>{ p }</li>
+					}
+				</ul>
 			} else {
-				<p class="text-sm text-rr-muted">Gives every active member their own code on this discount. For the Daily Grind referral, use a first-subscription-order, new-subscribers discount.</p>
+				<p class="text-sm text-rr-muted">Gives every active member their own code on this discount to share with friends.</p>
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/referral", props.Discount.ID.String())) }>
 					@ActionWrap("hint-discount-referral", "Replaces the current referral offer, if there is one.") {
-						<button type="submit" aria-describedby="hint-discount-referral" class="btn-confirm w-full justify-center">Use as the referral offer</button>
+						<button
+							type="submit"
+							aria-describedby="hint-discount-referral"
+							class="btn-confirm w-full justify-center"
+							{ ConfirmAttrs(ActionConfirm{
+								Title:   "Make this the referral offer?",
+								Lead:    "Every active member gets their own code on this discount.",
+								Points:  referralOfferConfirmPoints(props.Codes),
+								Confirm: "Make it the referral offer",
+							})... }
+						>Use as the referral offer</button>
 					}
 				</form>
 			}
 		</div>
 	}
+}
+
+// referralOfferProblems lists what a discount lacks to be the referral offer,
+// in the order DiscountService.SetReferralOffer checks it. Empty when it
+// qualifies.
+func referralOfferProblems(d domain.Discount) []string {
+	var out []string
+	if d.UsageLimit != domain.CouponUsageOncePerCustomer {
+		out = append(out, "Once per customer (set when created)")
+	}
+	if d.AppliesTo != domain.DiscountAppliesToSubscriptionSignup {
+		out = append(out, "For the first subscription order (Order type)")
+	}
+	if d.Type != domain.DiscountTypePercentage && d.Type != domain.DiscountTypeFixedAmount {
+		out = append(out, "A percentage or a fixed amount off")
+	}
+	return out
+}
+
+// referralOfferConfirmPoints warns that the discount's own codes stop working:
+// the referral offer only answers to members' codes. A public code already
+// handed out (WELCOME50) is exactly what this would break, so it is named.
+func referralOfferConfirmPoints(codes []domain.CouponCode) []string {
+	var own []string
+	for _, c := range codes {
+		if c.CustomerID == nil {
+			own = append(own, c.Code)
+		}
+	}
+	points := []string{"Replaces the current referral offer, if there is one."}
+	if len(own) > 0 {
+		points = append(points, fmt.Sprintf("Its own code (%s) stops working. Only members' codes work on a referral offer. If you've shared %s publicly, use a separate discount instead.", strings.Join(own, ", "), own[0]))
+	}
+	return points
 }

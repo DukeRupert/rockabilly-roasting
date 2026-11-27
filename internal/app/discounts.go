@@ -398,18 +398,43 @@ func (s *DiscountService) ReferralOffer(ctx context.Context, tx pgx.Tx) (*domain
 }
 
 // SetReferralOffer makes a discount the one members share, unmarking any
-// other. It has to be once-per-customer: a member's code is handed to many
-// friends, and a single-use one would stop working after the first.
+// other. What qualifies is what the members' card promises: money off a
+// friend's first subscription order, as many friends as they like.
+//
+//   - once per customer: a member's code goes to many friends, and a
+//     single-use one would stop working after the first
+//   - first subscription order: the card says so, and the friend joining is
+//     what earns the bag
+//   - percentage or fixed amount: the card names the saving ("50% off")
 func (s *DiscountService) SetReferralOffer(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	d, err := s.GetDiscount(ctx, tx, id)
 	if err != nil {
 		return err
 	}
-	if d.UsageLimit != domain.CouponUsageOncePerCustomer {
+	switch {
+	case d.UsageLimit != domain.CouponUsageOncePerCustomer:
 		return fmt.Errorf("a referral offer must be once per customer: %w", ErrReferralOfferInvalid)
+	case d.AppliesTo != domain.DiscountAppliesToSubscriptionSignup:
+		return fmt.Errorf("a referral offer must be for the first subscription order: %w", ErrReferralOfferInvalid)
+	case d.Type != domain.DiscountTypePercentage && d.Type != domain.DiscountTypeFixedAmount:
+		return fmt.Errorf("a referral offer must take money off: %w", ErrReferralOfferInvalid)
+	}
+	if d.IsReferral {
+		return nil
+	}
+	previous, err := s.ReferralOffer(ctx, tx)
+	if err != nil {
+		return err
 	}
 	if err := s.discounts.SetReferralDiscount(ctx, tx, id); err != nil {
 		return err
+	}
+	// The offer it replaces gets its own entry, so each discount's history
+	// says when it stopped being the offer as well as when it started.
+	if previous != nil {
+		if err := s.auditReferralOffer(ctx, tx, previous.ID, false, actor); err != nil {
+			return err
+		}
 	}
 	return s.auditReferralOffer(ctx, tx, id, true, actor)
 }
@@ -452,7 +477,7 @@ func (s *DiscountService) auditReferralOffer(ctx context.Context, tx pgx.Tx, id 
 // customer who is not an active member.
 func (s *DiscountService) MemberReferralCode(ctx context.Context, tx pgx.Tx, customer *domain.Customer) (*domain.CouponCode, *domain.Discount, error) {
 	offer, err := s.ReferralOffer(ctx, tx)
-	if err != nil || offer == nil || !offer.Active {
+	if err != nil || offer == nil || !discountLive(offer, time.Now()) {
 		return nil, nil, err
 	}
 	member, err := s.discounts.CustomerIsSubscriber(ctx, tx, customer.ID)
@@ -471,6 +496,7 @@ func (s *DiscountService) MemberReferralCode(ctx context.Context, tx pgx.Tx, cus
 	// Mint one. A savepoint around each insert, so a clash — another page
 	// load minting this member's code, or a code string already taken — does
 	// not abort the request's transaction.
+	var lastErr error
 	for attempt := 0; attempt < 5; attempt++ {
 		candidate := referralCodeFor(customer.FirstName)
 		sp, err := tx.Begin(ctx)
@@ -488,12 +514,29 @@ func (s *DiscountService) MemberReferralCode(ctx context.Context, tx pgx.Tx, cus
 			}
 			return created, offer, nil
 		}
+		lastErr = err
 		_ = sp.Rollback(ctx)
 		if existing, getErr := s.discounts.GetMemberCouponCode(ctx, tx, offer.ID, customer.ID); getErr == nil {
 			return existing, offer, nil
 		}
 	}
-	return nil, nil, fmt.Errorf("mint referral code for customer %s: no free code after 5 tries", customer.ID)
+	return nil, nil, fmt.Errorf("mint referral code for customer %s after 5 tries: %w", customer.ID, lastErr)
+}
+
+// discountLive reports whether a discount's codes can be used at now: switched
+// on, started, not expired. The same timing checkCoupon holds a code to, so
+// a member is never handed a code their friend would be refused.
+func discountLive(d *domain.Discount, now time.Time) bool {
+	if !d.Active {
+		return false
+	}
+	if d.StartsAt != nil && now.Before(*d.StartsAt) {
+		return false
+	}
+	if d.ExpiresAt != nil && !now.Before(*d.ExpiresAt) {
+		return false
+	}
+	return true
 }
 
 // referralCodeAlphabet leaves out characters that read alike (0/O, 1/I/L), so

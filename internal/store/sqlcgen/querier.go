@@ -296,6 +296,11 @@ type Querier interface {
 	LockSubscriptionForCustomer(ctx context.Context, arg LockSubscriptionForCustomerParams) (Subscription, error)
 	MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+	// Marks one discount the referral offer. Run after ClearReferralDiscount in the
+	// same transaction: the one-offer index is a partial unique index, checked row
+	// by row and not deferrable, so a single UPDATE that unmarks one row and marks
+	// another fails whenever it reaches the new row first.
+	MarkReferralDiscount(ctx context.Context, id uuid.UUID) error
 	MarkReferralRewardSent(ctx context.Context, arg MarkReferralRewardSentParams) (ReferralReward, error)
 	MarkResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	// The key generation moves once per refund, however many times a failed
@@ -330,9 +335,6 @@ type Querier interface {
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
-	// Makes one discount the referral offer and unmarks any other, in one
-	// statement so the one-offer index never sees two.
-	SetReferralDiscount(ctx context.Context, id uuid.UUID) error
 	SetSubscriptionRenewalPaymentIntent(ctx context.Context, arg SetSubscriptionRenewalPaymentIntentParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)

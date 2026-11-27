@@ -479,10 +479,15 @@ func (s *DiscountStore) GetReferralDiscount(ctx context.Context, tx pgx.Tx) (*do
 	return discountFromRow(row), nil
 }
 
-// SetReferralDiscount makes id the referral offer, unmarking any other.
+// SetReferralDiscount makes id the referral offer, unmarking any other. Two
+// statements, unmark then mark: see MarkReferralDiscount in discounts.sql.
 func (s *DiscountStore) SetReferralDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
-	if err := sqlcgen.New(tx).SetReferralDiscount(ctx, id); err != nil {
-		return fmt.Errorf("set referral discount: %w", err)
+	q := sqlcgen.New(tx)
+	if err := q.ClearReferralDiscount(ctx); err != nil {
+		return fmt.Errorf("clear referral discount: %w", err)
+	}
+	if err := q.MarkReferralDiscount(ctx, id); err != nil {
+		return fmt.Errorf("mark referral discount: %w", err)
 	}
 	return nil
 }

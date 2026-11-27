@@ -616,6 +616,19 @@ func (q *Queries) MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCode
 	return err
 }
 
+const markReferralDiscount = `-- name: MarkReferralDiscount :exec
+UPDATE discounts SET is_referral = true, updated_at = now() WHERE id = $1
+`
+
+// Marks one discount the referral offer. Run after ClearReferralDiscount in the
+// same transaction: the one-offer index is a partial unique index, checked row
+// by row and not deferrable, so a single UPDATE that unmarks one row and marks
+// another fails whenever it reaches the new row first.
+func (q *Queries) MarkReferralDiscount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markReferralDiscount, id)
+	return err
+}
+
 const markReferralRewardSent = `-- name: MarkReferralRewardSent :one
 UPDATE referral_rewards
 SET status = 'sent', sent_at = now(), sent_by = $2
@@ -692,18 +705,6 @@ WHERE redeemed_by_order_id = $1
 // again. No-op if the coupon was never redeemed for that order.
 func (q *Queries) ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error {
 	_, err := q.db.Exec(ctx, releaseCouponCodeByOrderID, redeemedByOrderID)
-	return err
-}
-
-const setReferralDiscount = `-- name: SetReferralDiscount :exec
-UPDATE discounts SET is_referral = (id = $1), updated_at = now()
-WHERE is_referral OR id = $1
-`
-
-// Makes one discount the referral offer and unmarks any other, in one
-// statement so the one-offer index never sees two.
-func (q *Queries) SetReferralDiscount(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, setReferralDiscount, id)
 	return err
 }
 

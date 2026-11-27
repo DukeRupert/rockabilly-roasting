@@ -677,7 +677,11 @@ func (s *CheckoutService) checkCoupon(ctx context.Context, tx pgx.Tx, coupon *do
 		if coupon.CustomerID == nil {
 			return nil, ErrCouponNotFound
 		}
-		if use.CustomerID != nil && *use.CustomerID == *coupon.CustomerID {
+		// Either identity counts: the checkout's customer (from the typed
+		// email) or the signed-in member, so checking out under a second
+		// email does not turn a member's own code into a referral.
+		if (use.CustomerID != nil && *use.CustomerID == *coupon.CustomerID) ||
+			(use.SignedInCustomerID != nil && *use.SignedInCustomerID == *coupon.CustomerID) {
 			return nil, ErrCouponOwnCode
 		}
 	} else if coupon.CustomerID != nil {

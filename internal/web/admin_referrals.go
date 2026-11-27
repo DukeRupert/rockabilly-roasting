@@ -96,7 +96,7 @@ func (d *Deps) setReferralOffer(w http.ResponseWriter, r *http.Request, on bool)
 	case errors.Is(err, app.ErrDiscountNotFound):
 		http.NotFound(w, r)
 	case errors.Is(err, app.ErrReferralOfferInvalid):
-		http.Redirect(w, r, back+"?error="+url.QueryEscape("Only a once-per-customer discount can be the referral offer."), http.StatusSeeOther)
+		http.Redirect(w, r, back+"?error="+url.QueryEscape("This discount can't be the referral offer. It needs to be once per customer, for the first subscription order, and take money off."), http.StatusSeeOther)
 	default:
 		Error(w, r, err)
 	}

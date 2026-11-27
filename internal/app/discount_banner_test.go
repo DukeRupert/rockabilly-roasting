@@ -222,7 +222,7 @@ func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
 	t.Run("a signup code goes to the Daily Grind page with it", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		d, text := bannerDiscount(t, tx, svc, testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup))
-		code := testutil.CreateCouponCode(t, tx, d.ID).Code
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("JOIN-"+strings.ToUpper(uuid.NewString()[:6]))).Code
 		assert.Equal(t, "/subscriptions?promo="+code, bannerHref(t, tx, svc, nil, text))
 	})
 
@@ -237,7 +237,7 @@ func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
 	t.Run("a member's own code on it does not count against the shared one", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		d, text := bannerDiscount(t, tx, svc)
-		code := testutil.CreateCouponCode(t, tx, d.ID).Code
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("SHARED-"+strings.ToUpper(uuid.NewString()[:6]))).Code
 		owned := testutil.CreateCouponCode(t, tx, d.ID)
 		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET customer_id = $2 WHERE id = $1`,
 			owned.ID, newShopper(t, tx).customer.ID)
@@ -252,6 +252,21 @@ func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
 		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET redeemed_at = now() WHERE id = $1`, cc.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a code a promo link could not hold is left off", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("GIFT 20 "+uuid.NewString()[:4]))
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("an escaped character survives the link", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := "GIFT_" + strings.ToUpper(uuid.NewString()[:6])
+		testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode(code))
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
 	})
 
 	t.Run("the referral offer never carries one: each member shares their own", func(t *testing.T) {

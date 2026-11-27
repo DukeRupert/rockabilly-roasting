@@ -2,8 +2,9 @@ package web
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
+
+	"github.com/dukerupert/hiri/internal/domain"
 )
 
 // A promo link: any storefront page with ?promo=CODE, from the offer strip or
@@ -21,20 +22,9 @@ const (
 	promoCookieMaxAge = 30 * 24 * 60 * 60
 )
 
-// promoCodePattern is what a code may look like: codes are stored uppercase,
-// and minted referral codes are NAME-XXXX. Anything else is not kept, so the
-// cookie never carries markup or a value checkout would choke on.
-var promoCodePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9-]{0,39}$`)
-
 // normalizePromo returns the code as checkout stores it, or "" when it could
-// not be a code.
-func normalizePromo(raw string) string {
-	code := strings.ToUpper(strings.TrimSpace(raw))
-	if !promoCodePattern.MatchString(code) {
-		return ""
-	}
-	return code
-}
+// not be a code. See domain.NormalizePromoCode.
+func normalizePromo(raw string) string { return domain.NormalizePromoCode(raw) }
 
 // capturePromoParam keeps a promo link's code and redirects to the same page
 // without it, so the address bar, shared links and analytics see the clean
@@ -61,6 +51,12 @@ func capturePromoParam(next http.Handler) http.Handler {
 		q.Del(promoParam)
 		clean := *r.URL
 		clean.RawQuery = q.Encode()
+		// This runs before ServeMux cleans the path, so the redirect is built
+		// from what the client sent. "//evil.example/" would be a
+		// protocol-relative Location, and browsers treat "/\" the same way:
+		// collapse the leading slashes so it can only ever name this site.
+		clean.Path = "/" + strings.TrimLeft(r.URL.Path, "/\\")
+		clean.RawPath = ""
 		http.Redirect(w, r, clean.RequestURI(), http.StatusFound)
 	})
 }
@@ -83,8 +79,9 @@ func pendingPromo(r *http.Request) string {
 	return normalizePromo(c.Value)
 }
 
-// clearPendingPromo forgets the promo link's code: it is on the cart now, or
-// checkout refused it for good.
+// clearPendingPromo forgets the promo link's code: a cart holds a code now,
+// or checkout refused it in a way no checkout would accept (see
+// app.CouponDeadEverywhere).
 func clearPendingPromo(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     promoCookieName,

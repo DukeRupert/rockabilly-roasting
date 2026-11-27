@@ -769,9 +769,11 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				couponNotice = msg
 				if errors.Is(cErr, app.ErrCouponSignInRequired) {
 					couponSignInURL = subscribeSignInURL(lines)
-				} else if code == pendingPromo(r) {
-					// A promo link's code refused for good: stop filling it in.
-					// An accepted one stays, as a signup has no cart to hold it.
+				} else if code == pendingPromo(r) && app.CouponDeadEverywhere(cErr) {
+					// A promo link's code no checkout would take: stop filling
+					// it in. Any other refusal may be the cart's code, still
+					// good there; an accepted one stays, as a signup has no
+					// cart to hold it.
 					dropPendingPromo = true
 				}
 			default:

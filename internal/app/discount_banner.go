@@ -140,7 +140,7 @@ func bannerHref(d domain.Discount, code string) string {
 	default:
 		path = "/catalog"
 	}
-	if code == "" {
+	if code == "" || domain.NormalizePromoCode(code) != code {
 		return path
 	}
 	return path + "?promo=" + url.QueryEscape(code)

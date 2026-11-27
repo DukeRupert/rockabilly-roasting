@@ -129,7 +129,9 @@ The site remembers the code for 30 days while the customer browses, and takes it
 - **Cart checkout** applies it automatically when the cart has no code yet. If it doesn't apply, the customer sees why, just as if they had typed it, with the code left in the box.
 - **Subscription signup** starts with the code filled in, and the payment step prices it or says why not.
 
-A code that needs the customer to sign in (members-only) is kept until they do. A code that can't be used at all is forgotten after checkout says so. A link with something that isn't a code shape in it is ignored.
+The code is forgotten once it is on a cart, or once checkout finds it can't be used anywhere: it doesn't exist, its discount is deactivated or over, or a single-use code is spent. Any other refusal keeps it, because it may still work after a change. For example, a members-only code works after signing in, and a signup code still works on the subscribe page.
+
+Codes in a link may use letters, numbers, hyphens and underscores, up to 64 characters. A code with anything else won't carry in a link, and the banner link leaves it off.
 
 ## Referral Program
 

@@ -620,6 +620,7 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 	}
 
 	var resp checkoutApplyCouponResponse
+	var refusal error // why the code was refused, if it was
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		items, txErr := d.CartService.ListItems(ctx, tx, cartID)
@@ -638,6 +639,7 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 				return txErr
 			}
 			d.Metrics.CouponRejected.WithLabelValues(label).Inc()
+			refusal = txErr
 			resp = checkoutApplyCouponResponse{ErrorMessage: msg}
 			if errors.Is(txErr, app.ErrCouponSignInRequired) {
 				resp.SignInURL = checkoutSignInURL
@@ -668,9 +670,10 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 	}
 
 	// A promo link's code is done with once the cart holds a code, or once
-	// checkout has refused it for a reason signing in will not fix.
+	// it is refused in a way no checkout would accept. A signup code refused
+	// here is still good on the subscribe page, so it is kept.
 	if pending := pendingPromo(r); pending != "" &&
-		(resp.Valid || (pending == code && resp.SignInURL == "")) {
+		(resp.Valid || (pending == code && app.CouponDeadEverywhere(refusal))) {
 		clearPendingPromo(w)
 	}
 	JSON(w, http.StatusOK, resp)

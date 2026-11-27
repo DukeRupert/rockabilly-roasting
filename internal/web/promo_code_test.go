@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
@@ -66,14 +67,29 @@ func TestCapturePromoParam(t *testing.T) {
 		assert.Positive(t, c.MaxAge)
 	})
 
-	t.Run("a referral code's shape is a code", func(t *testing.T) {
-		c := promoCookie(serve(http.MethodGet, "/?promo=LOGAN-7K3Q"))
-		require.NotNil(t, c)
-		assert.Equal(t, "LOGAN-7K3Q", c.Value)
+	t.Run("a referral code's shape is a code, and so is a staff code with an underscore", func(t *testing.T) {
+		for raw, want := range map[string]string{"LOGAN-7K3Q": "LOGAN-7K3Q", " gift_20 ": "GIFT_20"} {
+			c := promoCookie(serve(http.MethodGet, "/?promo="+url.QueryEscape(raw)))
+			require.NotNil(t, c, "%q", raw)
+			assert.Equal(t, want, c.Value)
+		}
+	})
+
+	t.Run("the redirect can only name this site", func(t *testing.T) {
+		// The path as the client sent it: this runs before ServeMux cleans it.
+		for target, want := range map[string]string{
+			"//evil.example/?promo=X":   "/evil.example/",
+			"/\\evil.example/?promo=X": "/evil.example/",
+			"///evil.example?promo=X":   "/evil.example",
+		} {
+			w := serve(http.MethodGet, target)
+			require.Equal(t, http.StatusFound, w.Code, target)
+			assert.Equal(t, want, w.Header().Get("Location"), target)
+		}
 	})
 
 	t.Run("something that cannot be a code is dropped, and the URL still cleaned", func(t *testing.T) {
-		for _, bad := range []string{"", "<script>", "GIFT 20", strings.Repeat("A", 41), "-LEADING"} {
+		for _, bad := range []string{"", "<script>", "GIFT 20", strings.Repeat("A", 65), "-LEADING"} {
 			w := serve(http.MethodGet, "/catalog?promo="+url.QueryEscape(bad))
 			assert.Nil(t, promoCookie(w), "%q", bad)
 			assert.Equal(t, "/catalog", w.Header().Get("Location"), "%q", bad)
@@ -144,9 +160,11 @@ func TestCheckoutApplyCoupon_SettlesThePendingPromo(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		return w, resp
 	}
+	// cleared: the response deletes the cookie, at the path it was set on —
+	// a delete at another path leaves the cookie in place.
 	cleared := func(w *httptest.ResponseRecorder) bool {
 		c := promoCookie(w)
-		return c != nil && c.MaxAge < 0
+		return c != nil && c.MaxAge < 0 && c.Path == "/"
 	}
 
 	t.Run("applied: the cart holds it now", func(t *testing.T) {
@@ -183,6 +201,15 @@ func TestCheckoutApplyCoupon_SettlesThePendingPromo(t *testing.T) {
 		assert.False(t, cleared(w))
 	})
 
+	t.Run("a signup code refused at the cart: kept for the subscribe page", func(t *testing.T) {
+		f := newCheckoutCouponFixture(t)
+		clearCartCoupon(t, f)
+		code := welcomeCode(t)
+		w, resp := apply(f, code, code)
+		require.False(t, resp.Valid)
+		assert.Nil(t, promoCookie(w))
+	})
+
 	t.Run("a different code typed and refused leaves the promo alone", func(t *testing.T) {
 		f := newCheckoutCouponFixture(t)
 		clearCartCoupon(t, f)
@@ -217,18 +244,45 @@ func TestSubscribe_PendingPromo(t *testing.T) {
 		assert.Nil(t, promoCookie(w))
 	})
 
-	t.Run("refused for good: stop filling it in", func(t *testing.T) {
+	post := func(t *testing.T, code, pending string) (*httptest.ResponseRecorder, subscribePaymentIntentResponse) {
+		t.Helper()
 		d, _ := newSubscribePaymentDeps(t)
-		code := newSignupCode(t) // a cart-checkout code: refused on a signup
 		r := httptest.NewRequest(http.MethodPost, "/api/subscribe/payment-intent",
 			strings.NewReader(subscribePaymentIntentBody(f.planID, f.variantID, 1, withCoupon(code))))
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		d.handleSubscribePaymentIntent(w, withPending(r, code))
-		resp := decodeSubscribeIntent(t, w)
+		d.handleSubscribePaymentIntent(w, withPending(r, pending))
+		return w, decodeSubscribeIntent(t, w)
+	}
+
+	t.Run("a code no checkout would take: stop filling it in", func(t *testing.T) {
+		w, resp := post(t, "NOSUCHCODE", "NOSUCHCODE")
 		require.NotEmpty(t, resp.CouponNotice)
 		c := promoCookie(w)
 		require.NotNil(t, c)
 		assert.Negative(t, c.MaxAge)
+		assert.Equal(t, "/", c.Path)
+	})
+
+	t.Run("a cart code refused on a signup: kept for cart checkout", func(t *testing.T) {
+		code := newSignupCode(t)
+		w, resp := post(t, code, code)
+		require.NotEmpty(t, resp.CouponNotice)
+		assert.Nil(t, promoCookie(w))
+	})
+
+	t.Run("refused until the shopper signs in: kept", func(t *testing.T) {
+		code := newSignupCode(t,
+			testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup),
+			testutil.WithEligibility(domain.DiscountEligibilitySubscribers))
+		w, resp := post(t, code, code)
+		require.NotEmpty(t, resp.CouponSignInURL)
+		assert.Nil(t, promoCookie(w))
+	})
+
+	t.Run("a different code refused leaves the promo alone", func(t *testing.T) {
+		w, resp := post(t, "NOSUCHCODE", "WELCOME50")
+		require.NotEmpty(t, resp.CouponNotice)
+		assert.Nil(t, promoCookie(w))
 	})
 }

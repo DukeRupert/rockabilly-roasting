@@ -584,3 +584,17 @@ type MOQViolationError struct {
 
 func (e *MOQViolationError) Error() string        { return ErrMOQViolation.Error() }
 func (e *MOQViolationError) Is(target error) bool { return target == ErrMOQViolation }
+
+// CouponDeadEverywhere reports whether a coupon refusal holds at every
+// checkout, for every shopper, now and later: the code does not exist, its
+// discount is off or over, or a single-use code is spent. Every other refusal
+// depends on the kind of order, the cart, who is signed in or the email
+// typed, and the same code may work at the other checkout or after a change.
+// A promo link's remembered code is forgotten only on these.
+func CouponDeadEverywhere(err error) bool {
+	return errors.Is(err, ErrCouponNotFound) ||
+		errors.Is(err, ErrDiscountNotFound) ||
+		errors.Is(err, ErrDiscountNotActive) ||
+		errors.Is(err, ErrDiscountExpired) ||
+		errors.Is(err, ErrCouponAlreadyUsed)
+}

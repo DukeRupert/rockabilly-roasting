@@ -23,6 +23,10 @@ import (
 // address.*, subscription self-actions, and login/logout.
 func customerEventLabel(action string) string {
 	switch action {
+	case audit.AuditReferralRewardEarned:
+		return "Earned a referral bag"
+	case audit.AuditReferralRewardSent:
+		return "Referral bag sent"
 	case audit.AuditCustomerLogin:
 		return "Logged in"
 	case audit.AuditCustomerLogout:
@@ -97,7 +101,8 @@ func customerEventMarker(action string) string {
 		audit.AuditCustomerTaxExemptionGranted,
 		audit.AuditSubscriptionCreated,
 		audit.AuditSubscriptionResumed,
-		audit.AuditSubscriptionSkipUndone:
+		audit.AuditSubscriptionSkipUndone,
+		audit.AuditReferralRewardEarned:
 		return "bg-rr-amber"
 	case audit.AuditSubscriptionPaused, audit.AuditSubscriptionSkipped:
 		return "bg-rr-raised"
@@ -147,7 +152,7 @@ func CustomerActivity(customerID uuid.UUID, entries []domain.AuditEntry, loc *ti
 			var templ_7745c5c3_Var2 templ.SafeURL
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/audit?customer_id=" + customerID.String()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_activity.templ`, Line: 113, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_activity.templ`, Line: 118, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {

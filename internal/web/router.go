@@ -637,6 +637,10 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/discounts/{id}", deps.handleAdminDiscountUpdate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/deactivate", deps.handleAdminDiscountDeactivate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/activate", deps.handleAdminDiscountActivate)
+	adminMux.HandleFunc("POST /admin/discounts/{id}/referral", deps.handleAdminDiscountReferralSet)
+	adminMux.HandleFunc("POST /admin/discounts/{id}/referral/clear", deps.handleAdminDiscountReferralClear)
+	adminMux.HandleFunc("GET /admin/referrals", deps.handleAdminReferralList)
+	adminMux.HandleFunc("POST /admin/referrals/{id}/sent", deps.handleAdminReferralSent)
 
 	// Admin team / staff management — admin-only (staff:write). Wrapped in
 	// requirePermission; requireStaffSession (mounting the whole adminMux) has

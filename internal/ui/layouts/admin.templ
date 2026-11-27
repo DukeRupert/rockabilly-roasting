@@ -83,7 +83,8 @@ func resolveActiveNav(path string) string {
 	case strings.HasPrefix(path, "/admin/subscriptions") ||
 		strings.HasPrefix(path, "/admin/plans"):
 		return "/admin/subscriptions"
-	case strings.HasPrefix(path, "/admin/discounts"):
+	case strings.HasPrefix(path, "/admin/discounts"),
+		strings.HasPrefix(path, "/admin/referrals"):
 		return "/admin/discounts"
 	case strings.HasPrefix(path, "/admin/service"):
 		return "/admin/service"

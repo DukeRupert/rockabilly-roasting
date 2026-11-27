@@ -161,6 +161,7 @@ templ DiscountShowContent(props DiscountShowProps) {
 		<aside class="flex flex-col gap-4 xl:sticky xl:top-6 xl:self-start">
 			@discountEditCard(props)
 			@discountStatusCard(props)
+			@discountReferralCard(props)
 		</aside>
 	</div>
 }
@@ -220,14 +221,18 @@ templ discountCodesTable(props DiscountShowProps) {
 // orders that used it. Its codes are never spent, so the single-use table's
 // status/redeemed/order columns would read "available" forever.
 templ discountSharedCodes(props DiscountShowProps) {
-	<p class="mt-2 text-sm text-rr-heading">
-		for i, c := range props.Codes {
-			if i > 0 {
-				<span class="text-rr-border"> · </span>
+	if props.Discount.IsReferral {
+		<p class="mt-2 text-sm text-rr-heading">{ referralCodesSummary(props.Codes) }</p>
+	} else {
+		<p class="mt-2 text-sm text-rr-heading">
+			for i, c := range props.Codes {
+				if i > 0 {
+					<span class="text-rr-border"> · </span>
+				}
+				<span class="font-mono">{ c.Code }</span>
 			}
-			<span class="font-mono">{ c.Code }</span>
-		}
-	</p>
+		</p>
+	}
 	if len(props.Redemptions) > 0 {
 		<div class="mt-2 overflow-x-auto border border-rr-border bg-rr-surface">
 			<table class="min-w-full divide-y divide-rr-border">
@@ -429,5 +434,57 @@ templ DiscountShow(props DiscountShowProps) {
 		StaffRole:  props.StaffRole,
 	}) {
 		@DiscountShowContent(props)
+	}
+}
+
+// referralCodesSummary stands in for the code list on the referral offer,
+// which carries one code per member — too many to print, and none of them the
+// discount's own business to show.
+func referralCodesSummary(codes []domain.CouponCode) string {
+	members := 0
+	for _, c := range codes {
+		if c.CustomerID != nil {
+			members++
+		}
+	}
+	noun := "codes"
+	if members == 1 {
+		noun = "code"
+	}
+	return fmt.Sprintf("%d member %s. Each active member gets their own on their account page. The code typed when this discount was created can't be used on its own.", members, noun)
+}
+
+// discountReferralCard makes a discount the referral offer, or stops it being
+// one. Only a once-per-customer discount qualifies: a member's code goes to
+// many friends.
+templ discountReferralCard(props DiscountShowProps) {
+	@railCard("Referral offer") {
+		<div class="flex flex-col gap-2">
+			if props.Discount.IsReferral {
+				<p class="text-sm text-rr-body">This is the referral offer. Members share their own codes on it, and each friend's paid first order earns the member a free bag. <a href="/admin/referrals" class="font-semibold text-rr-red hover:text-rr-red-lt">Bags owed &rarr;</a></p>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/referral/clear", props.Discount.ID.String())) }>
+					<button
+						type="submit"
+						class="btn-danger w-full justify-center"
+						{ ConfirmAttrs(ActionConfirm{
+							Title:   "Stop using this as the referral offer?",
+							Lead:    "Members' codes stop working and their account pages stop showing a code.",
+							Points:  []string{"Bags already earned stay on the Referrals page.", "You can make it the referral offer again from here."},
+							Confirm: "Stop",
+							Danger:  true,
+						})... }
+					>Stop using as referral offer</button>
+				</form>
+			} else if props.Discount.UsageLimit != domain.CouponUsageOncePerCustomer {
+				<p class="text-sm text-rr-muted">Only a once-per-customer discount can be the referral offer: each member's code goes to many friends.</p>
+			} else {
+				<p class="text-sm text-rr-muted">Gives every active member their own code on this discount. For the Daily Grind referral, use a first-subscription-order, new-subscribers discount.</p>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/referral", props.Discount.ID.String())) }>
+					@ActionWrap("hint-discount-referral", "Replaces the current referral offer, if there is one.") {
+						<button type="submit" aria-describedby="hint-discount-referral" class="btn-confirm w-full justify-center">Use as the referral offer</button>
+					}
+				</form>
+			}
+		</div>
 	}
 }

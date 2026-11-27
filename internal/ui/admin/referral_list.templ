@@ -1,0 +1,137 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// ReferralListProps backs the free-bags page: what members have earned by
+// bringing in friends, and what has gone out.
+type ReferralListProps struct {
+	// Offer is the discount marked as the referral offer; nil when none is.
+	Offer *domain.Discount
+	Owed  []domain.ReferralRewardRow
+	// Sent is the most recent bags sent, newest last like Owed.
+	Sent       []domain.ReferralRewardRow
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+func referralMemberName(r domain.ReferralRewardRow) string {
+	name := r.ReferrerFirstName
+	if r.ReferrerLastName != "" {
+		name += " " + r.ReferrerLastName
+	}
+	return name
+}
+
+templ ReferralListContent(props ReferralListProps) {
+	@ConfirmDialogHost()
+	<div class="sm:flex sm:items-start sm:justify-between sm:gap-6">
+		<div>
+			<h1 class="admin-page-title">Referrals</h1>
+			<p class="mt-1 text-sm text-rr-muted">Free bags members have earned by bringing in a friend. Send each one, then mark it sent.</p>
+		</div>
+		<div class="mt-4 shrink-0 sm:mt-0">
+			<a href="/admin/discounts" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Discounts</a>
+		</div>
+	</div>
+	<div class="mt-6 border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-body">
+		if props.Offer == nil {
+			No referral offer is set up. Open a once-per-customer discount and choose <span class="font-semibold">Use as the referral offer</span>. Active members then each get their own code on their account page.
+		} else {
+			Referral offer:
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", props.Offer.ID.String())) } class="font-semibold text-rr-red hover:text-rr-red-lt">{ props.Offer.Name }</a>
+			if !props.Offer.Active {
+				<span class="ml-1 badge badge-grey">inactive</span>
+			}
+		}
+	</div>
+	<h2 class="mt-8 text-sm font-semibold text-rr-heading">Bags owed</h2>
+	if len(props.Owed) == 0 {
+		<p class="mt-1 text-sm text-rr-muted">Nothing owed right now.</p>
+	} else {
+		<p class="mt-1 text-sm text-rr-muted">{ fmt.Sprintf("%d to send, oldest first. A bag is earned when the friend's first order is paid; cancelling that order takes it back.", len(props.Owed)) }</p>
+		@referralTable(props.Owed, props.MerchantTZ, true)
+	}
+	if len(props.Sent) > 0 {
+		<h2 class="mt-8 text-sm font-semibold text-rr-heading">Recently sent</h2>
+		@referralTable(props.Sent, props.MerchantTZ, false)
+	}
+}
+
+templ referralTable(rows []domain.ReferralRewardRow, tz *time.Location, owed bool) {
+	<div class="mt-2 overflow-x-auto border border-rr-border bg-rr-surface">
+		<table class="min-w-full divide-y divide-rr-border">
+			<thead class="bg-rr-raised">
+				<tr>
+					<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Member</th>
+					<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Code</th>
+					<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Friend's order</th>
+					<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">
+						if owed {
+							Earned
+						} else {
+							Sent
+						}
+					</th>
+					if owed {
+						<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+					}
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-rr-border bg-rr-surface">
+				for _, r := range rows {
+					<tr>
+						<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+							<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", r.ReferrerCustomerID.String())) } class="font-semibold text-rr-red hover:text-rr-red-lt">{ referralMemberName(r) }</a>
+							<span class="block text-xs text-rr-muted">{ r.ReferrerEmail }</span>
+						</td>
+						<td class="whitespace-nowrap px-3 py-4 font-mono text-sm text-rr-heading">{ r.Code }</td>
+						<td class="whitespace-nowrap px-3 py-4 text-sm">
+							<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", r.OrderID.String())) } class="font-semibold text-rr-red hover:text-rr-red-lt">{ r.OrderNumber }</a>
+						</td>
+						<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+							if owed || r.SentAt == nil {
+								{ r.CreatedAt.In(tz).Format("Jan 2, 2006") }
+							} else {
+								{ r.SentAt.In(tz).Format("Jan 2, 2006") }
+							}
+						</td>
+						if owed {
+							<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
+								<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/referrals/%s/sent", r.ID.String())) }>
+									<button
+										type="submit"
+										class="btn-confirm"
+										{ ConfirmAttrs(ActionConfirm{
+											Title:   "Mark this bag sent?",
+											Lead:    "Do this once the free bag is on its way to " + referralMemberName(r) + ".",
+											Points:  []string{"It moves to Recently sent.", "It can't be moved back to owed."},
+											Confirm: "Mark sent",
+										})... }
+									>Mark sent</button>
+								</form>
+							</td>
+						}
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ ReferralList(props ReferralListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Referrals",
+		ActivePath: "/admin/referrals",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@ReferralListContent(props)
+	}
+}

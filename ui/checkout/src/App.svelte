@@ -134,6 +134,11 @@
       appliedCoupon = cart.coupon ?? null;
       if (!cart.items.length) {
         error = 'Your cart is empty.';
+      } else if (!appliedCoupon && cart.pending_coupon) {
+        // A promo link's code: applied through the code box, so the shopper
+        // sees it applied, or sees why not with the code still in the box.
+        couponInput = cart.pending_coupon;
+        applyCouponInput();
       }
     } catch (e: any) {
       error = e.message || 'Failed to load cart';
@@ -160,8 +165,14 @@
     }
   }
 
-  async function handleApplyCoupon(e: Event) {
+  function handleApplyCoupon(e: Event) {
     e.preventDefault();
+    applyCouponInput();
+  }
+
+  // applyCouponInput applies whatever is in the code box: typed by the
+  // shopper, or filled in from a promo link (see loadCart).
+  async function applyCouponInput() {
     if (!cart || !couponInput.trim() || couponBusy) return;
     couponBusy = true;
     couponError = '';

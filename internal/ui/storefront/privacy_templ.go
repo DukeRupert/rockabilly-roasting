@@ -162,7 +162,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, and the cookies set by Google Analytics and Google Ads described above. The Google Ads cookies are advertising cookies: they let Google connect a visit here to an ad you saw, and let us show our ads to people who've visited before.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, a promotion cookie that holds a discount code from a link you followed for up to 30 days so checkout can apply it, and the cookies set by Google Analytics and Google Ads described above. The Google Ads cookies are advertising cookies: they let Google connect a visit here to an ad you saw, and let us show our ads to people who've visited before.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

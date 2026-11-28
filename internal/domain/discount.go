@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,6 +98,22 @@ type Discount struct {
 	BannerText string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+}
+
+// promoCodePattern is the shape a code may take in a promo link
+// (?promo=CODE): codes are stored uppercase, minted referral codes are
+// NAME-XXXX, and staff-typed codes may use an underscore. Anything else is
+// not carried, so the cookie never holds markup.
+var promoCodePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9_-]{0,63}$`)
+
+// NormalizePromoCode returns code as checkout stores it, or "" when it cannot
+// travel in a promo link.
+func NormalizePromoCode(code string) string {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if !promoCodePattern.MatchString(code) {
+		return ""
+	}
+	return code
 }
 
 // MaxBannerTextLen is the longest banner line staff may write, in characters.

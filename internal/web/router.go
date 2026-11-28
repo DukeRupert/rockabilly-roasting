@@ -894,6 +894,7 @@ func NewRouter(deps *Deps) http.Handler {
 	var handler http.Handler = metrics.RecordRoute(mux)
 	handler = deps.withPromoBanners(handler) // reads the session, so inside it
 	handler = deps.optionalCustomerSession(handler)
+	handler = capturePromoParam(handler) // ?promo=CODE links; see promo_code.go
 	handler = crossOriginProtection(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/
 	handler = ratelimit.GlobalLimit(deps.RateLimiter, ratelimit.GlobalIPLimit, ratelimit.GlobalWindow)(handler)

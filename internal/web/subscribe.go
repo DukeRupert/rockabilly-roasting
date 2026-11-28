@@ -427,6 +427,12 @@ func (d *Deps) subscribePageProps(w http.ResponseWriter, r *http.Request) (store
 		StripeKey:  os.Getenv("STRIPE_PUBLISHABLE_KEY"),
 		CartCount:  d.cartItemCountFromCookie(r),
 	}
+	// Best-effort and outside the page's transaction: a failed lookup only
+	// leaves the code box empty.
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		props.PendingCoupon = d.pendingPromoFor(ctx, tx, r, domain.DiscountAppliesToSubscriptionSignup)
+		return nil
+	})
 	return props, true
 }
 
@@ -652,11 +658,12 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		// is one. Its shipping charge covers the box.
 		shipsWith *domain.Order
 
-		discountTotal   int
-		discountName    string
-		couponCode      string
-		couponNotice    string
-		couponSignInURL string
+		discountTotal    int
+		discountName     string
+		couponCode       string
+		couponNotice     string
+		dropPendingPromo bool
+		couponSignInURL  string
 	)
 	// The session's customer, if any: the form's email proves nothing, and a
 	// members-only code is held to the session (see app.CouponUse).
@@ -767,6 +774,12 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 				couponNotice = msg
 				if errors.Is(cErr, app.ErrCouponSignInRequired) {
 					couponSignInURL = subscribeSignInURL(lines)
+				} else if code == pendingPromo(r) && app.CouponDeadEverywhere(cErr) {
+					// A promo link's code no checkout would take: stop filling
+					// it in. Any other refusal may be the cart's code, still
+					// good there; an accepted one stays, as a signup has no
+					// cart to hold it.
+					dropPendingPromo = true
 				}
 			default:
 				return fmt.Errorf("check signup coupon: %w", cErr)
@@ -1030,6 +1043,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			Subtotal:  item.UnitPrice * item.Quantity,
 		}
 	}
+	if dropPendingPromo {
+		clearPendingPromo(w)
+	}
 	JSON(w, http.StatusOK, subscribePaymentIntentResponse{
 		checkoutPaymentIntentResponse: checkoutPaymentIntentResponse{
 			ClientSecret:    pi.ClientSecret,
@@ -1165,6 +1181,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to finalize subscription"})
 		return
 	}
+
+	// Signed up: a signup code from a promo link is spent or no longer
+	// wanted, and would only be refused on the next visit. A cart code waits
+	// for cart checkout.
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if pendingPromo(r) != "" && d.pendingPromoFor(ctx, tx, r, domain.DiscountAppliesToSubscriptionSignup) != "" {
+			clearPendingPromo(w)
+		}
+		return nil
+	})
 
 	// The analytics payload is best-effort: the signup has already succeeded,
 	// so a failed load costs the tracking event, not the response.

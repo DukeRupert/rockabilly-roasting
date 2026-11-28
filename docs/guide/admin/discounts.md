@@ -100,7 +100,7 @@ A discount can be promoted in a strip of offers above the header on every storef
 1. Write one short line, at most 120 characters, and **include the code**. For example: *Holiday gift: 20% off any bag with code GIFT20*. The referral offer is the exception: leave the code out, because each member has their own. For example: *Share your Daily Grind code: friends get 50% off, you get a free bag*.
 2. Click **Save banner**.
 
-The line links to where the code is used: the shop for one-time orders, the Daily Grind page for a first subscription order, and a member's subscriptions page for the referral offer. The card says who will see the line and where it links before you save.
+The line links to where the code is used: the shop for one-time orders, the Daily Grind page for a first subscription order, and a member's subscriptions page for the referral offer. When the discount has exactly one shared code, the link carries it, so checkout applies it for the customer (see **Promo Links** below). The card says who will see the line and where it links before you save.
 
 The banner only shows while the discount is **active and within its dates**, so it goes away when the discount ends. Nobody has to remember to take it down. To stop showing it sooner, empty the line and save, or deactivate the discount.
 
@@ -116,6 +116,24 @@ The site shows each line only to the customers the discount is for:
 Wholesale accounts don't see storefront banners. If several discounts are promoted, each gets its own line, with the one ending soonest first.
 
 A member who isn't signed in sees what a guest sees. Members-only offers need sign-in at checkout anyway, so email is still the way to reach every member.
+
+## Promo Links
+
+Add `?promo=CODE` to any storefront link, in an email, a post or a printed QR code, and the code goes with the customer to checkout:
+
+- `https://rockabillyroasting.com/subscriptions?promo=WELCOME50`
+- `https://rockabillyroasting.com/catalog?promo=GIFT20`
+
+The site remembers the code for 30 days while the customer browses, and takes it out of the address bar so it isn't shared further by accident. Then:
+
+- **Cart checkout** applies a one-time-order code automatically when the cart has no code yet. If it doesn't apply, the customer sees why, just as if they had typed it, with the code left in the box.
+- **Subscription signup** starts with a first-subscription-order code filled in, and the payment step prices it or says why not.
+
+Each checkout only offers a code meant for it, so a WELCOME50 link never puts WELCOME50 in the cart's code box. A signup code is forgotten once the customer has signed up.
+
+The code is forgotten once it is on a cart, or once checkout finds it can't be used anywhere: it doesn't exist, its discount is deactivated or over, or a single-use code is spent. Any other refusal keeps it, because it may still work after a change. For example, a members-only code works after signing in, and a signup code still works on the subscribe page.
+
+Codes in a link may use letters, numbers, hyphens and underscores, up to 64 characters. A code with anything else won't carry in a link, and the banner link leaves it off.
 
 ## Referral Program
 

@@ -41,6 +41,8 @@ export interface CartResponse {
   // Present only when the visitor has a customer session.
   prefill?: CheckoutPrefill;
   coupon?: AppliedCoupon;
+  // A code a promo link left, offered only while the cart has no coupon.
+  pending_coupon?: string;
   // Cents still needed (after coupon) for free shipping; 0 once met. Absent
   // when the shop has no free-shipping threshold.
   free_shipping_remaining?: number;

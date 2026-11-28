@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -205,4 +206,101 @@ func TestDiscountService_SetBannerText(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		assert.ErrorIs(t, svc.SetBannerText(ctx, tx, uuid.New(), "x", testutil.TestActor()), app.ErrDiscountNotFound)
 	})
+}
+
+// A banner link carries the discount's code when there is exactly one it
+// could mean, so checkout applies it; see web/promo_code.go.
+func TestStorefrontBanners_LinkCarriesTheCode(t *testing.T) {
+	svc := newDiscountService()
+
+	t.Run("one shared code", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("GIFT-"+strings.ToUpper(uuid.NewString()[:6]))).Code
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a signup code goes to the Daily Grind page with it", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc, testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup))
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("JOIN-"+strings.ToUpper(uuid.NewString()[:6]))).Code
+		assert.Equal(t, "/subscriptions?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("more than one code: the link cannot pick", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		testutil.CreateCouponCode(t, tx, d.ID)
+		testutil.CreateCouponCode(t, tx, d.ID)
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a member's own code on it does not count against the shared one", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("SHARED-"+strings.ToUpper(uuid.NewString()[:6]))).Code
+		owned := testutil.CreateCouponCode(t, tx, d.ID)
+		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET customer_id = $2 WHERE id = $1`,
+			owned.ID, newShopper(t, tx).customer.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a spent single-use code is not carried", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		cc := testutil.CreateCouponCode(t, tx, d.ID)
+		_, err := tx.Exec(context.Background(), `UPDATE coupon_codes SET redeemed_at = now() WHERE id = $1`, cc.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a code a promo link could not hold is left off", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode("GIFT 20 "+uuid.NewString()[:4]))
+		assert.Equal(t, "/catalog", bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("a code with an underscore is carried", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc)
+		code := "GIFT_" + strings.ToUpper(uuid.NewString()[:6])
+		testutil.CreateCouponCode(t, tx, d.ID, testutil.WithCouponCode(code))
+		assert.Equal(t, "/catalog?promo="+code, bannerHref(t, tx, svc, nil, text))
+	})
+
+	t.Run("the referral offer never carries one: each member shares their own", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		d, text := bannerDiscount(t, tx, svc,
+			testutil.WithAppliesTo(domain.DiscountAppliesToSubscriptionSignup),
+			testutil.WithUsageLimit(domain.CouponUsageOncePerCustomer))
+		testutil.CreateCouponCode(t, tx, d.ID)
+		require.NoError(t, svc.SetReferralOffer(context.Background(), tx, d.ID, testutil.TestActor()))
+		member := newShopper(t, tx)
+		member.subscribe(t, tx, domain.SubscriptionStatusActive)
+		assert.Equal(t, "/account/subscriptions", bannerHref(t, tx, svc, member.customer, text))
+	})
+}
+
+// Which refusals forget a promo link's code. Only those true at every
+// checkout, for every shopper, from now on; each other refusal depends on
+// the order, the cart, the session or the email, and a change can fix it.
+func TestCouponDeadEverywhere(t *testing.T) {
+	dead := []error{
+		app.ErrCouponNotFound, app.ErrDiscountNotFound, app.ErrDiscountNotActive,
+		app.ErrDiscountExpired, app.ErrCouponAlreadyUsed,
+	}
+	alive := []error{
+		app.ErrDiscountNotStarted, app.ErrMinimumOrderNotMet, app.ErrCouponSignInRequired,
+		app.ErrCouponSubscribersOnly, app.ErrCouponSignupOnly, app.ErrCouponOneTimeOnly,
+		app.ErrCouponNewSubscribersOnly, app.ErrCouponUsedByCustomer, app.ErrCouponOwnCode,
+	}
+	for _, err := range dead {
+		assert.True(t, app.CouponDeadEverywhere(fmt.Errorf("wrapped: %w", err)), "%v", err)
+	}
+	for _, err := range alive {
+		assert.False(t, app.CouponDeadEverywhere(err), "%v", err)
+	}
+	assert.False(t, app.CouponDeadEverywhere(nil))
 }

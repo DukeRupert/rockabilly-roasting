@@ -9,10 +9,12 @@ function init() {
   // The box, read once from the server-rendered page — never fetched on
   // mount. See storefront.SubscribeLineProps and its json tags for the shape.
   const lines = JSON.parse(target.dataset.lines || '[]');
+  // A code a promo link left (see web/promo_code.go); empty when none.
+  const coupon = target.dataset.coupon || '';
 
   mount(SubscribeApp, {
     target,
-    props: { lines, stripeKey },
+    props: { lines, stripeKey, coupon },
   });
 }
 

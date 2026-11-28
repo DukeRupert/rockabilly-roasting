@@ -614,16 +614,23 @@ func (s *DiscountStore) SetBannerText(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return nil
 }
 
+// BannerDiscount is a live discount with banner copy, and the code its banner
+// link carries ("" when it has no single shared, unspent code).
+type BannerDiscount struct {
+	Discount  domain.Discount
+	PromoCode string
+}
+
 // ListBannerDiscounts returns the live discounts that have banner copy,
 // soonest to end first.
-func (s *DiscountStore) ListBannerDiscounts(ctx context.Context, tx pgx.Tx) ([]domain.Discount, error) {
+func (s *DiscountStore) ListBannerDiscounts(ctx context.Context, tx pgx.Tx) ([]BannerDiscount, error) {
 	rows, err := sqlcgen.New(tx).ListBannerDiscounts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list banner discounts: %w", err)
 	}
-	out := make([]domain.Discount, 0, len(rows))
+	out := make([]BannerDiscount, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, *discountFromRow(r))
+		out = append(out, BannerDiscount{Discount: *discountFromRow(r.Discount), PromoCode: r.PromoCode})
 	}
 	return out, nil
 }

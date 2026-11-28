@@ -605,6 +605,23 @@ type CouponUse struct {
 	SubscriptionSignup bool
 }
 
+// CouponAppliesTo is the kind of order a code's discount works on, without
+// checking any other rule. found is false for a code that does not exist.
+func (s *CheckoutService) CouponAppliesTo(ctx context.Context, tx pgx.Tx, code string) (kind domain.DiscountAppliesTo, found bool, err error) {
+	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, strings.TrimSpace(code))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("get coupon code: %w", err)
+	}
+	discount, err := s.discounts.GetByID(ctx, tx, coupon.DiscountID)
+	if err != nil {
+		return "", false, fmt.Errorf("get discount: %w", err)
+	}
+	return discount.AppliesTo, true, nil
+}
+
 // ApplyCoupon looks a coupon code up and checks it against every rule —
 // see checkCoupon — returning the discount it carries and the code row. The
 // lookup is case-insensitive (handled in SQL), so customers can type codes

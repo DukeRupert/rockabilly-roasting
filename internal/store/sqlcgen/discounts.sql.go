@@ -457,41 +457,54 @@ func (q *Queries) GetReferralDiscount(ctx context.Context) (Discount, error) {
 }
 
 const listBannerDiscounts = `-- name: ListBannerDiscounts :many
-SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at, usage_limit, eligibility, applies_to, is_referral, banner_text FROM discounts
+SELECT discounts.id, discounts.name, discounts.description, discounts.type, discounts.value, discounts.minimum_order_cents, discounts.starts_at, discounts.expires_at, discounts.active, discounts.created_at, discounts.updated_at, discounts.usage_limit, discounts.eligibility, discounts.applies_to, discounts.is_referral, discounts.banner_text,
+       COALESCE((SELECT min(c.code) FROM coupon_codes c
+                 WHERE c.discount_id = discounts.id
+                   AND c.customer_id IS NULL AND c.redeemed_at IS NULL
+                 HAVING count(*) = 1), '')::text AS promo_code
+FROM discounts
 WHERE active AND banner_text <> ''
   AND (starts_at IS NULL OR starts_at <= now())
   AND (expires_at IS NULL OR expires_at > now())
 ORDER BY expires_at ASC NULLS LAST, created_at
 `
 
+type ListBannerDiscountsRow struct {
+	Discount  Discount `json:"discount"`
+	PromoCode string   `json:"promo_code"`
+}
+
 // The live discounts with banner copy, soonest to end first: the offer about
-// to run out is the one worth a shopper's attention.
-func (q *Queries) ListBannerDiscounts(ctx context.Context) ([]Discount, error) {
+// to run out is the one worth a shopper's attention. promo_code is the code
+// the banner link carries: the discount's one shared, unspent code, or empty
+// when there is none or more than one and the link could not pick.
+func (q *Queries) ListBannerDiscounts(ctx context.Context) ([]ListBannerDiscountsRow, error) {
 	rows, err := q.db.Query(ctx, listBannerDiscounts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Discount{}
+	items := []ListBannerDiscountsRow{}
 	for rows.Next() {
-		var i Discount
+		var i ListBannerDiscountsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Description,
-			&i.Type,
-			&i.Value,
-			&i.MinimumOrderCents,
-			&i.StartsAt,
-			&i.ExpiresAt,
-			&i.Active,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.UsageLimit,
-			&i.Eligibility,
-			&i.AppliesTo,
-			&i.IsReferral,
-			&i.BannerText,
+			&i.Discount.ID,
+			&i.Discount.Name,
+			&i.Discount.Description,
+			&i.Discount.Type,
+			&i.Discount.Value,
+			&i.Discount.MinimumOrderCents,
+			&i.Discount.StartsAt,
+			&i.Discount.ExpiresAt,
+			&i.Discount.Active,
+			&i.Discount.CreatedAt,
+			&i.Discount.UpdatedAt,
+			&i.Discount.UsageLimit,
+			&i.Discount.Eligibility,
+			&i.Discount.AppliesTo,
+			&i.Discount.IsReferral,
+			&i.Discount.BannerText,
+			&i.PromoCode,
 		); err != nil {
 			return nil, err
 		}
